@@ -729,7 +729,7 @@ def handle_yaml(data, sourcename, reference, method, tlp, user, email_id=None,
           }
 
     try:
-        converted = yaml.load(data)
+        converted = yaml.safe_load(data)
         if isinstance(converted, dict) == False:
             raise
     except Exception, e:

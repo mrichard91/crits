@@ -690,7 +690,7 @@ class CritsDocument(BaseDocument):
                   :class:`crits.core.crits_mongoengine.CritsBaseAttributes`
         """
 
-        return cls._from_son(yaml.load(yaml_data))
+        return cls._from_son(yaml.safe_load(yaml_data))
 
     def to_yaml(self, exclude=[]):
         """
@@ -701,7 +701,7 @@ class CritsDocument(BaseDocument):
         :returns: json
         """
 
-        return yaml.dump(yaml.load(self._json_yaml_convert(exclude)),
+        return yaml.dump(yaml.safe_load(self._json_yaml_convert(exclude)),
             default_flow_style=False)
 
     def __str__(self):
