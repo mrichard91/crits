@@ -1,0 +1,22 @@
+version: '3.9'
+services:
+  backend:
+    build: ./crits_next/backend
+    environment:
+      - GOOGLE_CLIENT_ID
+      - GOOGLE_CLIENT_SECRET
+      - SESSION_SECRET=change-me
+    volumes:
+      - ./crits_next/backend/app:/app
+    ports:
+      - "8000:8000"
+  frontend:
+    build: ./crits_next/frontend
+    environment:
+      - VITE_BACKEND_URL=http://backend:8000
+    volumes:
+      - ./crits_next/frontend:/app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
