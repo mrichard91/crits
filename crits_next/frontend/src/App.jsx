@@ -1,20 +1,28 @@
-import { gql, useQuery } from '@apollo/client';
-
-const HELLO_QUERY = gql`
-  query Hello {
-    hello
-  }
-`;
+import { GoogleLogin } from '@react-oauth/google';
+import { useState } from 'react';
+import AdminPanel from './AdminPanel';
 
 export default function App() {
-  const { data, loading, error } = useQuery(HELLO_QUERY);
+  const [user, setUser] = useState(null);
 
-  if (loading) return <p>Loading...</p>;
-  if (error) return <p>Error: {error.message}</p>;
+  const handleSuccess = async (credentialResponse) => {
+    const res = await fetch('http://localhost:8000/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: credentialResponse.credential }),
+    });
+    const data = await res.json();
+    setUser(data);
+  };
 
   return (
     <div>
-      <h1>{data.hello}</h1>
+      <h1>CRITs Next User Management</h1>
+      {user ? (
+        <AdminPanel />
+      ) : (
+        <GoogleLogin onSuccess={handleSuccess} onError={() => console.log('Login Failed')} />
+      )}
     </div>
   );
 }
