@@ -48,3 +48,9 @@ If you are looking for a more permanent and performant CRITs installation or jus
 We recommend adding services to your CRITs install. Services extend the features and functionality of the core project allowing you to enhance CRITs based on your needs. You can find more information about how to do this [here](https://github.com/crits/crits/wiki/Adding-services-to-CRITs).
 
 **Thanks for using CRITs!**
+
+## CRITs Next
+
+A new experimental version targeting Python 3.12+ with a React + GraphQL stack is being developed in the [`crits_next`](crits_next/) directory. Contributions are welcome!
+
+
