@@ -30,3 +30,6 @@ INSTALL_RECEIPT.json
 
 # Ignore VirtualEnv
 venv/*
+crits_next/frontend/node_modules/
+crits_next/backend/.venv/
+
