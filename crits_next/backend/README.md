@@ -13,7 +13,7 @@ This is a minimal FastAPI project exposing a GraphQL API using Strawberry.
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+GITHUB_CLIENT_ID=your_id GITHUB_CLIENT_SECRET=your_secret uvicorn app.main:app --reload
 ```
 
 The API will be available at `http://localhost:8000/graphql`.

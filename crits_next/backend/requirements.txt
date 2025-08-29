@@ -1,5 +1,4 @@
 fastapi
 uvicorn
 strawberry-graphql
-google-auth
 requests

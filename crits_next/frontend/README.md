@@ -8,7 +8,7 @@ Install dependencies with your preferred package manager and start the developme
 
 ```bash
 npm install
-npm run dev
+VITE_GITHUB_CLIENT_ID=your_id npm run dev
 ```
 
 The application will be available at `http://localhost:3000` and expects the backend running at `http://localhost:8000`.
