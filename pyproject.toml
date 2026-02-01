@@ -6,7 +6,6 @@ build-backend = "hatchling.build"
 name = "crits"
 version = "5.0.0-dev"
 description = "Collaborative Research Into Threats - Threat Intelligence Platform"
-readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
 authors = [
@@ -63,6 +62,9 @@ dependencies = [
     "python-dateutil>=2.8.0",
     "pyparsing>=3.1.0",
     "pytz>=2024.1",
+
+    # Version parsing (replaces deprecated distutils.version)
+    "packaging>=23.0",
 
     # Configuration
     "PyYAML>=6.0.0",

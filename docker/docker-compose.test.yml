@@ -1,0 +1,27 @@
+# Docker Compose for full CRITs environment validation with MongoDB
+# Usage: make env-test-full
+#
+# This runs the test suite with MongoDB available so CRITs modules can be imported.
+
+services:
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  test:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.test
+    environment:
+      - SKIP_CRITS_MODULES=0
+      - MONGODB_HOST=mongodb
+    depends_on:
+      mongodb:
+        condition: service_healthy

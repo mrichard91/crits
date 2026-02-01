@@ -11,7 +11,7 @@ from pymongo import ReadPreference, MongoClient
 from mongoengine import connect
 from mongoengine import __version__ as mongoengine_version
 
-from distutils.version import StrictVersion
+from packaging.version import Version
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -50,7 +50,7 @@ TEST_RUN = False
 DJANGO_VERSION = django.get_version()
 MONGOENGINE_VERSION = mongoengine_version
 #Check mongoengine version (we got it from import)
-if StrictVersion(mongoengine_version) < StrictVersion('0.10.0'):
+if Version(mongoengine_version) < Version('0.10.0'):
     old_mongoengine = True
     #raise Exception("Mongoengine versions prior to 0.10 are no longer supported! Please see UPDATING!")
 else:
@@ -820,12 +820,12 @@ REMOTE_USER_META = 'REMOTE_USER'
 
 
 
-if StrictVersion(DJANGO_VERSION) < StrictVersion('1.10.0'):
+if Version(DJANGO_VERSION) < Version('1.10.0'):
     MIDDLEWARE_CLASSES = _MIDDLEWARE
 else:
     MIDDLEWARE = _MIDDLEWARE
 
-if StrictVersion(DJANGO_VERSION) < StrictVersion('1.8.0'):
+if Version(DJANGO_VERSION) < Version('1.8.0'):
     print ("Django  versions prior to 1.8.0 are not supported! Please consider upgrading.")
     TEMPLATE_DEBUG = _TEMPLATE_DEBUG
     TEMPLATE_DIRS = _TEMPLATE_DIRS

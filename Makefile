@@ -1,4 +1,4 @@
-.PHONY: help install install-dev sync lock lint format typecheck test run clean migrate shell
+.PHONY: help install install-dev sync lock lint format typecheck test run clean migrate shell env-test env-test-local env-test-full
 
 # Default target
 help:
@@ -20,6 +20,11 @@ help:
 	@echo "  make run          Run development server"
 	@echo "  make migrate      Run database migrations"
 	@echo "  make shell        Open Django shell"
+	@echo ""
+	@echo "Docker:"
+	@echo "  make env-test       Build and run environment validation in Docker"
+	@echo "  make env-test-full  Run full validation with MongoDB (docker-compose)"
+	@echo "  make env-test-local Run environment validation locally"
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  make clean        Remove build artifacts"
@@ -86,6 +91,23 @@ py3-migrate:
 py3-migrate-dry:
 	uv run python scripts/migrate_py2_to_py3.py --dry-run
 
+# Docker environment validation
+env-test:
+	@echo "Building test environment Docker image..."
+	docker build -f docker/Dockerfile.test -t crits-env-test .
+	@echo ""
+	@echo "Running environment validation..."
+	docker run --rm crits-env-test
+
+env-test-full:
+	@echo "Running full environment validation with MongoDB..."
+	docker compose -f docker/docker-compose.test.yml up --build --abort-on-container-exit
+	docker compose -f docker/docker-compose.test.yml down
+
+env-test-local:
+	@echo "Running local environment validation..."
+	uv run python scripts/test_imports.py
+
 # Cleanup
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
@@ -97,3 +119,6 @@ clean:
 	find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name "htmlcov" -exec rm -rf {} + 2>/dev/null || true
 	rm -rf build/ dist/ 2>/dev/null || true
+
+clean-docker:
+	docker rmi crits-env-test 2>/dev/null || true
