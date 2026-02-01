@@ -183,17 +183,17 @@ class Role(CritsDocument, CritsSchemaDocument, Document):
                        'description',
                        'unsupported_attrs']
 
-        for p in self._data.iterkeys():
-            if p in settings.CRITS_TYPES.iterkeys():
+        for p in self._data.keys():
+            if p in settings.CRITS_TYPES.keys():
                 attr = getattr(self, p)
                 # Modify the attributes.
-                for x in attr._data.iterkeys():
+                for x in attr._data.keys():
                     setattr(attr, x, True)
                 # Set the attribute on the ACL.
                 setattr(self, p, attr)
             elif p == "sources":
                 for s in getattr(self, p):
-                    for x in s._data.iterkeys():
+                    for x in s._data.keys():
                         if x != "name":
                             setattr(s, x, True)
             elif p not in dont_modify:

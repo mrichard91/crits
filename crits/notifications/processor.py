@@ -111,12 +111,12 @@ class ChangeParser():
         if len(added_names) > 0:
             added_names = ', '.join(added_names)
             if not isinstance(added_names, unicode):
-                added_names = unicode(added_names, 'utf-8', 'replace')
+                added_names = str(added_names, 'utf-8', 'replace')
             message += "Added to %s: %s. " % (changed_field, added_names)
         if len(removed_names) > 0:
             removed_names = ', '.join(removed_names)
             if not isinstance(removed_names, unicode):
-                removed_names = unicode(removed_names, 'utf-8', 'replace')
+                removed_names = str(removed_names, 'utf-8', 'replace')
             message += "Removed from %s: %s. " % (changed_field, removed_names)
 
         return message
@@ -143,12 +143,12 @@ class ChangeParser():
         if len(added_names) > 0:
             added_names = ', '.join(added_names)
             if not isinstance(added_names, unicode):
-                added_names = unicode(added_names, 'utf-8', 'replace')
+                added_names = str(added_names, 'utf-8', 'replace')
             message += "Added to %s: %s. " % (changed_field, added_names)
         if len(removed_names) > 0:
             removed_names = ', '.join(removed_names)
             if not isinstance(removed_names, unicode):
-                removed_names = unicode(removed_names, 'utf-8', 'replace')
+                removed_names = str(removed_names, 'utf-8', 'replace')
             message += "Removed from %s: %s. " % (changed_field, removed_names)
 
         return message
@@ -346,7 +346,7 @@ class ChangeParser():
     ############################################################################
     @staticmethod
     def actions_summary_handler(object):
-        return "%s - %s" % (object.action_type, unicode(object.date))
+        return "%s - %s" % (object.action_type, str(object.date))
 
     @staticmethod
     def indicator_activity_summary_handler(object):
@@ -359,7 +359,7 @@ class ChangeParser():
     @staticmethod
     def raw_data_highlights_summary_handler(object):
         if not isinstance(object.line_data, unicode):
-            line_data = unicode(object.line_data, 'utf-8', 'replace')
+            line_data = str(object.line_data, 'utf-8', 'replace')
         return "line %s: %s" % (object.line, line_data)
 
     @staticmethod

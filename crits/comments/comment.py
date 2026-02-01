@@ -172,7 +172,7 @@ class Comment(CritsDocument, CritsSchemaDocument, CritsSourceDocument, Document)
         :type url_key: str
         """
 
-        if isinstance(url_key, basestring):
+        if isinstance(url_key, str):
                 self.url_key = url_key
 
 def parse_comment(comment):

@@ -327,7 +327,7 @@ def get_dialog(request):
             dialog = 'error'
             params['error'] = "Dialog does not exist"
 
-    except Exception, e:
+    except Exception as e:
         dialog = 'error'
         params['error'] = 'Error preparing requested dialog'
         logger.warning("Dialog error: %s" % e)
@@ -1293,26 +1293,26 @@ def base_context(request):
             base_context['new_action'] = ActionsForm(initial={'analyst': user,
                 'active': "off",
                 'date': datetime.datetime.now()})
-        except Exception, e:
+        except Exception as e:
             logger.warning("Base Context ActionsForm Error: %s" % e)
 
         # Other info acquired from functions
         try:
             base_context['email_notifications'] = get_user_email_notification(user.username)
-        except Exception, e:
+        except Exception as e:
             logger.warning("Base Context get_user_email_notification Error: %s" % e)
         try:
             base_context['user_notifications'] = get_user_notifications(user.username,
                                                                         count=True)
-        except Exception, e:
+        except Exception as e:
             logger.warning("Base Context get_user_notifications Error: %s" % e)
         try:
             base_context['user_organization'] = get_user_organization(user)
-        except Exception, e:
+        except Exception as e:
             logger.warning("Base Context get_user_organization Error: %s" % e)
         try:
             base_context['user_source_list'] = user_sources(user)
-        except Exception, e:
+        except Exception as e:
             logger.warning("Base Context user_sources Error: %s" % e)
 
         nav_template = get_nav_template(request.user.prefs.nav)
@@ -1332,7 +1332,7 @@ def base_context(request):
     # As said in stable-4, I do not believe that this is neccessary anymore with the current implementation
     #try:
     #    base_context['source_create'] = AddSourceForm()
-    #except Exception, e:
+    #except Exception as e:
     #    logger.warning("Base Context AddSourceForm Error: %s" % e)
 
     base_context['category_list'] = [

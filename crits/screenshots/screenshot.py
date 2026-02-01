@@ -101,7 +101,7 @@ class Screenshot(CritsBaseDocument, CritsSourceDocument, CritsSchemaDocument,
         fs.seek(0)
         self.screenshot = fs.read()
         self.generate_thumbnail(im)
-        if isinstance(tags, basestring):
+        if isinstance(tags, str):
             tlist = tags.split(',')
             self.tags = [t.strip() for t in tlist if len(t.strip())]
         elif isinstance(tags, list):
@@ -116,7 +116,7 @@ class Screenshot(CritsBaseDocument, CritsSourceDocument, CritsSchemaDocument,
         """
 
         tag_list = []
-        if isinstance(tags, basestring):
+        if isinstance(tags, str):
             tag_list = [t.strip() for t in tags.split(',') if len(t.strip())]
         if isinstance(tags, list):
             tag_list = [t.strip() for t in tags if len(t.strip())]

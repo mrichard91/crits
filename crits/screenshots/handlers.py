@@ -150,7 +150,7 @@ def add_screenshot(description, tags, source, method, reference, tlp, analyst,
             screenshot_id = screenshot_id.strip().lower()
             s = Screenshot.objects(id=screenshot_id).first()
             if s:
-                if isinstance(source, basestring) and len(source) > 0:
+                if isinstance(source, str) and len(source) > 0:
                     s_embed = create_embedded_source(source, method=method,
                                                     reference=reference,
                                                     analyst=analyst,
@@ -182,7 +182,7 @@ def add_screenshot(description, tags, source, method, reference, tlp, analyst,
             s.md5 = md5
             screenshot.seek(0)
             s.add_screenshot(screenshot, tags)
-        if isinstance(source, basestring) and len(source) > 0:
+        if isinstance(source, str) and len(source) > 0:
             s_embed = create_embedded_source(source, method=method,
                                              reference=reference,
                                             analyst=analyst,
@@ -202,7 +202,7 @@ def add_screenshot(description, tags, source, method, reference, tlp, analyst,
         try:
             s.save(username=analyst)
             final_screenshots.append(s)
-        except Exception, e:
+        except Exception as e:
             result['message'] = str(e)
             return result
         obj.screenshots.append(str(s.id))
@@ -277,7 +277,7 @@ def delete_screenshot_from_object(obj, oid, sid, analyst):
         klass.save(username=analyst)
         result['success'] = True
         return result
-    except Exception, e:
+    except Exception as e:
         result['message'] = str(e)
         return result
 

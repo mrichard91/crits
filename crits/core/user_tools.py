@@ -62,39 +62,30 @@ def user_sources(user=None):
 
 
 def get_acl_object(crits_type):
-    from crits.vocabulary.acls import *
-    if crits_type == 'Actor':
-        return ActorACL
-    elif crits_type == 'Backdoor':
-        return BackdoorACL
-    elif crits_type == 'Campaign':
-        return CampaignACL
-    elif crits_type == 'Certificate':
-        return CertificateACL
-    elif crits_type == 'Domain':
-        return DomainACL
-    elif crits_type == 'Email':
-        return EmailACL
-    elif crits_type == 'Event':
-        return EventACL
-    elif crits_type == 'Exploit':
-        return ExploitACL
-    elif crits_type == 'Indicator':
-        return IndicatorACL
-    elif crits_type == 'IP':
-        return IPACL
-    elif crits_type == 'PCAP':
-        return PCAPACL
-    elif crits_type == 'RawData':
-        return RawDataACL
-    elif crits_type == 'Sample':
-        return SampleACL
-    elif crits_type == 'Screenshot':
-        return ScreenshotACL
-    elif crits_type == 'Signature':
-        return SignatureACL
-    elif crits_type == 'Target':
-        return TargetACL
+    from crits.vocabulary.acls import (
+        ActorACL, BackdoorACL, CampaignACL, CertificateACL, DomainACL,
+        EmailACL, EventACL, ExploitACL, IndicatorACL, IPACL, PCAPACL,
+        RawDataACL, SampleACL, ScreenshotACL, SignatureACL, TargetACL
+    )
+    acl_map = {
+        'Actor': ActorACL,
+        'Backdoor': BackdoorACL,
+        'Campaign': CampaignACL,
+        'Certificate': CertificateACL,
+        'Domain': DomainACL,
+        'Email': EmailACL,
+        'Event': EventACL,
+        'Exploit': ExploitACL,
+        'Indicator': IndicatorACL,
+        'IP': IPACL,
+        'PCAP': PCAPACL,
+        'RawData': RawDataACL,
+        'Sample': SampleACL,
+        'Screenshot': ScreenshotACL,
+        'Signature': SignatureACL,
+        'Target': TargetACL,
+    }
+    return acl_map.get(crits_type)
 
 
 def sanitize_sources(username, items):
@@ -351,7 +342,7 @@ def subscribe_user(username, stype, oid):
     try:
         user.save()
         return {'success': True}
-    except ValidationError, e:
+    except ValidationError as e:
         return {'success': False,
                 'message': e}
 
@@ -378,7 +369,7 @@ def unsubscribe_user(username, stype, oid):
     try:
         user.save()
         return {'success': True}
-    except ValidationError, e:
+    except ValidationError as e:
         return {'success': False,
                 'message': e}
 
@@ -403,7 +394,7 @@ def subscribe_to_source(username, source):
     try:
         user.save()
         return {'success': True}
-    except ValidationError, e:
+    except ValidationError as e:
         return {'success': False,
                 'message': e}
 
@@ -428,7 +419,7 @@ def unsubscribe_from_source(username, source):
     try:
         user.save()
         return {'success': True}
-    except ValidationError, e:
+    except ValidationError as e:
         return {'success': False,
                 'message': e}
 
@@ -459,7 +450,7 @@ def update_user_preference(username, section, values):
         try:
             user.save()
             return {'success': True }
-        except ValidationError, e:
+        except ValidationError as e:
             return {'success': False,
                     'message': e}
     return {'success': False,
@@ -536,7 +527,7 @@ def toggle_user_preference(username, section, setting, is_enabled=False):
             user.save()
             return {'success': True,
                     'state': opt[param] }
-        except ValidationError, e:
+        except ValidationError as e:
             return {'success': False,
                     'message': e}
     return {'success': False,

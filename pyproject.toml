@@ -1,0 +1,158 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "crits"
+version = "5.0.0-dev"
+description = "Collaborative Research Into Threats - Threat Intelligence Platform"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+authors = [
+    { name = "MITRE Corporation" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: Django :: 4.2",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+]
+dependencies = [
+    # Web Framework (temporary - will migrate to FastAPI)
+    "Django>=4.2,<5.0",
+
+    # MongoDB
+    "mongoengine>=0.28.0",
+    "pymongo>=4.6.0",
+
+    # Task Queue
+    "celery>=5.3.0",
+    "redis>=5.0.0",
+
+    # API Framework (temporary - will migrate to Strawberry GraphQL)
+    "django-tastypie>=0.14.6",
+    "django-tastypie-mongoengine>=0.4.6",
+
+    # Security & Cryptography
+    "cryptography>=42.0.0",
+    "python-magic>=0.4.27",
+    "pydeep>=0.4",
+
+    # XML Processing
+    "lxml>=5.0.0",
+    "defusedxml>=0.7.0",
+
+    # Image Processing
+    "Pillow>=10.0.0",
+
+    # File Format Parsing
+    "biplist>=1.0.3",
+    "olefile>=0.47",
+    "chardet>=5.0.0",
+
+    # HTTP & Networking
+    "requests>=2.31.0",
+
+    # Date/Time & Parsing
+    "python-dateutil>=2.8.0",
+    "pyparsing>=3.1.0",
+    "pytz>=2024.1",
+
+    # Configuration
+    "PyYAML>=6.0.0",
+
+    # TOTP/2FA
+    "qrcode>=7.4.0",
+
+    # Fuzzy Hashing
+    "pyimpfuzzy>=0.5",
+]
+
+[project.optional-dependencies]
+ldap = [
+    "python-ldap>=3.4.0",
+]
+dev = [
+    "ruff>=0.2.0",
+    "mypy>=1.8.0",
+    "pytest>=8.0.0",
+    "pytest-django>=4.8.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "django-debug-toolbar>=4.2.0",
+    "ipython>=8.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/mitre/crits"
+Documentation = "https://github.com/mitre/crits/wiki"
+Repository = "https://github.com/mitre/crits"
+
+[tool.hatch.build.targets.wheel]
+packages = ["crits"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "migrations",
+    "node_modules",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # function call in default argument
+    "SIM108", # ternary operator
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["crits"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "crits.settings"
+python_files = ["test_*.py", "*_test.py"]
+addopts = "-v --tb=short"
+
+[tool.uv]
+dev-dependencies = [
+    "ruff>=0.9.0",
+    "mypy>=1.8.0",
+    "pytest>=8.0.0",
+    "pytest-django>=4.8.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "django-debug-toolbar>=4.2.0",
+    "ipython>=8.0.0",
+]
+
+[tool.uv.sources]
+# Note: pydeep requires ssdeep library to be installed on the system
+# Install on Ubuntu/Debian: apt-get install libfuzzy-dev
+# Install on macOS: brew install ssdeep

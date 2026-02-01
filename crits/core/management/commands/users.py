@@ -167,10 +167,10 @@ class Command(BaseCommand):
             try:
                 user.save()
                 if reset:
-                    print "New temporary password for %s: %s" % (username,
-                                                                 password)
-                print "User %s has been updated!" % username
-            except Exception, e:
+                    print("New temporary password for %s: %s" % (username,
+                                                                 password))
+                print("User %s has been updated!" % username)
+            except Exception as e:
                 raise CommandError("Error saving changes: %s" % str(e))
             if adduser:
                 raise CommandError("User '%s' exists in CRITs!" % username)
@@ -223,7 +223,7 @@ Thank you!
             pw_regex = settings.PASSWORD_COMPLEXITY_REGEX
         rex = re.compile(pw_regex)
         chars = string.letters + string.digits + string.punctuation
-        for i in xrange(20):
+        for i in range(20):
             passwd = ''
             while len(passwd) < 50:
                 passwd += choice(chars)

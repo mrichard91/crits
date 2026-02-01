@@ -324,7 +324,7 @@ def get_verified_field(data, valid_values, field=None, default=None):
     else:
         value_list = [data]
     for i, item in enumerate(value_list):
-        if isinstance(item, basestring):
+        if isinstance(item, str):
             item = item.lower().strip().replace(' - ', '-')
             if item in valid_values:
                 value_list[i] = valid_values[item]
@@ -469,7 +469,7 @@ def handle_indicator_csv(csv_data, ctype, user, source, source_method=None,
                                                related_id=related_id,
                                                related_type=related_type,
                                                relationship_type=relationship_type)
-        except Exception, e:
+        except Exception as e:
             result['success'] = False
             result_message += msg % (processed + 1, e)
             continue
@@ -605,7 +605,7 @@ def handle_indicator_ind(value, source, ctype, threat_type, attack_type,
                                            add_relationship=add_relationship, cache=cache,
                                            related_id=related_id, related_type=related_type,
                                            relationship_type=relationship_type)
-        except Exception, e:
+        except Exception as e:
             return {'success': False, 'message': repr(e)}
 
     return result
@@ -728,7 +728,7 @@ def handle_indicator_insert(ind, source, source_reference=None, source_method=No
                                        append=True)
 
     if 'campaign' in ind:
-        if isinstance(ind['campaign'], basestring) and len(ind['campaign']) > 0:
+        if isinstance(ind['campaign'], str) and len(ind['campaign']) > 0:
             confidence = ind.get('campaign_confidence', 'low')
             ind['campaign'] = EmbeddedCampaign(name=ind['campaign'],
                                                confidence=confidence,
@@ -764,7 +764,7 @@ def handle_indicator_insert(ind, source, source_reference=None, source_method=No
             indicator.add_ticket(ticket, user.username)
 
     # generate new source information and add to indicator
-    if isinstance(source, basestring) and source:
+    if isinstance(source, str) and source:
         if user.check_source_write(source):
             indicator.add_source(source=source, method=source_method,
                                  reference=source_reference, analyst=user.username, tlp=source_tlp)
@@ -1002,7 +1002,7 @@ def modify_threat_types(id_, threat_types, user, **kwargs):
     """
 
     indicator = Indicator.objects(id=id_).first()
-    if isinstance(threat_types, basestring):
+    if isinstance(threat_types, str):
         threat_types = threat_types.split(',')
     for t in threat_types:
         if t not in IndicatorThreatTypes.values():
@@ -1029,7 +1029,7 @@ def modify_attack_types(id_, attack_types, user, **kwargs):
     """
 
     indicator = Indicator.objects(id=id_).first()
-    if isinstance(attack_types, basestring):
+    if isinstance(attack_types, str):
         attack_types = attack_types.split(',')
     for a in attack_types:
         if a not in IndicatorAttackTypes.values():
@@ -1093,7 +1093,7 @@ def activity_add(id_, activity, user, **kwargs):
         indicator.save(username=user.username)
         return {'success': True, 'object': activity,
                 'id': str(indicator.id)}
-    except ValidationError, e:
+    except ValidationError as e:
         return {'success': False, 'message': e,
                 'id': str(indicator.id)}
 
@@ -1129,7 +1129,7 @@ def activity_update(id_, activity, user=None, **kwargs):
                                 activity['date'])
         indicator.save(username=user.username)
         return {'success': True, 'object': activity}
-    except ValidationError, e:
+    except ValidationError as e:
         return {'success': False, 'message': e}
 
 def activity_remove(id_, date, user, **kwargs):
@@ -1155,7 +1155,7 @@ def activity_remove(id_, date, user, **kwargs):
         indicator.delete_activity(date)
         indicator.save(username=user.username)
         return {'success': True}
-    except ValidationError, e:
+    except ValidationError as e:
         return {'success': False, 'message': e}
 
 def ci_update(id_, ci_type, value, user, **kwargs):
@@ -1185,7 +1185,7 @@ def ci_update(id_, ci_type, value, user, **kwargs):
                 indicator.set_impact(user.username, value)
             indicator.save(username=user.username)
             return {'success': True}
-        except ValidationError, e:
+        except ValidationError as e:
             return {'success': False, "message": e}
     else:
         return {'success': False, 'message': 'Invalid CI type'}
@@ -1261,7 +1261,7 @@ def create_indicator_and_ip(type_, id_, ip, user):
                 return {'success': True, 'message': rels, 'value': obj_class.id}
             else:
                 return {'success': False, 'message': message['message']}
-        except Exception, e:
+        except Exception as e:
             return {'success': False, 'message': e}
     else:
         return {'success': False,

@@ -63,7 +63,7 @@ class CRITsConfig(CritsDocument, Document):
     log_directory = StringField(default=os.path.join(settings.SITE_ROOT, '..', 'logs'))
     log_level = StringField(default='INFO')
     password_complexity_desc = StringField(default='8 characters, at least 1 capital, 1 lowercase and 1 number/special')
-    password_complexity_regex = StringField(default='(?=^.{8,}$)((?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*$')
+    password_complexity_regex = StringField(default=r'(?=^.{8,}$)((?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*$')
     query_caching = BooleanField(default=False)
     rel_max = IntField(default=50)
     remote_user = BooleanField(default=False)
