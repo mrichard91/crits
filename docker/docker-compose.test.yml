@@ -6,8 +6,8 @@
 services:
   mongodb:
     image: mongo:7
-    ports:
-      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=crits
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 5s
@@ -20,8 +20,16 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.test
     environment:
+      # Don't skip CRITs modules - we have MongoDB
       - SKIP_CRITS_MODULES=0
+      # Point to MongoDB container
+      - MONGO_HOST=mongodb
+      - MONGO_PORT=27017
+      - MONGO_DATABASE=crits-test
       - MONGODB_HOST=mongodb
     depends_on:
       mongodb:
         condition: service_healthy
+    # Give MongoDB time to fully initialize
+    command: >
+      sh -c "sleep 2 && uv run python scripts/test_imports.py"

@@ -24,8 +24,10 @@ from typing import Tuple
 from contextlib import contextmanager
 
 # Check if we should skip CRITs modules (no MongoDB available)
-SKIP_CRITS_MODULES = os.environ.get('SKIP_CRITS_MODULES', '').lower() in ('1', 'true', 'yes')
-MONGODB_HOST = os.environ.get('MONGODB_HOST', 'localhost')
+SKIP_CRITS_MODULES = os.environ.get('SKIP_CRITS_MODULES', '0').lower() in ('1', 'true', 'yes')
+# Support both MONGODB_HOST (test script) and MONGO_HOST (CRITs settings)
+MONGODB_HOST = os.environ.get('MONGODB_HOST') or os.environ.get('MONGO_HOST', 'localhost')
+MONGODB_PORT = int(os.environ.get('MONGO_PORT', 27017))
 
 
 class TimeoutError(Exception):
@@ -161,18 +163,22 @@ def main():
     print(f"\n{BOLD}MongoDB Connectivity:{RESET}")
 
     mongodb_available = False
+    mongo_addr = f"{MONGODB_HOST}:{MONGODB_PORT}"
     try:
         from pymongo import MongoClient
-        with timeout(5):
-            client = MongoClient(MONGODB_HOST, 27017, serverSelectionTimeoutMS=3000)
+        with timeout(10):
+            client = MongoClient(MONGODB_HOST, MONGODB_PORT, serverSelectionTimeoutMS=5000)
             client.server_info()  # Will raise exception if cannot connect
             mongodb_available = True
-            print_result(f"MongoDB connection ({MONGODB_HOST}:27017)", True)
+            print_result(f"MongoDB connection ({mongo_addr})", True)
             results["passed"] += 1
             client.close()
     except Exception as e:
-        print(f"  {YELLOW}○{RESET} MongoDB connection ({MONGODB_HOST}:27017) - not available")
-        print(f"    {YELLOW}└─ CRITs module imports will be skipped{RESET}")
+        if SKIP_CRITS_MODULES:
+            print(f"  {YELLOW}○{RESET} MongoDB connection ({mongo_addr}) - skipped (SKIP_CRITS_MODULES=1)")
+        else:
+            print(f"  {YELLOW}○{RESET} MongoDB connection ({mongo_addr}) - not available")
+            print(f"    {YELLOW}└─ {e}{RESET}")
         results["warnings"] += 1
 
     # ==========================================================================
@@ -199,7 +205,7 @@ def main():
         ]
 
         for module, desc in crits_core:
-            success, error = test_import(module, timeout_secs=10)
+            success, error = test_import(module, timeout_secs=30)
             print_result(f"{module}", success, error)
             if success:
                 results["passed"] += 1
@@ -241,7 +247,7 @@ def main():
         ]
 
         for module in tlo_modules:
-            success, error = test_import(module, timeout_secs=10)
+            success, error = test_import(module, timeout_secs=30)
             print_result(module, success, error)
             if success:
                 results["passed"] += 1

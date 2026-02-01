@@ -100,13 +100,14 @@ DATABASES = {
 # MongoDB Default Configuration
 # Tip: To change database settings, override by using
 #      template from config/database_example.py
-MONGO_HOST = 'localhost'                          # server to connect to
-MONGO_PORT = 27017                                # port MongoD is running on
-MONGO_DATABASE = 'crits'                          # database name to connect to
-MONGO_SSL = False                                 # whether MongoD has SSL enabled
-MONGO_USER = ''                                   # username used to authenticate to mongo (normally empty)
-MONGO_PASSWORD = ''                               # password for the mongo user
-MONGO_REPLICASET = None                           # Name of RS, if mongod in replicaset
+#      or set environment variables: MONGO_HOST, MONGO_PORT, MONGO_DATABASE
+MONGO_HOST = os.environ.get('MONGO_HOST', 'localhost')  # server to connect to
+MONGO_PORT = int(os.environ.get('MONGO_PORT', 27017))   # port MongoD is running on
+MONGO_DATABASE = os.environ.get('MONGO_DATABASE', 'crits')  # database name to connect to
+MONGO_SSL = os.environ.get('MONGO_SSL', '').lower() in ('true', '1', 'yes')  # whether MongoD has SSL enabled
+MONGO_USER = os.environ.get('MONGO_USER', '')           # username used to authenticate to mongo
+MONGO_PASSWORD = os.environ.get('MONGO_PASSWORD', '')   # password for the mongo user
+MONGO_REPLICASET = os.environ.get('MONGO_REPLICASET') or None  # Name of RS, if mongod in replicaset
 
 # File storage backends
 S3 = "S3"
@@ -123,7 +124,8 @@ BUCKET_SAMPLES = "samples"
 # Import custom Database config
 dbfile = os.path.join(SITE_ROOT, 'config/database.py')
 if os.path.exists(dbfile):
-    execfile(dbfile)
+    with open(dbfile) as f:
+        exec(compile(f.read(), dbfile, 'exec'))
 
 if TEST_RUN:
     MONGO_DATABASE = 'crits-unittest'
@@ -850,4 +852,5 @@ else:
 # Import custom settings if it exists
 csfile = os.path.join(SITE_ROOT, 'config/overrides.py')
 if os.path.exists(csfile):
-    execfile(csfile)
+    with open(csfile) as f:
+        exec(compile(f.read(), csfile, 'exec'))
