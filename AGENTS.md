@@ -621,10 +621,93 @@ if TYPE_CHECKING:
 
 ---
 
+## Environment Testing
+
+### Running Environment Tests
+
+**IMPORTANT**: Always run the full environment test after making changes to:
+- Python imports or module structure
+- Dependencies in `pyproject.toml`
+- Django settings or configuration
+- Any code that affects module loading
+
+```bash
+# Quick test (no MongoDB, just dependency validation)
+make env-test
+
+# Full test with MongoDB (recommended - catches more issues)
+make env-test-full
+```
+
+### What the Tests Validate
+
+The environment test (`scripts/test_imports.py`) validates:
+
+1. **Core Dependencies** (19 packages): Django, mongoengine, pymongo, celery, redis, cryptography, lxml, Pillow, requests, yaml, dateutil, pytz, defusedxml, chardet, olefile, biplist, qrcode, magic, pyparsing
+
+2. **Optional Dependencies** (3 packages): pydeep, pyimpfuzzy, python-ldap
+
+3. **MongoDB Connectivity**: Verifies connection to MongoDB
+
+4. **CRITs Core Modules** (9 modules): crits, crits.core, crits.core.crits_mongoengine, crits.core.fields, crits.core.user, crits.core.role, crits.core.handlers, crits.core.data_tools, crits.core.mongo_tools
+
+5. **CRITs TLO Modules** (22 modules): All top-level object modules (actors, samples, indicators, etc.)
+
+6. **Django Configuration**: Verifies Django settings load correctly
+
+### Updating the Test Script
+
+When you encounter import issues during development, **add them to the test script** to prevent regressions:
+
+```python
+# In scripts/test_imports.py
+
+# Add new core dependencies to validate
+core_deps = [
+    ("new_package", "Description of package"),
+    # ...
+]
+
+# Add new CRITs modules that should be importable
+crits_core = [
+    ("crits.new_module", "Description"),
+    # ...
+]
+```
+
+### Common Python 2→3 Import Fixes
+
+The migration script (`scripts/migrate_py2_to_py3.py`) handles many cases, but watch for:
+
+| Python 2 | Python 3 |
+|----------|----------|
+| `import HTMLParser` | `import html.parser` |
+| `from urlparse import urlparse` | `from urllib.parse import urlparse` |
+| `import ConfigParser` | `import configparser` |
+| `import cPickle` | `import pickle` |
+| `from StringIO import StringIO` | `from io import StringIO` |
+| `import httplib` | `import http.client` |
+| `import urllib2` | `import urllib.request` |
+| `from django.utils.http import urlunquote` | `from urllib.parse import unquote` |
+
+### Django 4.x Compatibility
+
+Watch for deprecated Django imports:
+
+| Deprecated | Replacement |
+|------------|-------------|
+| `django.utils.http.urlunquote` | `urllib.parse.unquote` |
+| `django.utils.http.is_safe_url` | `django.utils.http.url_has_allowed_host_and_scheme` |
+| `django.core.urlresolvers` | `django.urls` |
+| `django.utils.encoding.force_text` | `django.utils.encoding.force_str` |
+
+---
+
 ## Validation Checklist
 
 Before marking any phase complete:
 
+- [ ] **`make env-test-full` passes** (all imports work)
 - [ ] All tests pass
 - [ ] No ruff/eslint errors
 - [ ] Type checking passes (mypy/tsc)

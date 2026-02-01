@@ -67,7 +67,7 @@ easier it will be to look over and accept them when they are ready!
 
 ## Branch locally and develop!
 Make a branch in your cloned fork. We suggest naming the branch by feature name
-or “issue_XX” where XX is the issue number the branch is associated with. Make
+or "issue_XX" where XX is the issue number the branch is associated with. Make
 your changes in your branch and test thoroughly. If this is a large feature you
 can push your branch to your fork often. This allows you to request feedback for
 how things are progressing instead of dumping a large code change all at once.
@@ -76,6 +76,29 @@ When making commits to your branch, make sure you write [well-formed][wf] commit
 messages.
 
 [wf]: https://github.com/erlang/otp/wiki/Writing-good-commit-messages
+
+## Run Environment Tests
+
+Before submitting a PR, always run the environment validation tests:
+
+```bash
+# Full test with MongoDB (recommended)
+make env-test-full
+
+# Quick test without MongoDB
+make env-test
+```
+
+These tests validate that all Python dependencies can be imported and that CRITs
+modules load correctly. This catches many common issues:
+
+- Missing dependencies
+- Python 2→3 import compatibility issues
+- Django configuration problems
+- Circular imports
+
+If you add new dependencies or modify imports, consider updating the test script
+(`scripts/test_imports.py`) to catch regressions in the future.
 
 ## Submit a PR
 Once you are happy with your changes and ready for a PR, you can submit a PR to
