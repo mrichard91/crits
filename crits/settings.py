@@ -11,7 +11,7 @@ from pymongo import ReadPreference, MongoClient
 from mongoengine import connect
 from mongoengine import __version__ as mongoengine_version
 
-from distutils.version import StrictVersion
+from packaging.version import Version
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -50,7 +50,7 @@ TEST_RUN = False
 DJANGO_VERSION = django.get_version()
 MONGOENGINE_VERSION = mongoengine_version
 #Check mongoengine version (we got it from import)
-if StrictVersion(mongoengine_version) < StrictVersion('0.10.0'):
+if Version(mongoengine_version) < Version('0.10.0'):
     old_mongoengine = True
     #raise Exception("Mongoengine versions prior to 0.10 are no longer supported! Please see UPDATING!")
 else:
@@ -100,13 +100,14 @@ DATABASES = {
 # MongoDB Default Configuration
 # Tip: To change database settings, override by using
 #      template from config/database_example.py
-MONGO_HOST = 'localhost'                          # server to connect to
-MONGO_PORT = 27017                                # port MongoD is running on
-MONGO_DATABASE = 'crits'                          # database name to connect to
-MONGO_SSL = False                                 # whether MongoD has SSL enabled
-MONGO_USER = ''                                   # username used to authenticate to mongo (normally empty)
-MONGO_PASSWORD = ''                               # password for the mongo user
-MONGO_REPLICASET = None                           # Name of RS, if mongod in replicaset
+#      or set environment variables: MONGO_HOST, MONGO_PORT, MONGO_DATABASE
+MONGO_HOST = os.environ.get('MONGO_HOST', 'localhost')  # server to connect to
+MONGO_PORT = int(os.environ.get('MONGO_PORT', 27017))   # port MongoD is running on
+MONGO_DATABASE = os.environ.get('MONGO_DATABASE', 'crits')  # database name to connect to
+MONGO_SSL = os.environ.get('MONGO_SSL', '').lower() in ('true', '1', 'yes')  # whether MongoD has SSL enabled
+MONGO_USER = os.environ.get('MONGO_USER', '')           # username used to authenticate to mongo
+MONGO_PASSWORD = os.environ.get('MONGO_PASSWORD', '')   # password for the mongo user
+MONGO_REPLICASET = os.environ.get('MONGO_REPLICASET') or None  # Name of RS, if mongod in replicaset
 
 # File storage backends
 S3 = "S3"
@@ -123,7 +124,8 @@ BUCKET_SAMPLES = "samples"
 # Import custom Database config
 dbfile = os.path.join(SITE_ROOT, 'config/database.py')
 if os.path.exists(dbfile):
-    execfile(dbfile)
+    with open(dbfile) as f:
+        exec(compile(f.read(), dbfile, 'exec'))
 
 if TEST_RUN:
     MONGO_DATABASE = 'crits-unittest'
@@ -820,12 +822,12 @@ REMOTE_USER_META = 'REMOTE_USER'
 
 
 
-if StrictVersion(DJANGO_VERSION) < StrictVersion('1.10.0'):
+if Version(DJANGO_VERSION) < Version('1.10.0'):
     MIDDLEWARE_CLASSES = _MIDDLEWARE
 else:
     MIDDLEWARE = _MIDDLEWARE
 
-if StrictVersion(DJANGO_VERSION) < StrictVersion('1.8.0'):
+if Version(DJANGO_VERSION) < Version('1.8.0'):
     print ("Django  versions prior to 1.8.0 are not supported! Please consider upgrading.")
     TEMPLATE_DEBUG = _TEMPLATE_DEBUG
     TEMPLATE_DIRS = _TEMPLATE_DIRS
@@ -850,4 +852,5 @@ else:
 # Import custom settings if it exists
 csfile = os.path.join(SITE_ROOT, 'config/overrides.py')
 if os.path.exists(csfile):
-    execfile(csfile)
+    with open(csfile) as f:
+        exec(compile(f.read(), csfile, 'exec'))

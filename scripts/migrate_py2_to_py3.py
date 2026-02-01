@@ -120,6 +120,11 @@ def fix_basestring(content: str) -> str:
     return re.sub(r'\bbasestring\b', 'str', content)
 
 
+def fix_string_module(content: str) -> str:
+    """Convert string.letters to string.ascii_letters (Python 3)"""
+    return re.sub(r'\bstring\.letters\b', 'string.ascii_letters', content)
+
+
 def fix_has_key(content: str) -> str:
     """Convert dict.has_key(x) to x in dict"""
     # This is tricky - we need to handle: some_dict.has_key(key) → key in some_dict
@@ -164,6 +169,7 @@ def fix_file(filepath: Path, dry_run: bool = False) -> tuple[bool, list[str]]:
         ('xrange', fix_xrange),
         ('unicode', fix_unicode),
         ('basestring', fix_basestring),
+        ('string.letters', fix_string_module),
         ('has_key', fix_has_key),
         ('__future__ imports', remove_future_imports),
     ]

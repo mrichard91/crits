@@ -222,7 +222,7 @@ Thank you!
         else:
             pw_regex = settings.PASSWORD_COMPLEXITY_REGEX
         rex = re.compile(pw_regex)
-        chars = string.letters + string.digits + string.punctuation
+        chars = string.ascii_letters + string.digits + string.punctuation
         for i in range(20):
             passwd = ''
             while len(passwd) < 50:

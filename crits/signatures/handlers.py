@@ -1,7 +1,7 @@
 import datetime
 import hashlib
 import json
-import HTMLParser
+import html.parser
 
 try:
     from django.urls import reverse
@@ -619,7 +619,7 @@ def update_dependency(type_, id_, dep, user, append=False, **kwargs):
 
     # Have to unescape the submitted data. Use unescape() to escape
     # &lt; and friends. Use urllib2.unquote() to escape %3C and friends.
-    h = HTMLParser.HTMLParser()
+    h = html.parser.HTMLParser()
     data_type_dependency = h.unescape(dep)
     try:
         deps = data_type_dependency.split(',')
@@ -668,7 +668,7 @@ def update_min_version(type_, id_, data_type_min_version, user, **kwargs):
 
     # Have to unescape the submitted data. Use unescape() to escape
     # &lt; and friends. Use urllib2.unquote() to escape %3C and friends.
-    h = HTMLParser.HTMLParser()
+    h = html.parser.HTMLParser()
     data_type_min_version = h.unescape(data_type_min_version)
     try:
         obj.data_type_min_version = data_type_min_version
@@ -707,7 +707,7 @@ def update_max_version(type_, id_, data_type_max_version, user, **kwargs):
 
     # Have to unescape the submitted data. Use unescape() to escape
     # &lt; and friends. Use urllib2.unquote() to escape %3C and friends.
-    h = HTMLParser.HTMLParser()
+    h = html.parser.HTMLParser()
     data_type_max_version = h.unescape(data_type_max_version)
     try:
         obj.data_type_max_version = data_type_max_version
@@ -759,7 +759,7 @@ def update_signature_data(type_, id_, data, user, **kwargs):
 
     # Have to unescape the submitted data. Use unescape() to escape
     # &lt; and friends. Use urllib2.unquote() to escape %3C and friends.
-    h = HTMLParser.HTMLParser()
+    h = html.parser.HTMLParser()
     data = h.unescape(data)
     try:
         obj.data = data
@@ -797,7 +797,7 @@ def update_title(type_, id_, title, user, **kwargs):
 
     # Have to unescape the submitted data. Use unescape() to escape
     # &lt; and friends. Use urllib2.unquote() to escape %3C and friends.
-    h = HTMLParser.HTMLParser()
+    h = html.parser.HTMLParser()
     data = h.unescape(title)
     try:
         obj.title = data

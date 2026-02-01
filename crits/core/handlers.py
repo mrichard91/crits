@@ -1,14 +1,14 @@
 import cgi
 import os
 import datetime
-import HTMLParser
+import html.parser
 import json
 import logging
 import re
-import ushlex as shlex
+import shlex
 import urllib
 
-from urlparse import urlparse
+from urllib.parse import urlparse
 from bson.objectid import ObjectId
 from django.conf import settings
 
@@ -27,7 +27,12 @@ from django.http import HttpResponse
 from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.utils.html import escape as html_escape
-from django.utils.http import urlencode, urlunquote, is_safe_url
+from django.utils.http import urlencode
+from urllib.parse import unquote as urlunquote
+try:
+    from django.utils.http import url_has_allowed_host_and_scheme as is_safe_url
+except ImportError:
+    from django.utils.http import is_safe_url
 
 try:
     from mongoengine.base import ValidationError
@@ -244,7 +249,7 @@ def description_update(type_, id_, description, user, **kwargs):
 
     # Have to unescape the submitted data. Use unescape() to escape
     # &lt; and friends. Use urllib2.unquote() to escape %3C and friends.
-    h = HTMLParser.HTMLParser()
+    h = html.parser.HTMLParser()
     description = h.unescape(description)
     try:
         obj.description = description
@@ -282,7 +287,7 @@ def data_update(type_, id_, data, analyst):
 
     # Have to unescape the submitted data. Use unescape() to escape
     # &lt; and friends. Use urllib2.unquote() to escape %3C and friends.
-    h = HTMLParser.HTMLParser()
+    h = html.parser.HTMLParser()
     data = h.unescape(data)
     try:
         obj.data = data
@@ -2214,7 +2219,7 @@ def get_query(col_obj,request):
         otype = request.GET.get('otype', None)
         if otype:
             search_type = search_type + "_" + otype
-        term = HTMLParser.HTMLParser().unescape(term)
+        term = html.parser.HTMLParser().unescape(term)
         qdict = gen_global_query(col_obj,
                                  request.user.username,
                                  term,

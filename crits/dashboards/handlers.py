@@ -26,7 +26,7 @@ from django.http import HttpRequest
 from crits.dashboards.utilities import getHREFLink, get_obj_name_from_title, get_obj_type_from_string
 
 from crits.vocabulary.acls import EmailACL, SampleACL, IndicatorACL, CampaignACL
-import HTMLParser
+import html.parser
 
 def get_dashboard(user,dashId=None):
     """
@@ -282,7 +282,7 @@ def save_data(userId, columns, tableName, searchTerm="", objType="", sortBy=None
     """
     try:
         if searchTerm:
-            searchTerm = HTMLParser.HTMLParser().unescape(searchTerm)
+            searchTerm = html.parser.HTMLParser().unescape(searchTerm)
         #if user is editing a table
         if tableId :
             newSavedSearch = SavedSearch.objects(id=tableId).first()

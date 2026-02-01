@@ -1,0 +1,64 @@
+# Test Dockerfile for CRITs Python 3.12 environment validation
+# Usage: make env-test
+#
+# This Dockerfile validates that all Python dependencies can be installed
+# and imported correctly. CRITs module imports require MongoDB, so those
+# are skipped in this basic validation (use docker-compose for full test).
+
+FROM python:3.12-slim-bookworm
+
+LABEL maintainer="CRITs Development Team"
+LABEL description="CRITs environment validation container"
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+# Set to 1 to skip CRITs module imports (when no MongoDB available)
+ENV SKIP_CRITS_MODULES=0
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Build essentials for compiling Python packages
+    build-essential \
+    gcc \
+    g++ \
+    # For cryptography package
+    libffi-dev \
+    libssl-dev \
+    # For lxml package
+    libxml2-dev \
+    libxslt1-dev \
+    # For Pillow package
+    libjpeg-dev \
+    zlib1g-dev \
+    libpng-dev \
+    # For python-magic
+    libmagic1 \
+    # For fuzzy hashing (pydeep, pyimpfuzzy)
+    libfuzzy-dev \
+    # For python-ldap (optional)
+    libldap2-dev \
+    libsasl2-dev \
+    # General utilities
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv for fast package management
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Set working directory
+WORKDIR /app
+
+# Copy project files
+COPY pyproject.toml uv.lock ./
+COPY crits/ ./crits/
+COPY scripts/ ./scripts/
+
+# Install dependencies including all optional extras
+# Use --frozen to use exact versions from lockfile
+RUN uv sync --frozen --extra fuzzy --extra ldap
+
+# Run the import test
+CMD ["uv", "run", "python", "scripts/test_imports.py"]
