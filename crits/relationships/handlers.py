@@ -70,7 +70,7 @@ def forge_relationship(type_=None, id_=None,
 
     if rel_date == 'None':
         rel_date = None
-    elif isinstance(rel_date, basestring) and rel_date != '':
+    elif isinstance(rel_date, str) and rel_date != '':
         rel_date = parse(rel_date, fuzzy=True)
     elif not isinstance(rel_date, datetime.datetime):
         rel_date = None
@@ -162,7 +162,7 @@ def delete_relationship(left_class=None, right_class=None,
 
     if rel_date is None or rel_date == 'None':
         rel_date = None
-    elif isinstance(rel_date, basestring) and rel_date != '':
+    elif isinstance(rel_date, str) and rel_date != '':
         rel_date = parse(rel_date, fuzzy=True)
     elif not isinstance(rel_date, datetime.datetime):
         rel_date = None
@@ -232,7 +232,7 @@ def update_relationship_types(left_class=None, right_class=None,
 
     if rel_date is None or rel_date == 'None':
         rel_date = None
-    elif isinstance(rel_date, basestring) and rel_date != '':
+    elif isinstance(rel_date, str) and rel_date != '':
         rel_date = parse(rel_date, fuzzy=True)
     elif not isinstance(rel_date, datetime.datetime):
         rel_date = None
@@ -305,7 +305,7 @@ def update_relationship_confidences(left_class=None, right_class=None,
     """
     if rel_date is None or rel_date == 'None':
         rel_date = None
-    elif isinstance(rel_date, basestring) and rel_date != '':
+    elif isinstance(rel_date, str) and rel_date != '':
         rel_date = parse(rel_date, fuzzy=True)
     elif not isinstance(rel_date, datetime.datetime):
         rel_date = None
@@ -371,7 +371,7 @@ def update_relationship_reasons(left_class=None, right_class=None,
     """
     if rel_date is None or rel_date == 'None':
         rel_date = None
-    elif isinstance(rel_date, basestring) and rel_date != '':
+    elif isinstance(rel_date, str) and rel_date != '':
         rel_date = parse(rel_date, fuzzy=True)
     elif not isinstance(rel_date, datetime.datetime):
         rel_date = None
@@ -440,14 +440,14 @@ def update_relationship_dates(left_class=None, right_class=None,
 
     if rel_date is None or rel_date == 'None':
         rel_date = None
-    elif isinstance(rel_date, basestring) and rel_date != '':
+    elif isinstance(rel_date, str) and rel_date != '':
         rel_date = parse(rel_date, fuzzy=True)
     elif not isinstance(rel_date, datetime.datetime):
         rel_date = None
 
     if new_date is None or new_date == 'None':
         new_date = None
-    elif isinstance(new_date, basestring) and new_date != '':
+    elif isinstance(new_date, str) and new_date != '':
         new_date = parse(new_date, fuzzy=True)
     elif not isinstance(new_date, datetime.datetime):
         new_date = None

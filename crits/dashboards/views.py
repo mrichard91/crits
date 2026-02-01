@@ -132,7 +132,7 @@ def save_search(request):
         else:
             errorMessage = "Error finding dashboard. Please refresh and try again."
     except Exception as e:
-        print e
+        print(e)
         errorMessage = "You already have a dashboard with that name."
     if errorMessage:
         return respondWithError(errorMessage, True)
@@ -291,7 +291,7 @@ def delete_dashboard(request):
         if not response:
             raise("Could not find table")
     except Exception as e:
-        print e
+        print(e)
         return respondWithError("An error occured while deleting dashboard. Please try again later.", True)
 
     return respondWithSuccess(response+" deleted successfully.")
@@ -307,7 +307,7 @@ def rename_dashboard(request):
         if type(response) == str:
             return respondWithError(response, True)
     except Exception as e:
-        print e
+        print(e)
         return respondWithError("An error occured while renaming dashboard. Please try again later.", True)
     return respondWithSuccess("Dashboard renamed successfully")
 

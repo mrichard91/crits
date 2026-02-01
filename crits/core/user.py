@@ -856,7 +856,7 @@ class CRITsUser(CritsDocument, CritsSchemaDocument, Document):
                               config.ldap_userdn)
         elif "@" in config.ldap_userdn:
             un = "%s%s" % (self.username, config.ldap_userdn)
-	try:
+        try:
             # Try auth bind first
             l.simple_bind_s(un, password)
             logger.info("Bound to LDAP for: %s" % un)
@@ -992,7 +992,7 @@ class CRITsUser(CritsDocument, CritsSchemaDocument, Document):
         # for each role, modify the acl object to reflect all of the attributes
         # the user should be granted access to.
         for r in roles:
-            for p,v in r._data.iteritems():
+            for p,v in r._data.items():
                 if p in ['name', 'description', 'active', 'id']:
                     # No need to worry about these. Added benefit of
                     # throwing a validation error since there is no name
@@ -1009,7 +1009,7 @@ class CRITsUser(CritsDocument, CritsSchemaDocument, Document):
                         found = False
                         for src in acl['sources']:
                             if s.name == src.name:
-                                for x,y in s._data.iteritems():
+                                for x,y in s._data.items():
                                     if not acl['sources'][c].get(x, True):
                                         acl['sources'][c][x] = y
                                 found = True
@@ -1017,7 +1017,7 @@ class CRITsUser(CritsDocument, CritsSchemaDocument, Document):
                             c += 1
                         if not found:
                             acl['sources'].append(s)
-                elif p in settings.CRITS_TYPES.iterkeys():
+                elif p in settings.CRITS_TYPES.keys():
                     # For each CRITs Type adjust the attributes based on which
                     # ones the # user should get access to.
 
@@ -1025,7 +1025,7 @@ class CRITsUser(CritsDocument, CritsSchemaDocument, Document):
                     attr = acl.get(p, False)
 
                     # Modify the attributes.
-                    for x,y in getattr(r, p)._data.iteritems():
+                    for x,y in getattr(r, p)._data.items():
                         if not getattr(attr, x, False):
                             setattr(attr, x, y)
 
@@ -1075,14 +1075,14 @@ class CRITsUser(CritsDocument, CritsSchemaDocument, Document):
         attributes to allow for functions that act dynamically on multiple TLOs
         to be able to do so without huge if blocks. Example from above:
 
-            for x in settings.CRITS_TYPES.iterkeys():
+            for x in settings.CRITS_TYPES.keys():
                 if (X.has_access_to('%s.read' % x)
                     and X.has_access_to('%s.bucketlist_read' % x):
 
         Is much cleaner than:
 
             acl = X.get_access_list()
-            for x in settings.CRITS_TYPES.iterkeys():
+            for x in settings.CRITS_TYPES.keys():
                 if (getattr(getattr(acl, x), 'read')
                     and getattr(getattr(acl, x), 'bucketlist_read'))
 
@@ -1234,16 +1234,16 @@ class CRITsAuthBackend(object):
                     l.set_option(ldap.OPT_TIMEOUT, 10)
                     # two-step ldap binding
                     if len(config.ldap_bind_dn) > 0:
-                    	try:
-                    		logger.info("binding with bind_dn: %s" % config.ldap_bind_dn)
-                    		l.simple_bind_s(config.ldap_bind_dn, config.ldap_bind_password)
-                    		filter = '(|(cn='+fusername+')(uid='+fusername+')(mail='+fusername+'))'
-                    		# use the retrieved dn for the second bind
-                        	un = l.search_s(config.ldap_userdn,ldap.SCOPE_SUBTREE,filter,['dn'])[0][0]
+                        try:
+                            logger.info("binding with bind_dn: %s" % config.ldap_bind_dn)
+                            l.simple_bind_s(config.ldap_bind_dn, config.ldap_bind_password)
+                            filter = '(|(cn='+fusername+')(uid='+fusername+')(mail='+fusername+'))'
+                            # use the retrieved dn for the second bind
+                            un = l.search_s(config.ldap_userdn,ldap.SCOPE_SUBTREE,filter,['dn'])[0][0]
                         except Exception as err:
-            			#logger.error("Error binding to LDAP for: %s" % config.ldap_bind_dn)
-            			logger.error("authenticate ERR: %s" % err)
-                        l.unbind()
+                            #logger.error("Error binding to LDAP for: %s" % config.ldap_bind_dn)
+                            logger.error("authenticate ERR: %s" % err)
+                            l.unbind()
                         if len(ldap_server) == 2:
                             l = ldap.initialize('%s:%s' % (url.unparse(),
                                                            ldap_server[1]))
@@ -1305,7 +1305,7 @@ Please contact a site administrator to resolve.
 """
                 try:
                     user.email_user(subject, body)
-                except Exception, err:
+                except Exception as err:
                     logger.warning("Error sending email: %s" % str(err))
             self.track_login_attempt(user, e)
             user.reload()

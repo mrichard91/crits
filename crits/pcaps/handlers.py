@@ -315,7 +315,7 @@ def handle_pcap_file(filename, data, source_name, user=None,
         is_pcap_new = True
 
     # generate source information and add to pcap
-    if isinstance(source_name, basestring) and len(source_name) > 0:
+    if isinstance(source_name, str) and len(source_name) > 0:
         if user.check_source_write(source_name):
             s = create_embedded_source(source_name,
                                        method=method,

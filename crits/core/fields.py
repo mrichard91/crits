@@ -25,7 +25,7 @@ class CritsDateTimeField(DateTimeField):
         return super(CritsDateTimeField, self).__set__(instance, value)
 
     def transform(self, value):
-        if value and isinstance(value, basestring):
+        if value and isinstance(value, str):
             return parse(value, fuzzy=True)
         elif not value:
             return datetime.datetime.now()

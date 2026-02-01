@@ -45,7 +45,7 @@ def get_valid_root_domain(domain):
     """
 
     root = fqdn = error = ""
-    black_list = "/:@\ "
+    black_list = r"/:@\ "
     domain = domain.strip()
 
     if any(c in black_list for c in domain):
@@ -586,12 +586,12 @@ def upsert_domain(domain, source, username=None, campaign=None,
     if not campaign:
         campaign = []
     # assume it's a list, but check if it's a string
-    elif isinstance(campaign, basestring):
+    elif isinstance(campaign, str):
         c = EmbeddedCampaign(name=campaign, confidence=confidence, analyst=username)
         campaign = [c]
 
     # assume it's a list, but check if it's a string
-    if isinstance(source, basestring):
+    if isinstance(source, str):
         s = EmbeddedSource()
         s.name = source
         instance = EmbeddedSource.SourceInstance()
@@ -684,7 +684,7 @@ def upsert_domain(domain, source, username=None, campaign=None,
             root_domain.save(username=username)
         if fqdn_domain:
             fqdn_domain.save(username=username)
-    except Exception, e:
+    except Exception as e:
         return {'success': False, 'message': e}
 
     #Add relationships between fqdn, root
@@ -775,7 +775,7 @@ class etld(object):
                                   '\\.').replace('*',
                                                  '[^\\.]*').replace('!',
                                                                     '')
-        return '^(%s)\.(.*)$' % etld
+        return r'^(%s)\.(.*)$' % etld
 
     def parse(self, hostname):
         """

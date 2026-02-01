@@ -63,7 +63,7 @@ def add_new_object(request):
             if 'value' in request.FILES:
                 data = request.FILES['value']
             value = request.POST.get('value', None)
-            if isinstance(value, basestring):
+            if isinstance(value, str):
                 value = value.strip()
             results = add_object(my_type,
                                  oid,

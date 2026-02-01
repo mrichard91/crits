@@ -397,7 +397,7 @@ def handle_raw_data_file(data, source_name, user=None,
         is_rawdata_new = True
 
     # generate new source information and add to sample
-    if isinstance(source_name, basestring) and len(source_name) > 0:
+    if isinstance(source_name, str) and len(source_name) > 0:
         if user.check_source_write(source_name):
             source = create_embedded_source(source_name,
                                        method=method,
@@ -500,7 +500,7 @@ def update_raw_data_tool_details(_id, details, analyst):
     try:
         raw_data.save(username=analyst)
         return None
-    except ValidationError, e:
+    except ValidationError as e:
         return e
 
 def update_raw_data_tool_name(_id, name, analyst):
@@ -522,7 +522,7 @@ def update_raw_data_tool_name(_id, name, analyst):
     try:
         raw_data.save(username=analyst)
         return None
-    except ValidationError, e:
+    except ValidationError as e:
         return e
 
 def update_raw_data_type(_id, data_type, analyst):
@@ -547,7 +547,7 @@ def update_raw_data_type(_id, data_type, analyst):
         try:
             raw_data.save(username=analyst)
             return {'success': True}
-        except ValidationError, e:
+        except ValidationError as e:
             return {'success': False, 'message': str(e)}
 
 def update_raw_data_highlight_comment(_id, comment, line, analyst):
@@ -575,7 +575,7 @@ def update_raw_data_highlight_comment(_id, comment, line, analyst):
                 try:
                     raw_data.save(username=analyst)
                     return {'success': True}
-                except ValidationError, e:
+                except ValidationError as e:
                     return {'success': False, 'message': str(e)}
         return {'success': False, 'message': 'Could not find highlight.'}
 
@@ -604,7 +604,7 @@ def update_raw_data_highlight_date(_id, date, line, analyst):
                 try:
                     raw_data.save(username=analyst)
                     return {'success': True}
-                except ValidationError, e:
+                except ValidationError as e:
                     return {'success': False, 'message': str(e)}
         return {'success': False, 'message': 'Could not find highlight.'}
 
@@ -644,7 +644,7 @@ def new_inline_comment(_id, comment, line_num, analyst):
                 'line': line_num,
                 'html': html,
                 }
-    except ValidationError, e:
+    except ValidationError as e:
         return e
 
 def new_highlight(_id, line_num, line_data, analyst):
@@ -673,7 +673,7 @@ def new_highlight(_id, line_num, line_data, analyst):
         return {'success': True,
                 'html': html,
                 }
-    except ValidationError, e:
+    except ValidationError as e:
         return e
 
 def delete_highlight(_id, line_num, analyst):
@@ -701,7 +701,7 @@ def delete_highlight(_id, line_num, analyst):
             return {'success': True,
                     'html': html,
                     }
-        except ValidationError, e:
+        except ValidationError as e:
             return e
     else:
         return {'success': False}

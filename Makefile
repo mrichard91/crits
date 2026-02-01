@@ -1,0 +1,99 @@
+.PHONY: help install install-dev sync lock lint format typecheck test run clean migrate shell
+
+# Default target
+help:
+	@echo "CRITs Development Commands (using uv)"
+	@echo ""
+	@echo "Setup:"
+	@echo "  make install      Install production dependencies"
+	@echo "  make install-dev  Install with dev dependencies"
+	@echo "  make sync         Sync environment with lockfile"
+	@echo "  make lock         Update uv.lock file"
+	@echo ""
+	@echo "Development:"
+	@echo "  make lint         Run ruff linter"
+	@echo "  make format       Format code with ruff"
+	@echo "  make typecheck    Run mypy type checker"
+	@echo "  make test         Run pytest"
+	@echo ""
+	@echo "Django:"
+	@echo "  make run          Run development server"
+	@echo "  make migrate      Run database migrations"
+	@echo "  make shell        Open Django shell"
+	@echo ""
+	@echo "Maintenance:"
+	@echo "  make clean        Remove build artifacts"
+	@echo "  make py3-migrate  Run Python 2 to 3 migration script"
+
+# Installation
+install:
+	uv sync --no-dev
+
+install-dev:
+	uv sync
+
+sync:
+	uv sync
+
+lock:
+	uv lock
+
+# Code Quality
+lint:
+	uv run ruff check crits/
+
+format:
+	uv run ruff format crits/
+	uv run ruff check --fix crits/
+
+typecheck:
+	uv run mypy crits/ --ignore-missing-imports
+
+# Testing
+test:
+	uv run pytest crits/
+
+test-cov:
+	uv run pytest crits/ --cov=crits --cov-report=html
+
+# Django Commands
+run:
+	uv run python manage.py runserver
+
+migrate:
+	uv run python manage.py migrate
+
+shell:
+	uv run python manage.py shell
+
+createsuperuser:
+	uv run python manage.py createsuperuser
+
+collectstatic:
+	uv run python manage.py collectstatic --noinput
+
+# Database
+create-indexes:
+	uv run python manage.py create_indexes
+
+create-default-collections:
+	uv run python manage.py create_default_collections
+
+# Migration utilities
+py3-migrate:
+	uv run python scripts/migrate_py2_to_py3.py
+
+py3-migrate-dry:
+	uv run python scripts/migrate_py2_to_py3.py --dry-run
+
+# Cleanup
+clean:
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	find . -type f -name "*.pyo" -delete 2>/dev/null || true
+	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name ".mypy_cache" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name "htmlcov" -exec rm -rf {} + 2>/dev/null || true
+	rm -rf build/ dist/ 2>/dev/null || true

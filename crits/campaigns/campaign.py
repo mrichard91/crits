@@ -137,10 +137,10 @@ class Campaign(CritsBaseAttributes, CritsActionsDocument, Document):
 
         """
 
-        if isinstance(alias, basestring):
+        if isinstance(alias, str):
             alias = [alias]
         for a in alias:
-            if a not in self.aliases and isinstance(a, basestring):
+            if a not in self.aliases and isinstance(a, str):
                 self.aliases.append(a)
 
     def remove_alias(self, alias):

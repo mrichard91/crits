@@ -32,7 +32,7 @@ def migrate_backdoors(self):
         # Save the object after relationship was created.
         self.save()
     else:
-        print "\n\tError migrating %s: %s" % (self.id, result['message'])
+        print("\n\tError migrating %s: %s" % (self.id, result['message']))
 
 def migrate_exploits(self):
     """
@@ -63,7 +63,7 @@ def migrate_exploits(self):
             # Save the object after relationship was created.
             self.save()
         else:
-            print "\n\tError migrating %s: %s" % (self.id, result['message'])
+            print("\n\tError migrating %s: %s" % (self.id, result['message']))
 
 
 

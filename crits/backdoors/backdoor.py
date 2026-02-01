@@ -64,7 +64,7 @@ class Backdoor(CritsBaseAttributes, CritsSourceDocument, CritsActionsDocument,
         :type aliases: list
         """
 
-        if isinstance(aliases, basestring):
+        if isinstance(aliases, str):
             aliases = aliases.split(',')
         aliases = [a.strip() for a in aliases if a != '']
         existing_aliases = None

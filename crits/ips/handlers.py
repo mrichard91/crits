@@ -433,7 +433,7 @@ def ip_add_update(ip_address, ip_type, source=None, source_method='',
     elif ip_object.description != description:
         ip_object.description += "\n" + (description or '')
 
-    if isinstance(source_name, basestring):
+    if isinstance(source_name, str):
         if user.check_source_write(source):
             source = [create_embedded_source(source,
                                              reference=source_reference,
@@ -445,7 +445,7 @@ def ip_add_update(ip_address, ip_type, source=None, source_method='',
                     "message": "User does not have permission to add object \
                                 using source %s." % source}
 
-    if isinstance(campaign, basestring):
+    if isinstance(campaign, str):
         c = EmbeddedCampaign(name=campaign, confidence=confidence, analyst=user.username)
         campaign = [c]
 
