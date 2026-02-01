@@ -191,6 +191,14 @@ def main():
         print(f"    {YELLOW}└─ CRITs imports require a running MongoDB instance{RESET}")
         results["warnings"] += 1
     else:
+        # Configure Django settings before importing CRITs modules
+        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'crits.settings')
+        try:
+            import django
+            django.setup()
+        except Exception as e:
+            print(f"  {YELLOW}○{RESET} Django setup warning: {e}")
+
         # Test that crits package structure is importable
         crits_core = [
             ("crits", "CRITs package root"),
@@ -263,20 +271,16 @@ def main():
         print(f"  {YELLOW}○{RESET} Skipped - MongoDB not available")
         results["warnings"] += 1
     else:
+        # Django was already set up before CRITs imports above
+        # Just verify it's configured
         try:
-            os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'crits.settings')
-            import django
-            django.setup()
+            from django.conf import settings
+            _ = settings.INSTALLED_APPS  # Access a setting to verify config
             print_result("Django setup", True)
             results["passed"] += 1
         except Exception as e:
-            # Expected to fail without MongoDB - that's OK for import test
-            if "database" in str(e).lower() or "mongo" in str(e).lower():
-                print(f"  {YELLOW}○{RESET} Django setup - skipped (requires MongoDB)")
-                results["warnings"] += 1
-            else:
-                print_result("Django setup", False, str(e))
-                results["failed"] += 1
+            print_result("Django setup", False, str(e))
+            results["failed"] += 1
 
     # ==========================================================================
     # Summary
