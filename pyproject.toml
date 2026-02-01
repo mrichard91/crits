@@ -36,14 +36,13 @@ dependencies = [
     "celery>=5.3.0",
     "redis>=5.0.0",
 
-    # API Framework (temporary - will migrate to Strawberry GraphQL)
-    "django-tastypie>=0.14.6",
-    "django-tastypie-mongoengine>=0.4.6",
+    # NOTE: django-tastypie and django-tastypie-mongoengine removed
+    # They require mongoengine 0.8.x which is incompatible with Python 3.12
+    # The API layer will be replaced with FastAPI + Strawberry GraphQL
 
     # Security & Cryptography
     "cryptography>=42.0.0",
     "python-magic>=0.4.27",
-    "pydeep>=0.4",
 
     # XML Processing
     "lxml>=5.0.0",
@@ -70,14 +69,16 @@ dependencies = [
 
     # TOTP/2FA
     "qrcode>=7.4.0",
-
-    # Fuzzy Hashing
-    "pyimpfuzzy>=0.5",
 ]
 
 [project.optional-dependencies]
 ldap = [
     "python-ldap>=3.4.0",
+]
+# Fuzzy hashing requires system library: apt-get install libfuzzy-dev
+fuzzy = [
+    "pydeep>=0.4",
+    "pyimpfuzzy>=0.5",
 ]
 dev = [
     "ruff>=0.2.0",
@@ -140,8 +141,8 @@ DJANGO_SETTINGS_MODULE = "crits.settings"
 python_files = ["test_*.py", "*_test.py"]
 addopts = "-v --tb=short"
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "ruff>=0.9.0",
     "mypy>=1.8.0",
     "pytest>=8.0.0",
@@ -152,7 +153,7 @@ dev-dependencies = [
     "ipython>=8.0.0",
 ]
 
-[tool.uv.sources]
-# Note: pydeep requires ssdeep library to be installed on the system
-# Install on Ubuntu/Debian: apt-get install libfuzzy-dev
-# Install on macOS: brew install ssdeep
+# Note: Optional fuzzy hashing (pydeep, pyimpfuzzy) requires ssdeep library:
+#   Ubuntu/Debian: apt-get install libfuzzy-dev
+#   macOS: brew install ssdeep
+#   Then install: uv sync --extra fuzzy
