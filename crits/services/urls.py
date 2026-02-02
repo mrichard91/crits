@@ -1,7 +1,7 @@
 import os
 
 from django.conf import settings
-from django.conf.urls import include, url
+from django.urls import include, re_path as url
 
 from . import views
 

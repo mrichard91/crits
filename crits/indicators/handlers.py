@@ -2,7 +2,7 @@ import csv
 import datetime
 import json
 import logging
-import urlparse
+from urllib.parse import urlparse
 
 from io import BytesIO
 from django.conf import settings
@@ -794,7 +794,7 @@ def handle_indicator_insert(ind, source, source_reference=None, source_method=No
         if ind_type in (IndicatorTypes.DOMAIN,
                         IndicatorTypes.URI):
             if ind_type == IndicatorTypes.URI:
-                domain_or_ip = urlparse.urlparse(ind_value).hostname
+                domain_or_ip = urlparse(ind_value).hostname
                 try:
                     validate_ipv46_address(domain_or_ip)
                     url_contains_ip = True
@@ -1394,7 +1394,7 @@ def validate_indicator_value(value, ind_type):
 
     # URL
     if ind_type == IndicatorTypes.URI and "://" in value.split('.')[0]:
-        domain_or_ip = urlparse.urlparse(value).hostname
+        domain_or_ip = urlparse(value).hostname
         if not domain_or_ip:
             return ("", "Failed to parse a domain or IP from the URL")
         try:

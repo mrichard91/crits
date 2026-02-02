@@ -6,7 +6,7 @@ from random import choice
 
 from crits.core.user import CRITsUser
 from crits.config.config import CRITsConfig
-import settings
+from django.conf import settings
 
 class Command(BaseCommand):
     """

@@ -1,0 +1,97 @@
+# CRITs Docker Compose - Development Stack
+#
+# Usage:
+#   docker compose up              # Start all services
+#   docker compose up -d           # Start in background
+#   docker compose logs -f web     # Follow web logs
+#   docker compose down            # Stop all services
+#   docker compose down -v         # Stop and remove volumes
+#
+# First run:
+#   CRITS_INIT_DB=true CRITS_ADMIN_USER=admin CRITS_ADMIN_PASSWORD=changeme docker compose up
+#
+# Access:
+#   Web UI: http://localhost:8080
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: crits-mongodb
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_DATABASE=crits
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    ports:
+      - "27017:27017"  # Expose for debugging; remove in production
+
+  redis:
+    image: redis:7-alpine
+    container_name: crits-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "6379:6379"  # Expose for debugging; remove in production
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    container_name: crits-web
+    restart: unless-stopped
+    environment:
+      # MongoDB connection
+      - MONGO_HOST=mongodb
+      - MONGO_PORT=27017
+      - MONGO_DATABASE=crits
+      # Redis connection (for sessions/caching)
+      - REDIS_URL=redis://redis:6379/0
+      # Django settings
+      - DJANGO_SETTINGS_MODULE=crits.settings
+      - DEBUG=${DEBUG:-true}
+      # Security - CHANGE IN PRODUCTION
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      # API disabled by default (tastypie not installed)
+      - ENABLE_API=false
+      # Disable SSL redirect for development (enable in production with nginx)
+      - SECURE_SSL_REDIRECT=false
+      # Database initialization (set to true on first run)
+      - CRITS_INIT_DB=${CRITS_INIT_DB:-false}
+      - CRITS_ADMIN_USER=${CRITS_ADMIN_USER:-}
+      - CRITS_ADMIN_PASSWORD=${CRITS_ADMIN_PASSWORD:-}
+      - CRITS_ADMIN_EMAIL=${CRITS_ADMIN_EMAIL:-}
+    volumes:
+      # Persist uploaded files and logs
+      - crits_files:/app/files
+      - crits_logs:/app/logs
+    ports:
+      - "8080:8000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/login/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  mongodb_data:
+    name: crits_mongodb_data
+  crits_files:
+    name: crits_files
+  crits_logs:
+    name: crits_logs

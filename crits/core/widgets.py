@@ -2,7 +2,7 @@ from django import forms
 from django.forms.widgets import Select
 from django.forms.fields import ChoiceField
 from itertools import chain
-from django.utils.encoding import force_unicode, smart_unicode
+from django.utils.encoding import force_str as force_unicode, smart_str as smart_unicode
 from django.utils.html import escape, conditional_escape
 
 class CalWidget(forms.DateTimeInput):

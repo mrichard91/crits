@@ -8,7 +8,7 @@ from dateutil.parser import parse
 from time import gmtime, strftime
 
 from django.conf import settings
-from django import get_version
+from django import VERSION as django_version
 from django.contrib.auth.decorators import user_passes_test
 try:
     from django.urls import reverse
@@ -108,7 +108,7 @@ from crits.vocabulary.acls import *
 
 logger = logging.getLogger(__name__)
 
-django_version = get_version()
+# django_version is now imported as VERSION tuple from django
 
 @user_passes_test(user_can_view_data)
 def update_object_description(request):

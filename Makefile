@@ -108,6 +108,39 @@ env-test-local:
 	@echo "Running local environment validation..."
 	uv run python scripts/test_imports.py
 
+# Docker application stack
+docker-up:
+	@echo "Starting CRITs stack..."
+	docker compose up -d
+	@echo ""
+	@echo "CRITs is starting at http://localhost:8080"
+	@echo "Run 'make docker-logs' to view logs"
+
+docker-up-init:
+	@echo "Starting CRITs stack with database initialization..."
+	@echo "This will create the admin user if CRITS_ADMIN_USER and CRITS_ADMIN_PASSWORD are set."
+	CRITS_INIT_DB=true docker compose up -d
+	@echo ""
+	@echo "CRITs is starting at http://localhost:8080"
+
+docker-down:
+	@echo "Stopping CRITs stack..."
+	docker compose down
+
+docker-down-clean:
+	@echo "Stopping CRITs stack and removing volumes..."
+	docker compose down -v
+
+docker-logs:
+	docker compose logs -f
+
+docker-build:
+	@echo "Building CRITs Docker images..."
+	docker compose build
+
+docker-shell:
+	docker compose exec web bash
+
 # Cleanup
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

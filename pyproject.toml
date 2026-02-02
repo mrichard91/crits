@@ -30,6 +30,7 @@ dependencies = [
     # MongoDB
     "mongoengine>=0.28.0",
     "pymongo>=4.6.0",
+    "django-mongoengine>=0.5.0",
 
     # Task Queue
     "celery>=5.3.0",
@@ -58,6 +59,9 @@ dependencies = [
 
     # HTTP & Networking
     "requests>=2.31.0",
+
+    # WSGI Server
+    "gunicorn>=21.0.0",
 
     # Date/Time & Parsing
     "python-dateutil>=2.8.0",

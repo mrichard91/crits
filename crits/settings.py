@@ -86,7 +86,7 @@ else:
     CSRF_COOKIE_HTTPONLY = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_BROWSER_XSS_FILTER = True
-    SECURE_SSL_REDIRECT = True
+    SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'true').lower() in ('true', '1', 'yes')
     SECURE_HSTS_SECONDS = 0 #change this to non-zero for more security
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 
@@ -231,13 +231,24 @@ ADMIN_ROLE = "UberAdmin"
 #       than setting DEBUG to True). This is done because we can't anticipate
 #       the host header for every CRITs install and this should work "out of
 #       the box".
+
+# SECRET_KEY: Read from environment, then database.py, with fallback for dev
+SECRET_KEY = os.environ.get('SECRET_KEY') or crits_config.get('SECRET_KEY', 'dev-insecure-key-change-in-production')
+
 ALLOWED_HOSTS =             crits_config.get('allowed_hosts', ['*'])
 COMPANY_NAME =              crits_config.get('company_name', 'My Company')
 CLASSIFICATION =            crits_config.get('classification', 'unclassified')
 CRITS_EMAIL =               crits_config.get('crits_email', '')
 CRITS_EMAIL_SUBJECT_TAG =   crits_config.get('crits_email_subject_tag', '')
 CRITS_EMAIL_END_TAG =       crits_config.get('crits_email_end_tag', True)
-DEBUG =                     crits_config.get('debug', True)
+# DEBUG: Environment variable takes precedence over database config
+_debug_env = os.environ.get('DEBUG', '').lower()
+if _debug_env in ('true', '1', 'yes'):
+    DEBUG = True
+elif _debug_env in ('false', '0', 'no'):
+    DEBUG = False
+else:
+    DEBUG = crits_config.get('debug', True)
 ENABLE_DT =                 crits_config.get('enable_dt', False)
 if crits_config.get('email_host', None):
     EMAIL_HOST =            crits_config.get('email_host', None)
@@ -518,12 +529,14 @@ if old_mongoengine:
         'crits.signatures',
         'crits.stats',
         'crits.targets',
-        'tastypie',
-        'tastypie_mongoengine',
         'mongoengine.django.mongo_auth',
-
-
     )
+    # Only add tastypie if API is enabled (requires tastypie packages installed)
+    if ENABLE_API:
+        INSTALLED_APPS += (
+            'tastypie',
+            'tastypie_mongoengine',
+        )
     if ENABLE_DT:
         INSTALLED_APPS += (
             'template_timings_panel',
@@ -537,7 +550,6 @@ if old_mongoengine:
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -596,12 +608,15 @@ else:
         'crits.signatures',
         'crits.stats',
         'crits.targets',
-        'tastypie',
-        'tastypie_mongoengine',
         'django_mongoengine',
         'django_mongoengine.mongo_auth',
     )
-        
+    # Only add tastypie if API is enabled (requires tastypie packages installed)
+    if ENABLE_API:
+        INSTALLED_APPS += (
+            'tastypie',
+            'tastypie_mongoengine',
+        )
     if ENABLE_DT:
         INSTALLED_APPS += ( 
             'template_timings_panel',
@@ -615,8 +630,7 @@ else:
         'django.middleware.common.CommonMiddleware',
         'django.contrib.sessions.middleware.SessionMiddleware',
         'django.contrib.auth.middleware.AuthenticationMiddleware',
-        'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
-        'django.middleware.csrf.CsrfViewMiddleware',
+            'django.middleware.csrf.CsrfViewMiddleware',
         'django.contrib.messages.middleware.MessageMiddleware',
         'django.middleware.clickjacking.XFrameOptionsMiddleware',
     )
@@ -651,8 +665,7 @@ if REMOTE_USER:
             'django.middleware.common.CommonMiddleware',
             'django.contrib.sessions.middleware.SessionMiddleware',
             'django.contrib.auth.middleware.AuthenticationMiddleware',
-            'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
-            'django.contrib.messages.middleware.MessageMiddleware',
+                    'django.contrib.messages.middleware.MessageMiddleware',
             'django.middleware.clickjacking.XFrameOptionsMiddleware',
             'django.middleware.csrf.CsrfViewMiddleware',
         )
@@ -673,8 +686,7 @@ if REMOTE_USER:
             'django.middleware.common.CommonMiddleware',
             'django.contrib.sessions.middleware.SessionMiddleware',
             'django.contrib.auth.middleware.AuthenticationMiddleware',
-            'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
-            'django.contrib.messages.middleware.MessageMiddleware',
+                    'django.contrib.messages.middleware.MessageMiddleware',
             'django.middleware.clickjacking.XFrameOptionsMiddleware',
             'django.middleware.csrf.CsrfViewMiddleware',
             'django.contrib.auth.middleware.RemoteUserMiddleware',

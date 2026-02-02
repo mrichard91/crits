@@ -3,11 +3,11 @@ import os
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from create_indexes import create_indexes
-from create_roles import add_uber_admin_role, add_readonly_role, add_analyst_role
-from create_locations import add_location_objects
-from setconfig import create_config_if_not_exist
-from create_default_dashboard import create_dashboard
+from .create_indexes import create_indexes
+from .create_roles import add_uber_admin_role, add_readonly_role, add_analyst_role
+from .create_locations import add_location_objects
+from .setconfig import create_config_if_not_exist
+from .create_default_dashboard import create_dashboard
 
 from crits.core.crits_mongoengine import Action
 from crits.domains.domain import TLD
