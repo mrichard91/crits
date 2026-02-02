@@ -544,7 +544,7 @@
                     <button class='edit-button dont-toggle' id='savePositionsButton' title='Save' disabled>
                         <i class='fa fa-check dont-toggle'></i>
                     </button>
-                    <button class='edit-button dont-toggle' id='addSearchButton' title='Add Search' {% ifnotequal userId user.id %} disabled {% endifnotequal %} >
+                    <button class='edit-button dont-toggle' id='addSearchButton' title='Add Search' {% if userId != user.id %} disabled {% endif %} >
                         <i class='fa fa-search-plus dont-toggle'></i>
                     </button>
                     <button class='edit-button dont-toggle' id='resetPositionsButton' title='Reset'>

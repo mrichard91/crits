@@ -13,6 +13,13 @@ from mongoengine import __version__ as mongoengine_version
 
 from packaging.version import Version
 
+# Django 4.0+ removed is_ajax() - restore it for legacy code compatibility
+from django.http import HttpRequest
+if not hasattr(HttpRequest, 'is_ajax'):
+    def _is_ajax(self):
+        return self.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    HttpRequest.is_ajax = _is_ajax
+
 sys.path.insert(0, os.path.dirname(__file__))
 
 # calculated paths for django and the site
@@ -80,13 +87,16 @@ elif 'test' in sys.argv:
 else:
     DEVEL_INSTANCE = False
     SERVICE_MODEL = 'process'
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
+    # Cookie security - configurable via env for Docker development over HTTP
+    _secure_cookies = os.environ.get('SECURE_COOKIES', 'true').lower() in ('true', '1', 'yes')
+    SESSION_COOKIE_SECURE = _secure_cookies
+    CSRF_COOKIE_SECURE = _secure_cookies
     LOGIN_URL = "/login/"
-    CSRF_COOKIE_HTTPONLY = True
+    # CSRF_COOKIE_HTTPONLY must be False for AJAX-based login to work (JS reads the cookie)
+    CSRF_COOKIE_HTTPONLY = os.environ.get('CSRF_COOKIE_HTTPONLY', 'false').lower() in ('true', '1', 'yes')
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_BROWSER_XSS_FILTER = True
-    SECURE_SSL_REDIRECT = True
+    SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'true').lower() in ('true', '1', 'yes')
     SECURE_HSTS_SECONDS = 0 #change this to non-zero for more security
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 
@@ -231,13 +241,39 @@ ADMIN_ROLE = "UberAdmin"
 #       than setting DEBUG to True). This is done because we can't anticipate
 #       the host header for every CRITs install and this should work "out of
 #       the box".
+
+# SECRET_KEY: Read from environment, then database.py, with fallback for dev
+SECRET_KEY = os.environ.get('SECRET_KEY') or crits_config.get('SECRET_KEY', 'dev-insecure-key-change-in-production')
+
 ALLOWED_HOSTS =             crits_config.get('allowed_hosts', ['*'])
+
+# CSRF trusted origins for Django 4.x (required when behind a proxy)
+# Can be set via CSRF_TRUSTED_ORIGINS env var (comma-separated)
+_csrf_origins_env = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+if _csrf_origins_env:
+    CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in _csrf_origins_env.split(',')]
+else:
+    # Default origins for development
+    CSRF_TRUSTED_ORIGINS = [
+        'http://localhost:8080',
+        'http://127.0.0.1:8080',
+        'http://localhost',
+        'http://127.0.0.1',
+    ]
+
 COMPANY_NAME =              crits_config.get('company_name', 'My Company')
 CLASSIFICATION =            crits_config.get('classification', 'unclassified')
 CRITS_EMAIL =               crits_config.get('crits_email', '')
 CRITS_EMAIL_SUBJECT_TAG =   crits_config.get('crits_email_subject_tag', '')
 CRITS_EMAIL_END_TAG =       crits_config.get('crits_email_end_tag', True)
-DEBUG =                     crits_config.get('debug', True)
+# DEBUG: Environment variable takes precedence over database config
+_debug_env = os.environ.get('DEBUG', '').lower()
+if _debug_env in ('true', '1', 'yes'):
+    DEBUG = True
+elif _debug_env in ('false', '0', 'no'):
+    DEBUG = False
+else:
+    DEBUG = crits_config.get('debug', True)
 ENABLE_DT =                 crits_config.get('enable_dt', False)
 if crits_config.get('email_host', None):
     EMAIL_HOST =            crits_config.get('email_host', None)
@@ -325,6 +361,18 @@ MEDIA_URL = '/'
 
 STATIC_ROOT = os.path.join(SITE_ROOT, '../extras/www/static')
 STATIC_URL = '/static/'
+
+# Whitenoise for serving static files in production
+# Using CompressedStaticFilesStorage instead of CompressedManifestStaticFilesStorage
+# because legacy CSS may reference missing files
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
 
 # List of callables that know how to import templates from various sources.
 #https://docs.djangoproject.com/en/dev/ref/templates/api/#django.template.loaders.cached.Loader
@@ -518,12 +566,14 @@ if old_mongoengine:
         'crits.signatures',
         'crits.stats',
         'crits.targets',
-        'tastypie',
-        'tastypie_mongoengine',
         'mongoengine.django.mongo_auth',
-
-
     )
+    # Only add tastypie if API is enabled (requires tastypie packages installed)
+    if ENABLE_API:
+        INSTALLED_APPS += (
+            'tastypie',
+            'tastypie_mongoengine',
+        )
     if ENABLE_DT:
         INSTALLED_APPS += (
             'template_timings_panel',
@@ -537,7 +587,6 @@ if old_mongoengine:
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -551,6 +600,8 @@ if old_mongoengine:
 
     if django.VERSION >= (1,8,0):
         _MIDDLEWARE += ('django.middleware.security.SecurityMiddleware',)
+    # Whitenoise for static file serving in production
+    _MIDDLEWARE += ('whitenoise.middleware.WhiteNoiseMiddleware',)
     # Only needed for mongoengine<0.10
     _MIDDLEWARE += ('crits.core.user.AuthenticationMiddleware',)
 
@@ -596,12 +647,15 @@ else:
         'crits.signatures',
         'crits.stats',
         'crits.targets',
-        'tastypie',
-        'tastypie_mongoengine',
         'django_mongoengine',
         'django_mongoengine.mongo_auth',
     )
-        
+    # Only add tastypie if API is enabled (requires tastypie packages installed)
+    if ENABLE_API:
+        INSTALLED_APPS += (
+            'tastypie',
+            'tastypie_mongoengine',
+        )
     if ENABLE_DT:
         INSTALLED_APPS += ( 
             'template_timings_panel',
@@ -615,8 +669,7 @@ else:
         'django.middleware.common.CommonMiddleware',
         'django.contrib.sessions.middleware.SessionMiddleware',
         'django.contrib.auth.middleware.AuthenticationMiddleware',
-        'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
-        'django.middleware.csrf.CsrfViewMiddleware',
+            'django.middleware.csrf.CsrfViewMiddleware',
         'django.contrib.messages.middleware.MessageMiddleware',
         'django.middleware.clickjacking.XFrameOptionsMiddleware',
     )
@@ -628,6 +681,8 @@ else:
 
     if django.VERSION >= (1,8,0):
         _MIDDLEWARE += ('django.middleware.security.SecurityMiddleware',)
+    # Whitenoise for static file serving in production
+    _MIDDLEWARE += ('whitenoise.middleware.WhiteNoiseMiddleware',)
 
     SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
     #SESSION_ENGINE = 'django_mongoengine.sessions'
@@ -651,13 +706,14 @@ if REMOTE_USER:
             'django.middleware.common.CommonMiddleware',
             'django.contrib.sessions.middleware.SessionMiddleware',
             'django.contrib.auth.middleware.AuthenticationMiddleware',
-            'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
-            'django.contrib.messages.middleware.MessageMiddleware',
+                    'django.contrib.messages.middleware.MessageMiddleware',
             'django.middleware.clickjacking.XFrameOptionsMiddleware',
             'django.middleware.csrf.CsrfViewMiddleware',
         )
         if django.VERSION >= (1,8,0):
             _MIDDLEWARE += ('django.middleware.security.SecurityMiddleware',)
+        # Whitenoise for static file serving in production
+        _MIDDLEWARE += ('whitenoise.middleware.WhiteNoiseMiddleware',)
 
         _MIDDLEWARE += (
             'crits.core.user.AuthenticationMiddleware',
@@ -673,8 +729,7 @@ if REMOTE_USER:
             'django.middleware.common.CommonMiddleware',
             'django.contrib.sessions.middleware.SessionMiddleware',
             'django.contrib.auth.middleware.AuthenticationMiddleware',
-            'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
-            'django.contrib.messages.middleware.MessageMiddleware',
+                    'django.contrib.messages.middleware.MessageMiddleware',
             'django.middleware.clickjacking.XFrameOptionsMiddleware',
             'django.middleware.csrf.CsrfViewMiddleware',
             'django.contrib.auth.middleware.RemoteUserMiddleware',
@@ -686,6 +741,8 @@ if REMOTE_USER:
 
         if django.VERSION >= (1,8,0):
             _MIDDLEWARE += ('django.middleware.security.SecurityMiddleware',)
+        # Whitenoise for static file serving in production
+        _MIDDLEWARE += ('whitenoise.middleware.WhiteNoiseMiddleware',)
 
         _MIDDLEWARE += ('django.contrib.auth.middleware.RemoteUserMiddleware',)
 

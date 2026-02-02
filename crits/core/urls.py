@@ -1,4 +1,4 @@
-from django.conf.urls import url
+from django.urls import re_path as url
 from django.contrib.auth.views import logout_then_login
 
 from . import views
