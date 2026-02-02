@@ -3,7 +3,6 @@ Indicator queries for CRITs GraphQL API.
 """
 
 import logging
-from typing import Optional
 
 import strawberry
 from strawberry.types import Info
@@ -21,7 +20,7 @@ class IndicatorQueries:
 
     @strawberry.field(description="Get a single indicator by ID")
     @require_permission("Indicator.read")
-    def indicator(self, info: Info, id: str) -> Optional[IndicatorType]:
+    def indicator(self, info: Info, id: str) -> IndicatorType | None:
         """
         Get a single indicator by its ID.
 
@@ -32,6 +31,7 @@ class IndicatorQueries:
             The indicator if found and accessible, None otherwise
         """
         from bson import ObjectId
+
         from crits.indicators.indicator import Indicator
 
         ctx: GraphQLContext = info.context
@@ -63,10 +63,10 @@ class IndicatorQueries:
         info: Info,
         limit: int = 25,
         offset: int = 0,
-        ind_type: Optional[str] = None,
-        value_contains: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        ind_type: str | None = None,
+        value_contains: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> list[IndicatorType]:
         """
         List indicators with optional filtering.
@@ -114,7 +114,7 @@ class IndicatorQueries:
                 queryset = queryset.filter(campaign__name=campaign)
 
             # Order by modified date descending (most recent first)
-            queryset = queryset.order_by('-modified')
+            queryset = queryset.order_by("-modified")
 
             # Apply pagination
             indicators = queryset.skip(offset).limit(limit)
@@ -130,9 +130,9 @@ class IndicatorQueries:
     def indicators_count(
         self,
         info: Info,
-        ind_type: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        ind_type: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> int:
         """
         Count indicators matching the filters.
@@ -185,7 +185,7 @@ class IndicatorQueries:
         from crits.indicators.indicator import Indicator
 
         try:
-            types = Indicator.objects.distinct('ind_type')
+            types = Indicator.objects.distinct("ind_type")
             return sorted([t for t in types if t])
         except Exception as e:
             logger.error(f"Error getting indicator types: {e}")

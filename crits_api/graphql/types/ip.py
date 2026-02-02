@@ -3,19 +3,20 @@ IP GraphQL type for CRITs API.
 """
 
 from datetime import datetime
+from typing import Any
 
 import strawberry
 
 from crits_api.graphql.types.common import (
-    extract_sources,
+    EmbeddedActionType,
+    EmbeddedRelationshipType,
+    EmbeddedTicketType,
+    SourceInfo,
+    extract_actions,
     extract_campaigns,
     extract_relationships,
-    extract_actions,
+    extract_sources,
     extract_tickets,
-    SourceInfo,
-    EmbeddedRelationshipType,
-    EmbeddedActionType,
-    EmbeddedTicketType,
 )
 
 
@@ -49,21 +50,21 @@ class IPType:
     tickets: list[EmbeddedTicketType] = strawberry.field(default_factory=list)
 
     @classmethod
-    def from_model(cls, ip_obj) -> "IPType":
+    def from_model(cls, ip_obj: Any) -> "IPType":
         """Create IPType from IP MongoEngine model."""
         return cls(
             id=str(ip_obj.id),
-            ip=getattr(ip_obj, 'ip', '') or '',
-            ip_type=getattr(ip_obj, 'ip_type', '') or '',
-            description=getattr(ip_obj, 'description', '') or '',
-            analyst=getattr(ip_obj, 'analyst', '') or '',
-            status=getattr(ip_obj, 'status', '') or '',
-            tlp=getattr(ip_obj, 'tlp', '') or '',
-            created=getattr(ip_obj, 'created', None),
-            modified=getattr(ip_obj, 'modified', None),
+            ip=getattr(ip_obj, "ip", "") or "",
+            ip_type=getattr(ip_obj, "ip_type", "") or "",
+            description=getattr(ip_obj, "description", "") or "",
+            analyst=getattr(ip_obj, "analyst", "") or "",
+            status=getattr(ip_obj, "status", "") or "",
+            tlp=getattr(ip_obj, "tlp", "") or "",
+            created=getattr(ip_obj, "created", None),
+            modified=getattr(ip_obj, "modified", None),
             campaigns=extract_campaigns(ip_obj),
-            bucket_list=list(getattr(ip_obj, 'bucket_list', []) or []),
-            sectors=list(getattr(ip_obj, 'sectors', []) or []),
+            bucket_list=list(getattr(ip_obj, "bucket_list", []) or []),
+            sectors=list(getattr(ip_obj, "sectors", []) or []),
             sources=extract_sources(ip_obj),
             relationships=extract_relationships(ip_obj),
             actions=extract_actions(ip_obj),

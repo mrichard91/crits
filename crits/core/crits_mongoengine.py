@@ -1514,7 +1514,7 @@ class CritsBaseAttributes(CritsDocument, CritsBaseDocument,
         # or subtraction of a bucket_list.
         if isinstance(tags, list) and len(tags) == 1 and tags[0] == '':
             parsed_tags = []
-        elif isinstance(tags, (str, unicode)):
+        elif isinstance(tags, str):
             parsed_tags = tags.split(',')
         else:
             parsed_tags = tags
@@ -1566,7 +1566,7 @@ class CritsBaseAttributes(CritsDocument, CritsBaseDocument,
         # or subtraction of a sector.
         if isinstance(sectors, list) and len(sectors) == 1 and sectors[0] == '':
             parsed_sectors = []
-        elif isinstance(sectors, (str, unicode)):
+        elif isinstance(sectors, str):
             parsed_sectors = sectors.split(',')
         else:
             parsed_sectors = sectors

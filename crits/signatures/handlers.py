@@ -366,7 +366,7 @@ def handle_signature_file(data, source_name, user=None,
     signature.data_type_max_version = data_type_max_version
 
     if data_type_dependency:
-        if type(data_type_dependency) == unicode:
+        if isinstance(data_type_dependency, str):
             data_type_dependency = data_type_dependency.split(",")
 
         for item in data_type_dependency:

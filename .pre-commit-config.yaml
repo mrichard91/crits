@@ -1,0 +1,56 @@
+# Pre-commit hooks for CRITs
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # Ruff - fast Python linter and formatter (crits_api only, legacy code is Python 2)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.0
+    hooks:
+      - id: ruff
+        name: ruff lint (crits_api)
+        files: ^crits_api/
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format (crits_api)
+        files: ^crits_api/
+        types_or: [python, pyi]
+
+  # MyPy - static type checker (for crits_api only)
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.14.1
+    hooks:
+      - id: mypy
+        name: mypy (crits_api)
+        files: ^crits_api/
+        args:
+          - --config-file=pyproject.toml
+        additional_dependencies:
+          - types-redis
+          - types-PyYAML
+          - types-python-dateutil
+          - pydantic
+          - pydantic-settings
+          - fastapi
+          - strawberry-graphql
+          - mongoengine
+
+  # Basic pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(crits/|extras/)
+      - id: end-of-file-fixer
+        exclude: ^(crits/|extras/)
+      - id: check-yaml
+        args: [--unsafe]
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      - id: check-merge-conflict
+      - id: debug-statements
+        exclude: ^(crits/|contrib/|extras/)
+
+# Only run on crits_api by default for mypy (legacy crits/ code would fail)
+# To check all Python: pre-commit run --all-files

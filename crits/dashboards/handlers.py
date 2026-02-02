@@ -206,7 +206,7 @@ def parseDocObjectsToStrings(records, obj_type):
     entire object
     """
     for doc in records:
-        for key, value in doc.items():
+        for key, value in list(doc.items()):
             # all dates should look the same
 
             if isinstance(value, datetime.datetime):
@@ -247,7 +247,7 @@ def parseDocObjectsToStrings(records, obj_type):
                     tickets.append(ticketdict['ticket_number'])
                 doc[key] = "|||".join(tickets)
             elif key == "datatype":
-                doc[key] = value.keys()[0]
+                doc[key] = next(iter(value.keys()))
             elif key == "to":
                 doc[key] = len(value)
             elif key == "thumb":
@@ -266,7 +266,7 @@ def parseDocObjectsToStrings(records, obj_type):
                     doc[key] = ""
             doc[key] = html_escape(doc[key])
             value = doc[key].strip()
-            if isinstance(value, unicode) or isinstance(value, str):
+            if isinstance(value, str):
                 val = ' '.join(value.split())
                 val = val.replace('"',"'")
                 doc[key] = val

@@ -3,7 +3,6 @@ PCAP queries for CRITs GraphQL API.
 """
 
 import logging
-from typing import Optional
 
 import strawberry
 from strawberry.types import Info
@@ -21,9 +20,10 @@ class PCAPQueries:
 
     @strawberry.field(description="Get a single PCAP by ID")
     @require_permission("PCAP.read")
-    def pcap(self, info: Info, id: str) -> Optional[PCAPType]:
+    def pcap(self, info: Info, id: str) -> PCAPType | None:
         """Get a single PCAP by its ID."""
         from bson import ObjectId
+
         from crits.pcaps.pcap import PCAP
 
         ctx: GraphQLContext = info.context
@@ -53,10 +53,10 @@ class PCAPQueries:
         info: Info,
         limit: int = 25,
         offset: int = 0,
-        filename_contains: Optional[str] = None,
-        md5: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        filename_contains: str | None = None,
+        md5: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> list[PCAPType]:
         """List PCAPs with optional filtering."""
         from crits.pcaps.pcap import PCAP
@@ -84,7 +84,7 @@ class PCAPQueries:
             if campaign:
                 queryset = queryset.filter(campaign__name=campaign)
 
-            queryset = queryset.order_by('-modified')
+            queryset = queryset.order_by("-modified")
             pcaps = queryset.skip(offset).limit(limit)
 
             return [PCAPType.from_model(p) for p in pcaps]
@@ -98,8 +98,8 @@ class PCAPQueries:
     def pcaps_count(
         self,
         info: Info,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> int:
         """Count PCAPs matching the filters."""
         from crits.pcaps.pcap import PCAP

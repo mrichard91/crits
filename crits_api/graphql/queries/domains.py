@@ -3,7 +3,6 @@ Domain queries for CRITs GraphQL API.
 """
 
 import logging
-from typing import Optional
 
 import strawberry
 from strawberry.types import Info
@@ -21,9 +20,10 @@ class DomainQueries:
 
     @strawberry.field(description="Get a single domain by ID")
     @require_permission("Domain.read")
-    def domain(self, info: Info, id: str) -> Optional[DomainType]:
+    def domain(self, info: Info, id: str) -> DomainType | None:
         """Get a single domain by its ID."""
         from bson import ObjectId
+
         from crits.domains.domain import Domain
 
         ctx: GraphQLContext = info.context
@@ -53,10 +53,10 @@ class DomainQueries:
         info: Info,
         limit: int = 25,
         offset: int = 0,
-        domain_contains: Optional[str] = None,
-        record_type: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        domain_contains: str | None = None,
+        record_type: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> list[DomainType]:
         """List domains with optional filtering."""
         from crits.domains.domain import Domain
@@ -84,7 +84,7 @@ class DomainQueries:
             if campaign:
                 queryset = queryset.filter(campaign__name=campaign)
 
-            queryset = queryset.order_by('-modified')
+            queryset = queryset.order_by("-modified")
             domains = queryset.skip(offset).limit(limit)
 
             return [DomainType.from_model(d) for d in domains]
@@ -98,9 +98,9 @@ class DomainQueries:
     def domains_count(
         self,
         info: Info,
-        record_type: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        record_type: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> int:
         """Count domains matching the filters."""
         from crits.domains.domain import Domain
@@ -137,7 +137,7 @@ class DomainQueries:
         from crits.domains.domain import Domain
 
         try:
-            types = Domain.objects.distinct('record_type')
+            types = Domain.objects.distinct("record_type")
             return sorted([t for t in types if t])
         except Exception as e:
             logger.error(f"Error getting domain record types: {e}")

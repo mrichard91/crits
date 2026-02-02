@@ -5,7 +5,7 @@ Implements Relay-style cursor-based pagination.
 """
 
 import base64
-from typing import Generic, TypeVar, Optional
+from typing import Generic, TypeVar
 
 import strawberry
 
@@ -18,8 +18,8 @@ class PageInfo:
 
     has_next_page: bool
     has_previous_page: bool
-    start_cursor: Optional[str] = None
-    end_cursor: Optional[str] = None
+    start_cursor: str | None = None
+    end_cursor: str | None = None
     total_count: int = 0
 
 
@@ -41,7 +41,7 @@ def make_edge_type(node_type: type) -> type:
 
     @strawberry.type
     class TypedEdge:
-        node: node_type
+        node: node_type  # type: ignore[valid-type]
         cursor: str
 
     TypedEdge.__name__ = f"{node_type.__name__}Edge"
@@ -96,8 +96,8 @@ def decode_cursor(cursor: str) -> str:
 def paginate(
     items: list,
     first: int = 20,
-    after: Optional[str] = None,
-    total_count: Optional[int] = None,
+    after: str | None = None,
+    total_count: int | None = None,
 ) -> tuple[list, PageInfo]:
     """
     Apply cursor-based pagination to a list of items.

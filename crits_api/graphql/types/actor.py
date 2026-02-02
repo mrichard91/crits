@@ -3,21 +3,20 @@ Actor GraphQL type for CRITs API.
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Any
 
 import strawberry
 
 from crits_api.graphql.types.common import (
-    extract_sources,
+    EmbeddedActionType,
+    EmbeddedRelationshipType,
+    EmbeddedTicketType,
+    SourceInfo,
+    extract_actions,
     extract_campaigns,
     extract_relationships,
-    extract_actions,
+    extract_sources,
     extract_tickets,
-    SourceInfo,
-    EmbeddedCampaignType,
-    EmbeddedRelationshipType,
-    EmbeddedActionType,
-    EmbeddedTicketType,
 )
 
 
@@ -31,13 +30,13 @@ class EmbeddedActorIdentifierType:
     date: datetime | None = None
 
     @classmethod
-    def from_model(cls, identifier) -> "EmbeddedActorIdentifierType":
+    def from_model(cls, identifier: Any) -> "EmbeddedActorIdentifierType":
         """Create from EmbeddedActorIdentifier model."""
         return cls(
-            identifier_id=getattr(identifier, 'identifier_id', '') or '',
-            analyst=getattr(identifier, 'analyst', '') or '',
-            confidence=getattr(identifier, 'confidence', '') or '',
-            date=getattr(identifier, 'date', None),
+            identifier_id=getattr(identifier, "identifier_id", "") or "",
+            analyst=getattr(identifier, "analyst", "") or "",
+            confidence=getattr(identifier, "confidence", "") or "",
+            date=getattr(identifier, "date", None),
         )
 
 
@@ -78,32 +77,32 @@ class ActorType:
     tickets: list[EmbeddedTicketType] = strawberry.field(default_factory=list)
 
     @classmethod
-    def from_model(cls, actor) -> "ActorType":
+    def from_model(cls, actor: Any) -> "ActorType":
         """Create ActorType from Actor MongoEngine model."""
         # Handle identifiers
         identifiers = []
-        if hasattr(actor, 'identifiers') and actor.identifiers:
+        if hasattr(actor, "identifiers") and actor.identifiers:
             for ident in actor.identifiers:
                 identifiers.append(EmbeddedActorIdentifierType.from_model(ident))
 
         return cls(
             id=str(actor.id),
-            name=getattr(actor, 'name', '') or '',
-            description=getattr(actor, 'description', '') or '',
-            aliases=list(getattr(actor, 'aliases', []) or []),
-            analyst=getattr(actor, 'analyst', '') or '',
-            status=getattr(actor, 'status', '') or '',
-            tlp=getattr(actor, 'tlp', '') or '',
-            created=getattr(actor, 'created', None),
-            modified=getattr(actor, 'modified', None),
+            name=getattr(actor, "name", "") or "",
+            description=getattr(actor, "description", "") or "",
+            aliases=list(getattr(actor, "aliases", []) or []),
+            analyst=getattr(actor, "analyst", "") or "",
+            status=getattr(actor, "status", "") or "",
+            tlp=getattr(actor, "tlp", "") or "",
+            created=getattr(actor, "created", None),
+            modified=getattr(actor, "modified", None),
             identifiers=identifiers,
-            intended_effects=list(getattr(actor, 'intended_effects', []) or []),
-            motivations=list(getattr(actor, 'motivations', []) or []),
-            sophistications=list(getattr(actor, 'sophistications', []) or []),
-            threat_types=list(getattr(actor, 'threat_types', []) or []),
+            intended_effects=list(getattr(actor, "intended_effects", []) or []),
+            motivations=list(getattr(actor, "motivations", []) or []),
+            sophistications=list(getattr(actor, "sophistications", []) or []),
+            threat_types=list(getattr(actor, "threat_types", []) or []),
             campaigns=extract_campaigns(actor),
-            bucket_list=list(getattr(actor, 'bucket_list', []) or []),
-            sectors=list(getattr(actor, 'sectors', []) or []),
+            bucket_list=list(getattr(actor, "bucket_list", []) or []),
+            sectors=list(getattr(actor, "sectors", []) or []),
             sources=extract_sources(actor),
             relationships=extract_relationships(actor),
             actions=extract_actions(actor),

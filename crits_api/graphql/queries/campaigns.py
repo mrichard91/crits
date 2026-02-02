@@ -3,12 +3,10 @@ Campaign queries for CRITs GraphQL API.
 """
 
 import logging
-from typing import Optional
 
 import strawberry
 from strawberry.types import Info
 
-from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_permission
 from crits_api.graphql.types.campaign import CampaignType
 
@@ -21,12 +19,11 @@ class CampaignQueries:
 
     @strawberry.field(description="Get a single campaign by ID")
     @require_permission("Campaign.read")
-    def campaign(self, info: Info, id: str) -> Optional[CampaignType]:
+    def campaign(self, info: Info, id: str) -> CampaignType | None:
         """Get a single campaign by its ID."""
         from bson import ObjectId
-        from crits.campaigns.campaign import Campaign
 
-        ctx: GraphQLContext = info.context
+        from crits.campaigns.campaign import Campaign
 
         try:
             query = {"_id": ObjectId(id)}
@@ -49,9 +46,9 @@ class CampaignQueries:
         info: Info,
         limit: int = 25,
         offset: int = 0,
-        name_contains: Optional[str] = None,
-        active: Optional[str] = None,
-        status: Optional[str] = None,
+        name_contains: str | None = None,
+        active: str | None = None,
+        status: str | None = None,
     ) -> list[CampaignType]:
         """List campaigns with optional filtering."""
         from crits.campaigns.campaign import Campaign
@@ -70,7 +67,7 @@ class CampaignQueries:
             if status:
                 queryset = queryset.filter(status=status)
 
-            queryset = queryset.order_by('-modified')
+            queryset = queryset.order_by("-modified")
             campaigns = queryset.skip(offset).limit(limit)
 
             return [CampaignType.from_model(c) for c in campaigns]
@@ -84,8 +81,8 @@ class CampaignQueries:
     def campaigns_count(
         self,
         info: Info,
-        active: Optional[str] = None,
-        status: Optional[str] = None,
+        active: str | None = None,
+        status: str | None = None,
     ) -> int:
         """Count campaigns matching the filters."""
         from crits.campaigns.campaign import Campaign
@@ -112,7 +109,7 @@ class CampaignQueries:
         from crits.campaigns.campaign import Campaign
 
         try:
-            names = Campaign.objects.distinct('name')
+            names = Campaign.objects.distinct("name")
             return sorted([n for n in names if n])
         except Exception as e:
             logger.error(f"Error getting campaign names: {e}")

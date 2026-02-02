@@ -5,7 +5,7 @@ Exposes user information (excluding sensitive fields like password hashes).
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Any
 
 import strawberry
 
@@ -26,13 +26,13 @@ class UserType:
     is_active: bool = True
     is_staff: bool = False
     is_superuser: bool = False
-    last_login: Optional[datetime] = None
-    date_joined: Optional[datetime] = None
+    last_login: datetime | None = None
+    date_joined: datetime | None = None
     organization: str = ""
     roles: list[str] = strawberry.field(default_factory=list)
 
     @classmethod
-    def from_model(cls, user) -> "UserType":
+    def from_model(cls, user: Any) -> "UserType":
         """
         Create UserType from CRITsUser MongoEngine model.
 
@@ -68,7 +68,7 @@ class RoleType:
     active: bool = True
 
     @classmethod
-    def from_model(cls, role) -> "RoleType":
+    def from_model(cls, role: Any) -> "RoleType":
         """Create RoleType from Role MongoEngine model."""
         return cls(
             id=str(role.id),

@@ -3,7 +3,6 @@ Email queries for CRITs GraphQL API.
 """
 
 import logging
-from typing import Optional
 
 import strawberry
 from strawberry.types import Info
@@ -21,9 +20,10 @@ class EmailQueries:
 
     @strawberry.field(description="Get a single email by ID")
     @require_permission("Email.read")
-    def email(self, info: Info, id: str) -> Optional[EmailType]:
+    def email(self, info: Info, id: str) -> EmailType | None:
         """Get a single email by its ID."""
         from bson import ObjectId
+
         from crits.emails.email import Email
 
         ctx: GraphQLContext = info.context
@@ -53,10 +53,10 @@ class EmailQueries:
         info: Info,
         limit: int = 25,
         offset: int = 0,
-        subject_contains: Optional[str] = None,
-        from_address: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        subject_contains: str | None = None,
+        from_address: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> list[EmailType]:
         """List emails with optional filtering."""
         from crits.emails.email import Email
@@ -84,7 +84,7 @@ class EmailQueries:
             if campaign:
                 queryset = queryset.filter(campaign__name=campaign)
 
-            queryset = queryset.order_by('-modified')
+            queryset = queryset.order_by("-modified")
             emails = queryset.skip(offset).limit(limit)
 
             return [EmailType.from_model(e) for e in emails]
@@ -98,8 +98,8 @@ class EmailQueries:
     def emails_count(
         self,
         info: Info,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> int:
         """Count emails matching the filters."""
         from crits.emails.email import Email

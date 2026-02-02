@@ -7,7 +7,8 @@ model as Django handlers.
 
 import functools
 import logging
-from typing import Any, Callable, Optional, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from strawberry.types import Info
 
@@ -21,7 +22,7 @@ T = TypeVar("T")
 class PermissionDenied(Exception):
     """Raised when a user lacks required permissions."""
 
-    def __init__(self, permission: str, message: Optional[str] = None):
+    def __init__(self, permission: str, message: str | None = None):
         self.permission = permission
         self.message = message or f"Permission denied: {permission}"
         super().__init__(self.message)
@@ -72,9 +73,8 @@ def require_permission(permission: str) -> Callable[[Callable[..., T]], Callable
 
             # Check permission
             if not ctx.has_permission(permission):
-                logger.warning(
-                    f"Permission denied for user {ctx.user.username}: {permission}"
-                )
+                username = ctx.user.username if ctx.user else "unknown"
+                logger.warning(f"Permission denied for user {username}: {permission}")
                 raise PermissionDenied(permission)
 
             return func(*args, **kwargs)
@@ -143,7 +143,7 @@ def check_source_access(
         return False
 
     # Use the user's check method
-    if hasattr(ctx.user, "check_source_tlp"):
+    if ctx.user and hasattr(ctx.user, "check_source_tlp"):
         return ctx.user.check_source_tlp(obj)
 
     # Fallback: manual check

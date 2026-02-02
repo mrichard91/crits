@@ -7,7 +7,7 @@ with configurable TTL (default 15 minutes).
 
 import json
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import redis.asyncio as redis
 
@@ -16,7 +16,7 @@ from crits_api.config import settings
 logger = logging.getLogger(__name__)
 
 # Global Redis client
-_client: Optional[redis.Redis] = None
+_client: redis.Redis | None = None
 
 
 async def get_redis() -> redis.Redis:
@@ -46,7 +46,7 @@ class CacheClient:
     Handles serialization/deserialization and TTL management.
     """
 
-    def __init__(self, default_ttl: int = None):
+    def __init__(self, default_ttl: int | None = None):
         """
         Initialize cache client.
 
@@ -55,7 +55,7 @@ class CacheClient:
         """
         self.default_ttl = default_ttl or settings.cache_default_ttl
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """
         Get cached value.
 
@@ -84,7 +84,7 @@ class CacheClient:
         self,
         key: str,
         value: Any,
-        ttl: Optional[int] = None,
+        ttl: int | None = None,
     ) -> bool:
         """
         Set cached value.

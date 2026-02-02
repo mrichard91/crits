@@ -7,13 +7,13 @@ when caching query results.
 
 import hashlib
 import json
-from typing import Any, Optional
+from typing import Any
 
 
 def make_cache_key(
     prefix: str,
     *args: Any,
-    user_sources_hash: Optional[str] = None,
+    user_sources_hash: str | None = None,
     **kwargs: Any,
 ) -> str:
     """

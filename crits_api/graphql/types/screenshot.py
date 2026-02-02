@@ -3,12 +3,13 @@ Screenshot GraphQL type for CRITs API.
 """
 
 from datetime import datetime
+from typing import Any
 
 import strawberry
 
 from crits_api.graphql.types.common import (
-    extract_sources,
     SourceInfo,
+    extract_sources,
 )
 
 
@@ -35,18 +36,18 @@ class ScreenshotType:
     sources: list[SourceInfo] = strawberry.field(default_factory=list)
 
     @classmethod
-    def from_model(cls, screenshot) -> "ScreenshotType":
+    def from_model(cls, screenshot: Any) -> "ScreenshotType":
         """Create ScreenshotType from Screenshot MongoEngine model."""
         return cls(
             id=str(screenshot.id),
-            filename=getattr(screenshot, 'filename', '') or '',
-            description=getattr(screenshot, 'description', '') or '',
-            md5=getattr(screenshot, 'md5', '') or '',
-            width=getattr(screenshot, 'width', 0) or 0,
-            height=getattr(screenshot, 'height', 0) or 0,
-            analyst=getattr(screenshot, 'analyst', '') or '',
-            tags=list(getattr(screenshot, 'tags', []) or []),
-            created=getattr(screenshot, 'created', None),
-            modified=getattr(screenshot, 'modified', None),
+            filename=getattr(screenshot, "filename", "") or "",
+            description=getattr(screenshot, "description", "") or "",
+            md5=getattr(screenshot, "md5", "") or "",
+            width=getattr(screenshot, "width", 0) or 0,
+            height=getattr(screenshot, "height", 0) or 0,
+            analyst=getattr(screenshot, "analyst", "") or "",
+            tags=list(getattr(screenshot, "tags", []) or []),
+            created=getattr(screenshot, "created", None),
+            modified=getattr(screenshot, "modified", None),
             sources=extract_sources(screenshot),
         )

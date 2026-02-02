@@ -3,7 +3,6 @@ Signature queries for CRITs GraphQL API.
 """
 
 import logging
-from typing import Optional
 
 import strawberry
 from strawberry.types import Info
@@ -21,9 +20,10 @@ class SignatureQueries:
 
     @strawberry.field(description="Get a single signature by ID")
     @require_permission("Signature.read")
-    def signature(self, info: Info, id: str) -> Optional[SignatureType]:
+    def signature(self, info: Info, id: str) -> SignatureType | None:
         """Get a single signature by its ID."""
         from bson import ObjectId
+
         from crits.signatures.signature import Signature
 
         ctx: GraphQLContext = info.context
@@ -53,10 +53,10 @@ class SignatureQueries:
         info: Info,
         limit: int = 25,
         offset: int = 0,
-        title_contains: Optional[str] = None,
-        data_type: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        title_contains: str | None = None,
+        data_type: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> list[SignatureType]:
         """List signatures with optional filtering."""
         from crits.signatures.signature import Signature
@@ -84,7 +84,7 @@ class SignatureQueries:
             if campaign:
                 queryset = queryset.filter(campaign__name=campaign)
 
-            queryset = queryset.order_by('-modified')
+            queryset = queryset.order_by("-modified")
             signatures = queryset.skip(offset).limit(limit)
 
             return [SignatureType.from_model(s) for s in signatures]
@@ -98,9 +98,9 @@ class SignatureQueries:
     def signatures_count(
         self,
         info: Info,
-        data_type: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        data_type: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> int:
         """Count signatures matching the filters."""
         from crits.signatures.signature import Signature
@@ -137,7 +137,7 @@ class SignatureQueries:
         from crits.signatures.signature import Signature
 
         try:
-            types = Signature.objects.distinct('data_type')
+            types = Signature.objects.distinct("data_type")
             return sorted([t for t in types if t])
         except Exception as e:
             logger.error(f"Error getting signature data types: {e}")

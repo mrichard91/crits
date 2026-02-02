@@ -43,7 +43,7 @@ class GraphQLContext(BaseContext):
     user: Optional["CRITsUser"] = None
     acl: dict[str, Any] = field(default_factory=dict)
     sources: list[SourceAccess] = field(default_factory=list)
-    _sources_hash: Optional[str] = field(default=None, repr=False)
+    _sources_hash: str | None = field(default=None, repr=False)
 
     @property
     def is_authenticated(self) -> bool:
@@ -130,7 +130,7 @@ class GraphQLContext(BaseContext):
 
         return False
 
-    def get_readable_sources(self, tlp: Optional[str] = None) -> list[str]:
+    def get_readable_sources(self, tlp: str | None = None) -> list[str]:
         """
         Get list of source names the user can read.
 
@@ -149,15 +149,16 @@ class GraphQLContext(BaseContext):
             if not source.read:
                 continue
 
-            if tlp is None:
-                result.append(source.name)
-            elif tlp == "white":
-                result.append(source.name)
-            elif tlp == "green" and source.tlp_green:
-                result.append(source.name)
-            elif tlp == "amber" and source.tlp_amber:
-                result.append(source.name)
-            elif tlp == "red" and source.tlp_red:
+            if (
+                tlp is None
+                or tlp == "white"
+                or tlp == "green"
+                and source.tlp_green
+                or tlp == "amber"
+                and source.tlp_amber
+                or tlp == "red"
+                and source.tlp_red
+            ):
                 result.append(source.name)
 
         return result

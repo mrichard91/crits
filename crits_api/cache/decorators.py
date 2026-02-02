@@ -6,7 +6,8 @@ Provides @cached for query caching and @invalidates for mutation cache invalidat
 
 import functools
 import logging
-from typing import Any, Callable, Optional, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from strawberry.types import Info
 
@@ -22,7 +23,7 @@ T = TypeVar("T")
 
 def cached(
     prefix: str,
-    ttl: Optional[int] = None,
+    ttl: int | None = None,
     include_args: bool = True,
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """
@@ -50,10 +51,10 @@ def cached(
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> T:
             if not settings.cache_enabled:
-                return await func(*args, **kwargs)
+                return await func(*args, **kwargs)  # type: ignore[misc]
 
             # Extract info and context
-            info: Optional[Info] = None
+            info: Info | None = None
             for arg in args:
                 if isinstance(arg, Info):
                     info = arg
@@ -62,21 +63,17 @@ def cached(
                 info = kwargs.get("info")
 
             # Build cache key
-            ctx: Optional[GraphQLContext] = None
+            ctx: GraphQLContext | None = None
             sources_hash = "anon"
             if info:
                 ctx = info.context
-                if ctx.is_authenticated:
+                if ctx is not None and ctx.is_authenticated:
                     sources_hash = ctx.sources_hash
 
             # Build key args (exclude 'self' and 'info')
             key_kwargs = {}
             if include_args:
-                key_kwargs = {
-                    k: v
-                    for k, v in kwargs.items()
-                    if k not in ("self", "info")
-                }
+                key_kwargs = {k: v for k, v in kwargs.items() if k not in ("self", "info")}
 
             cache_key = make_cache_key(
                 prefix,
@@ -90,7 +87,7 @@ def cached(
                 return cached_result
 
             # Execute resolver
-            result = await func(*args, **kwargs)
+            result = await func(*args, **kwargs)  # type: ignore[misc]
 
             # Cache result (convert to dict if needed for serialization)
             cacheable = result
@@ -102,7 +99,7 @@ def cached(
 
             return result
 
-        return wrapper
+        return wrapper  # type: ignore[return-value]
 
     return decorator
 
@@ -128,7 +125,7 @@ def invalidates(*type_names: str) -> Callable[[Callable[..., T]], Callable[..., 
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> T:
             # Execute mutation first
-            result = await func(*args, **kwargs)
+            result = await func(*args, **kwargs)  # type: ignore[misc]
 
             # Invalidate caches
             for type_name in type_names:
@@ -136,7 +133,7 @@ def invalidates(*type_names: str) -> Callable[[Callable[..., T]], Callable[..., 
 
             return result
 
-        return wrapper
+        return wrapper  # type: ignore[return-value]
 
     return decorator
 
@@ -166,7 +163,7 @@ def invalidates_object(
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> T:
             # Execute mutation first
-            result = await func(*args, **kwargs)
+            result = await func(*args, **kwargs)  # type: ignore[misc]
 
             # Get object ID from kwargs
             object_id = kwargs.get(id_param)
@@ -175,7 +172,7 @@ def invalidates_object(
 
             return result
 
-        return wrapper
+        return wrapper  # type: ignore[return-value]
 
     return decorator
 
@@ -189,10 +186,10 @@ def _to_cacheable(obj: Any) -> Any:
     if obj is None:
         return None
 
-    if isinstance(obj, (str, int, float, bool)):
+    if isinstance(obj, str | int | float | bool):
         return obj
 
-    if isinstance(obj, (list, tuple)):
+    if isinstance(obj, list | tuple):
         return [_to_cacheable(item) for item in obj]
 
     if isinstance(obj, dict):
@@ -204,10 +201,7 @@ def _to_cacheable(obj: Any) -> Any:
 
     if hasattr(obj, "__dataclass_fields__"):
         # Dataclass (including Strawberry types)
-        return {
-            k: _to_cacheable(getattr(obj, k))
-            for k in obj.__dataclass_fields__
-        }
+        return {k: _to_cacheable(getattr(obj, k)) for k in obj.__dataclass_fields__}
 
     if hasattr(obj, "__dict__"):
         return {k: _to_cacheable(v) for k, v in obj.__dict__.items()}

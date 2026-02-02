@@ -3,7 +3,6 @@ IP queries for CRITs GraphQL API.
 """
 
 import logging
-from typing import Optional
 
 import strawberry
 from strawberry.types import Info
@@ -21,9 +20,10 @@ class IPQueries:
 
     @strawberry.field(description="Get a single IP by ID")
     @require_permission("IP.read")
-    def ip(self, info: Info, id: str) -> Optional[IPType]:
+    def ip(self, info: Info, id: str) -> IPType | None:
         """Get a single IP by its ID."""
         from bson import ObjectId
+
         from crits.ips.ip import IP
 
         ctx: GraphQLContext = info.context
@@ -53,10 +53,10 @@ class IPQueries:
         info: Info,
         limit: int = 25,
         offset: int = 0,
-        ip_contains: Optional[str] = None,
-        ip_type: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        ip_contains: str | None = None,
+        ip_type: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> list[IPType]:
         """List IPs with optional filtering."""
         from crits.ips.ip import IP
@@ -84,7 +84,7 @@ class IPQueries:
             if campaign:
                 queryset = queryset.filter(campaign__name=campaign)
 
-            queryset = queryset.order_by('-modified')
+            queryset = queryset.order_by("-modified")
             ips = queryset.skip(offset).limit(limit)
 
             return [IPType.from_model(ip) for ip in ips]
@@ -98,9 +98,9 @@ class IPQueries:
     def ips_count(
         self,
         info: Info,
-        ip_type: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        ip_type: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> int:
         """Count IPs matching the filters."""
         from crits.ips.ip import IP
@@ -137,7 +137,7 @@ class IPQueries:
         from crits.ips.ip import IP
 
         try:
-            types = IP.objects.distinct('ip_type')
+            types = IP.objects.distinct("ip_type")
             return sorted([t for t in types if t])
         except Exception as e:
             logger.error(f"Error getting IP types: {e}")

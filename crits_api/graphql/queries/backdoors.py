@@ -3,7 +3,6 @@ Backdoor queries for CRITs GraphQL API.
 """
 
 import logging
-from typing import Optional
 
 import strawberry
 from strawberry.types import Info
@@ -21,9 +20,10 @@ class BackdoorQueries:
 
     @strawberry.field(description="Get a single backdoor by ID")
     @require_permission("Backdoor.read")
-    def backdoor(self, info: Info, id: str) -> Optional[BackdoorType]:
+    def backdoor(self, info: Info, id: str) -> BackdoorType | None:
         """Get a single backdoor by its ID."""
         from bson import ObjectId
+
         from crits.backdoors.backdoor import Backdoor
 
         ctx: GraphQLContext = info.context
@@ -53,9 +53,9 @@ class BackdoorQueries:
         info: Info,
         limit: int = 25,
         offset: int = 0,
-        name_contains: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        name_contains: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> list[BackdoorType]:
         """List backdoors with optional filtering."""
         from crits.backdoors.backdoor import Backdoor
@@ -80,7 +80,7 @@ class BackdoorQueries:
             if campaign:
                 queryset = queryset.filter(campaign__name=campaign)
 
-            queryset = queryset.order_by('-modified')
+            queryset = queryset.order_by("-modified")
             backdoors = queryset.skip(offset).limit(limit)
 
             return [BackdoorType.from_model(b) for b in backdoors]
@@ -94,8 +94,8 @@ class BackdoorQueries:
     def backdoors_count(
         self,
         info: Info,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> int:
         """Count backdoors matching the filters."""
         from crits.backdoors.backdoor import Backdoor
