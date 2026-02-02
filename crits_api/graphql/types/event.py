@@ -3,19 +3,20 @@ Event GraphQL type for CRITs API.
 """
 
 from datetime import datetime
+from typing import Any
 
 import strawberry
 
 from crits_api.graphql.types.common import (
-    extract_sources,
+    EmbeddedActionType,
+    EmbeddedRelationshipType,
+    EmbeddedTicketType,
+    SourceInfo,
+    extract_actions,
     extract_campaigns,
     extract_relationships,
-    extract_actions,
+    extract_sources,
     extract_tickets,
-    SourceInfo,
-    EmbeddedRelationshipType,
-    EmbeddedActionType,
-    EmbeddedTicketType,
 )
 
 
@@ -50,27 +51,27 @@ class EventType:
     tickets: list[EmbeddedTicketType] = strawberry.field(default_factory=list)
 
     @classmethod
-    def from_model(cls, event) -> "EventType":
+    def from_model(cls, event: Any) -> "EventType":
         """Create EventType from Event MongoEngine model."""
         # Handle event_id which is a UUID field
-        event_id = ''
-        if hasattr(event, 'event_id') and event.event_id:
+        event_id = ""
+        if hasattr(event, "event_id") and event.event_id:
             event_id = str(event.event_id)
 
         return cls(
             id=str(event.id),
-            title=getattr(event, 'title', '') or '',
-            event_type=getattr(event, 'event_type', '') or '',
+            title=getattr(event, "title", "") or "",
+            event_type=getattr(event, "event_type", "") or "",
             event_id=event_id,
-            description=getattr(event, 'description', '') or '',
-            analyst=getattr(event, 'analyst', '') or '',
-            status=getattr(event, 'status', '') or '',
-            tlp=getattr(event, 'tlp', '') or '',
-            created=getattr(event, 'created', None),
-            modified=getattr(event, 'modified', None),
+            description=getattr(event, "description", "") or "",
+            analyst=getattr(event, "analyst", "") or "",
+            status=getattr(event, "status", "") or "",
+            tlp=getattr(event, "tlp", "") or "",
+            created=getattr(event, "created", None),
+            modified=getattr(event, "modified", None),
             campaigns=extract_campaigns(event),
-            bucket_list=list(getattr(event, 'bucket_list', []) or []),
-            sectors=list(getattr(event, 'sectors', []) or []),
+            bucket_list=list(getattr(event, "bucket_list", []) or []),
+            sectors=list(getattr(event, "sectors", []) or []),
             sources=extract_sources(event),
             relationships=extract_relationships(event),
             actions=extract_actions(event),

@@ -3,7 +3,6 @@ Sample queries for CRITs GraphQL API.
 """
 
 import logging
-from typing import Optional
 
 import strawberry
 from strawberry.types import Info
@@ -21,9 +20,10 @@ class SampleQueries:
 
     @strawberry.field(description="Get a single sample by ID")
     @require_permission("Sample.read")
-    def sample(self, info: Info, id: str) -> Optional[SampleType]:
+    def sample(self, info: Info, id: str) -> SampleType | None:
         """Get a single sample by its ID."""
         from bson import ObjectId
+
         from crits.samples.sample import Sample
 
         ctx: GraphQLContext = info.context
@@ -48,7 +48,7 @@ class SampleQueries:
 
     @strawberry.field(description="Get a sample by MD5 hash")
     @require_permission("Sample.read")
-    def sample_by_md5(self, info: Info, md5: str) -> Optional[SampleType]:
+    def sample_by_md5(self, info: Info, md5: str) -> SampleType | None:
         """Get a sample by its MD5 hash."""
         from crits.samples.sample import Sample
 
@@ -74,7 +74,7 @@ class SampleQueries:
 
     @strawberry.field(description="Get a sample by SHA256 hash")
     @require_permission("Sample.read")
-    def sample_by_sha256(self, info: Info, sha256: str) -> Optional[SampleType]:
+    def sample_by_sha256(self, info: Info, sha256: str) -> SampleType | None:
         """Get a sample by its SHA256 hash."""
         from crits.samples.sample import Sample
 
@@ -105,12 +105,12 @@ class SampleQueries:
         info: Info,
         limit: int = 25,
         offset: int = 0,
-        filename_contains: Optional[str] = None,
-        filetype: Optional[str] = None,
-        md5: Optional[str] = None,
-        sha256: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        filename_contains: str | None = None,
+        filetype: str | None = None,
+        md5: str | None = None,
+        sha256: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> list[SampleType]:
         """List samples with optional filtering."""
         from crits.samples.sample import Sample
@@ -144,7 +144,7 @@ class SampleQueries:
             if campaign:
                 queryset = queryset.filter(campaign__name=campaign)
 
-            queryset = queryset.order_by('-modified')
+            queryset = queryset.order_by("-modified")
             samples = queryset.skip(offset).limit(limit)
 
             return [SampleType.from_model(s) for s in samples]
@@ -158,9 +158,9 @@ class SampleQueries:
     def samples_count(
         self,
         info: Info,
-        filetype: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        filetype: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> int:
         """Count samples matching the filters."""
         from crits.samples.sample import Sample
@@ -197,7 +197,7 @@ class SampleQueries:
         from crits.samples.sample import Sample
 
         try:
-            types = Sample.objects.distinct('filetype')
+            types = Sample.objects.distinct("filetype")
             return sorted([t for t in types if t])
         except Exception as e:
             logger.error(f"Error getting sample filetypes: {e}")

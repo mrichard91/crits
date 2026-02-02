@@ -6,17 +6,19 @@ nginx routes /api/graphql to this service.
 """
 
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.requests import Request as StarletteRequest
 from strawberry.fastapi import GraphQLRouter
 
 from crits_api.config import settings
 from crits_api.db.connection import connect_mongodb
-from crits_api.graphql.schema import schema
 from crits_api.graphql.context import get_context
+from crits_api.graphql.schema import schema
 
 # Configure logging
 logging.basicConfig(
@@ -27,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan handler for startup/shutdown."""
     # Startup
     logger.info("Starting CRITs GraphQL API...")
@@ -62,23 +64,19 @@ app.add_middleware(
 
 # Exception handler for better error visibility in debug mode
 @app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
+async def global_exception_handler(request: StarletteRequest, exc: Exception) -> JSONResponse:
     """Log unhandled exceptions and return error details in debug mode."""
     logger.exception(f"Unhandled exception: {exc}")
     if settings.debug:
         return JSONResponse(
-            status_code=500,
-            content={"detail": str(exc), "type": type(exc).__name__}
+            status_code=500, content={"detail": str(exc), "type": type(exc).__name__}
         )
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error"}
-    )
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 # Health check endpoint
 @app.get("/api/health")
-async def health_check():
+async def health_check() -> dict[str, str]:
     """Health check endpoint for container orchestration."""
     return {
         "status": "healthy",
@@ -90,7 +88,7 @@ async def health_check():
 # Mount GraphQL router
 graphql_router = GraphQLRouter(
     schema,
-    context_getter=get_context,
+    context_getter=get_context,  # type: ignore[arg-type]
     graphiql=settings.graphiql_enabled,
 )
 app.include_router(graphql_router, prefix=settings.graphql_path)
@@ -98,6 +96,7 @@ app.include_router(graphql_router, prefix=settings.graphql_path)
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "crits_api.main:app",
         host="0.0.0.0",

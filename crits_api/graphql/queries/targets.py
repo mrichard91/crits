@@ -3,12 +3,10 @@ Target queries for CRITs GraphQL API.
 """
 
 import logging
-from typing import Optional
 
 import strawberry
 from strawberry.types import Info
 
-from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_permission
 from crits_api.graphql.types.target import TargetType
 
@@ -21,16 +19,14 @@ class TargetQueries:
 
     @strawberry.field(description="Get a single target by ID")
     @require_permission("Target.read")
-    def target(self, info: Info, id: str) -> Optional[TargetType]:
+    def target(self, info: Info, id: str) -> TargetType | None:
         """Get a single target by its ID."""
         from bson import ObjectId
-        from crits.targets.target import Target
 
-        ctx: GraphQLContext = info.context
+        from crits.targets.target import Target
 
         try:
             query = {"_id": ObjectId(id)}
-            # Targets don't have source filtering
 
             target = Target.objects(__raw__=query).first()
 
@@ -49,11 +45,11 @@ class TargetQueries:
         info: Info,
         limit: int = 25,
         offset: int = 0,
-        email_contains: Optional[str] = None,
-        department: Optional[str] = None,
-        division: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        email_contains: str | None = None,
+        department: str | None = None,
+        division: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> list[TargetType]:
         """List targets with optional filtering."""
         from crits.targets.target import Target
@@ -78,7 +74,7 @@ class TargetQueries:
             if campaign:
                 queryset = queryset.filter(campaign__name=campaign)
 
-            queryset = queryset.order_by('-modified')
+            queryset = queryset.order_by("-modified")
             targets = queryset.skip(offset).limit(limit)
 
             return [TargetType.from_model(t) for t in targets]
@@ -92,10 +88,10 @@ class TargetQueries:
     def targets_count(
         self,
         info: Info,
-        department: Optional[str] = None,
-        division: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        department: str | None = None,
+        division: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> int:
         """Count targets matching the filters."""
         from crits.targets.target import Target
@@ -128,7 +124,7 @@ class TargetQueries:
         from crits.targets.target import Target
 
         try:
-            depts = Target.objects.distinct('department')
+            depts = Target.objects.distinct("department")
             return sorted([d for d in depts if d])
         except Exception as e:
             logger.error(f"Error getting departments: {e}")
@@ -141,7 +137,7 @@ class TargetQueries:
         from crits.targets.target import Target
 
         try:
-            divs = Target.objects.distinct('division')
+            divs = Target.objects.distinct("division")
             return sorted([d for d in divs if d])
         except Exception as e:
             logger.error(f"Error getting divisions: {e}")

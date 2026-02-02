@@ -3,7 +3,6 @@ Screenshot queries for CRITs GraphQL API.
 """
 
 import logging
-from typing import Optional
 
 import strawberry
 from strawberry.types import Info
@@ -21,9 +20,10 @@ class ScreenshotQueries:
 
     @strawberry.field(description="Get a single screenshot by ID")
     @require_permission("Screenshot.read")
-    def screenshot(self, info: Info, id: str) -> Optional[ScreenshotType]:
+    def screenshot(self, info: Info, id: str) -> ScreenshotType | None:
         """Get a single screenshot by its ID."""
         from bson import ObjectId
+
         from crits.screenshots.screenshot import Screenshot
 
         ctx: GraphQLContext = info.context
@@ -53,8 +53,8 @@ class ScreenshotQueries:
         info: Info,
         limit: int = 25,
         offset: int = 0,
-        filename_contains: Optional[str] = None,
-        tag: Optional[str] = None,
+        filename_contains: str | None = None,
+        tag: str | None = None,
     ) -> list[ScreenshotType]:
         """List screenshots with optional filtering."""
         from crits.screenshots.screenshot import Screenshot
@@ -76,7 +76,7 @@ class ScreenshotQueries:
             if tag:
                 queryset = queryset.filter(tags=tag)
 
-            queryset = queryset.order_by('-modified')
+            queryset = queryset.order_by("-modified")
             screenshots = queryset.skip(offset).limit(limit)
 
             return [ScreenshotType.from_model(s) for s in screenshots]
@@ -90,7 +90,7 @@ class ScreenshotQueries:
     def screenshots_count(
         self,
         info: Info,
-        tag: Optional[str] = None,
+        tag: str | None = None,
     ) -> int:
         """Count screenshots matching the filters."""
         from crits.screenshots.screenshot import Screenshot

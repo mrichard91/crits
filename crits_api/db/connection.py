@@ -36,6 +36,7 @@ def connect_mongodb() -> None:
 
         # Import and setup Django - this will connect to MongoDB
         import django
+
         django.setup()
 
         _django_setup = True

@@ -3,7 +3,6 @@ Event queries for CRITs GraphQL API.
 """
 
 import logging
-from typing import Optional
 
 import strawberry
 from strawberry.types import Info
@@ -21,9 +20,10 @@ class EventQueries:
 
     @strawberry.field(description="Get a single event by ID")
     @require_permission("Event.read")
-    def event(self, info: Info, id: str) -> Optional[EventType]:
+    def event(self, info: Info, id: str) -> EventType | None:
         """Get a single event by its ID."""
         from bson import ObjectId
+
         from crits.events.event import Event
 
         ctx: GraphQLContext = info.context
@@ -53,10 +53,10 @@ class EventQueries:
         info: Info,
         limit: int = 25,
         offset: int = 0,
-        title_contains: Optional[str] = None,
-        event_type: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        title_contains: str | None = None,
+        event_type: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> list[EventType]:
         """List events with optional filtering."""
         from crits.events.event import Event
@@ -84,7 +84,7 @@ class EventQueries:
             if campaign:
                 queryset = queryset.filter(campaign__name=campaign)
 
-            queryset = queryset.order_by('-modified')
+            queryset = queryset.order_by("-modified")
             events = queryset.skip(offset).limit(limit)
 
             return [EventType.from_model(e) for e in events]
@@ -98,9 +98,9 @@ class EventQueries:
     def events_count(
         self,
         info: Info,
-        event_type: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        event_type: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> int:
         """Count events matching the filters."""
         from crits.events.event import Event
@@ -137,7 +137,7 @@ class EventQueries:
         from crits.events.event import Event
 
         try:
-            types = Event.objects.distinct('event_type')
+            types = Event.objects.distinct("event_type")
             return sorted([t for t in types if t])
         except Exception as e:
             logger.error(f"Error getting event types: {e}")

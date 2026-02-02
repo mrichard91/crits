@@ -3,19 +3,20 @@ Sample GraphQL type for CRITs API.
 """
 
 from datetime import datetime
+from typing import Any
 
 import strawberry
 
 from crits_api.graphql.types.common import (
-    extract_sources,
+    EmbeddedActionType,
+    EmbeddedRelationshipType,
+    EmbeddedTicketType,
+    SourceInfo,
+    extract_actions,
     extract_campaigns,
     extract_relationships,
-    extract_actions,
+    extract_sources,
     extract_tickets,
-    SourceInfo,
-    EmbeddedRelationshipType,
-    EmbeddedActionType,
-    EmbeddedTicketType,
 )
 
 
@@ -61,29 +62,29 @@ class SampleType:
     tickets: list[EmbeddedTicketType] = strawberry.field(default_factory=list)
 
     @classmethod
-    def from_model(cls, sample) -> "SampleType":
+    def from_model(cls, sample: Any) -> "SampleType":
         """Create SampleType from Sample MongoEngine model."""
         return cls(
             id=str(sample.id),
-            filename=getattr(sample, 'filename', '') or '',
-            filenames=list(getattr(sample, 'filenames', []) or []),
-            filetype=getattr(sample, 'filetype', '') or '',
-            mimetype=getattr(sample, 'mimetype', '') or '',
-            size=getattr(sample, 'size', 0) or 0,
-            md5=getattr(sample, 'md5', '') or '',
-            sha1=getattr(sample, 'sha1', '') or '',
-            sha256=getattr(sample, 'sha256', '') or '',
-            ssdeep=getattr(sample, 'ssdeep', '') or '',
-            impfuzzy=getattr(sample, 'impfuzzy', '') or '',
-            description=getattr(sample, 'description', '') or '',
-            analyst=getattr(sample, 'analyst', '') or '',
-            status=getattr(sample, 'status', '') or '',
-            tlp=getattr(sample, 'tlp', '') or '',
-            created=getattr(sample, 'created', None),
-            modified=getattr(sample, 'modified', None),
+            filename=getattr(sample, "filename", "") or "",
+            filenames=list(getattr(sample, "filenames", []) or []),
+            filetype=getattr(sample, "filetype", "") or "",
+            mimetype=getattr(sample, "mimetype", "") or "",
+            size=getattr(sample, "size", 0) or 0,
+            md5=getattr(sample, "md5", "") or "",
+            sha1=getattr(sample, "sha1", "") or "",
+            sha256=getattr(sample, "sha256", "") or "",
+            ssdeep=getattr(sample, "ssdeep", "") or "",
+            impfuzzy=getattr(sample, "impfuzzy", "") or "",
+            description=getattr(sample, "description", "") or "",
+            analyst=getattr(sample, "analyst", "") or "",
+            status=getattr(sample, "status", "") or "",
+            tlp=getattr(sample, "tlp", "") or "",
+            created=getattr(sample, "created", None),
+            modified=getattr(sample, "modified", None),
             campaigns=extract_campaigns(sample),
-            bucket_list=list(getattr(sample, 'bucket_list', []) or []),
-            sectors=list(getattr(sample, 'sectors', []) or []),
+            bucket_list=list(getattr(sample, "bucket_list", []) or []),
+            sectors=list(getattr(sample, "sectors", []) or []),
             sources=extract_sources(sample),
             relationships=extract_relationships(sample),
             actions=extract_actions(sample),

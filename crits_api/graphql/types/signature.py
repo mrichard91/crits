@@ -3,19 +3,20 @@ Signature GraphQL type for CRITs API.
 """
 
 from datetime import datetime
+from typing import Any
 
 import strawberry
 
 from crits_api.graphql.types.common import (
-    extract_sources,
+    EmbeddedActionType,
+    EmbeddedRelationshipType,
+    EmbeddedTicketType,
+    SourceInfo,
+    extract_actions,
     extract_campaigns,
     extract_relationships,
-    extract_actions,
+    extract_sources,
     extract_tickets,
-    SourceInfo,
-    EmbeddedRelationshipType,
-    EmbeddedActionType,
-    EmbeddedTicketType,
 )
 
 
@@ -56,33 +57,33 @@ class SignatureType:
     tickets: list[EmbeddedTicketType] = strawberry.field(default_factory=list)
 
     @classmethod
-    def from_model(cls, sig) -> "SignatureType":
+    def from_model(cls, sig: Any) -> "SignatureType":
         """Create SignatureType from Signature MongoEngine model."""
         # Handle link_id UUID
-        link_id = ''
-        if hasattr(sig, 'link_id') and sig.link_id:
+        link_id = ""
+        if hasattr(sig, "link_id") and sig.link_id:
             link_id = str(sig.link_id)
 
         return cls(
             id=str(sig.id),
-            title=getattr(sig, 'title', '') or '',
-            data_type=getattr(sig, 'data_type', '') or '',
-            data_type_min_version=getattr(sig, 'data_type_min_version', '') or '',
-            data_type_max_version=getattr(sig, 'data_type_max_version', '') or '',
-            data_type_dependency=list(getattr(sig, 'data_type_dependency', []) or []),
-            data=getattr(sig, 'data', '') or '',
-            md5=getattr(sig, 'md5', '') or '',
+            title=getattr(sig, "title", "") or "",
+            data_type=getattr(sig, "data_type", "") or "",
+            data_type_min_version=getattr(sig, "data_type_min_version", "") or "",
+            data_type_max_version=getattr(sig, "data_type_max_version", "") or "",
+            data_type_dependency=list(getattr(sig, "data_type_dependency", []) or []),
+            data=getattr(sig, "data", "") or "",
+            md5=getattr(sig, "md5", "") or "",
             link_id=link_id,
-            version=getattr(sig, 'version', 0) or 0,
-            description=getattr(sig, 'description', '') or '',
-            analyst=getattr(sig, 'analyst', '') or '',
-            status=getattr(sig, 'status', '') or '',
-            tlp=getattr(sig, 'tlp', '') or '',
-            created=getattr(sig, 'created', None),
-            modified=getattr(sig, 'modified', None),
+            version=getattr(sig, "version", 0) or 0,
+            description=getattr(sig, "description", "") or "",
+            analyst=getattr(sig, "analyst", "") or "",
+            status=getattr(sig, "status", "") or "",
+            tlp=getattr(sig, "tlp", "") or "",
+            created=getattr(sig, "created", None),
+            modified=getattr(sig, "modified", None),
             campaigns=extract_campaigns(sig),
-            bucket_list=list(getattr(sig, 'bucket_list', []) or []),
-            sectors=list(getattr(sig, 'sectors', []) or []),
+            bucket_list=list(getattr(sig, "bucket_list", []) or []),
+            sectors=list(getattr(sig, "sectors", []) or []),
             sources=extract_sources(sig),
             relationships=extract_relationships(sig),
             actions=extract_actions(sig),

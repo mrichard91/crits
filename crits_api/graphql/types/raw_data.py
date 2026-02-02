@@ -3,19 +3,20 @@ RawData GraphQL type for CRITs API.
 """
 
 from datetime import datetime
+from typing import Any
 
 import strawberry
 
 from crits_api.graphql.types.common import (
-    extract_sources,
+    EmbeddedActionType,
+    EmbeddedRelationshipType,
+    EmbeddedTicketType,
+    SourceInfo,
+    extract_actions,
     extract_campaigns,
     extract_relationships,
-    extract_actions,
+    extract_sources,
     extract_tickets,
-    SourceInfo,
-    EmbeddedRelationshipType,
-    EmbeddedActionType,
-    EmbeddedTicketType,
 )
 
 
@@ -28,12 +29,12 @@ class EmbeddedToolType:
     details: str = ""
 
     @classmethod
-    def from_model(cls, tool) -> "EmbeddedToolType":
+    def from_model(cls, tool: Any) -> "EmbeddedToolType":
         """Create from EmbeddedTool model."""
         return cls(
-            name=getattr(tool, 'name', '') or '',
-            version=getattr(tool, 'version', '') or '',
-            details=getattr(tool, 'details', '') or '',
+            name=getattr(tool, "name", "") or "",
+            version=getattr(tool, "version", "") or "",
+            details=getattr(tool, "details", "") or "",
         )
 
 
@@ -49,15 +50,15 @@ class EmbeddedHighlightType:
     line_date: datetime | None = None
 
     @classmethod
-    def from_model(cls, highlight) -> "EmbeddedHighlightType":
+    def from_model(cls, highlight: Any) -> "EmbeddedHighlightType":
         """Create from EmbeddedHighlight model."""
         return cls(
-            line=getattr(highlight, 'line', 0) or 0,
-            line_data=getattr(highlight, 'line_data', '') or '',
-            comment=getattr(highlight, 'comment', '') or '',
-            analyst=getattr(highlight, 'analyst', '') or '',
-            date=getattr(highlight, 'date', None),
-            line_date=getattr(highlight, 'line_date', None),
+            line=getattr(highlight, "line", 0) or 0,
+            line_data=getattr(highlight, "line_data", "") or "",
+            comment=getattr(highlight, "comment", "") or "",
+            analyst=getattr(highlight, "analyst", "") or "",
+            date=getattr(highlight, "date", None),
+            line_date=getattr(highlight, "line_date", None),
         )
 
 
@@ -72,14 +73,14 @@ class EmbeddedInlineType:
     counter: int = 0
 
     @classmethod
-    def from_model(cls, inline) -> "EmbeddedInlineType":
+    def from_model(cls, inline: Any) -> "EmbeddedInlineType":
         """Create from EmbeddedInline model."""
         return cls(
-            line=getattr(inline, 'line', 0) or 0,
-            comment=getattr(inline, 'comment', '') or '',
-            analyst=getattr(inline, 'analyst', '') or '',
-            date=getattr(inline, 'date', None),
-            counter=getattr(inline, 'counter', 0) or 0,
+            line=getattr(inline, "line", 0) or 0,
+            comment=getattr(inline, "comment", "") or "",
+            analyst=getattr(inline, "analyst", "") or "",
+            date=getattr(inline, "date", None),
+            counter=getattr(inline, "counter", 0) or 0,
         )
 
 
@@ -122,50 +123,50 @@ class RawDataType:
     tickets: list[EmbeddedTicketType] = strawberry.field(default_factory=list)
 
     @classmethod
-    def from_model(cls, raw_data) -> "RawDataType":
+    def from_model(cls, raw_data: Any) -> "RawDataType":
         """Create RawDataType from RawData MongoEngine model."""
         # Handle tool
         tool = None
-        if hasattr(raw_data, 'tool') and raw_data.tool:
+        if hasattr(raw_data, "tool") and raw_data.tool:
             tool = EmbeddedToolType.from_model(raw_data.tool)
 
         # Handle highlights
         highlights = []
-        if hasattr(raw_data, 'highlights') and raw_data.highlights:
+        if hasattr(raw_data, "highlights") and raw_data.highlights:
             for h in raw_data.highlights:
                 highlights.append(EmbeddedHighlightType.from_model(h))
 
         # Handle inlines
         inlines = []
-        if hasattr(raw_data, 'inlines') and raw_data.inlines:
+        if hasattr(raw_data, "inlines") and raw_data.inlines:
             for i in raw_data.inlines:
                 inlines.append(EmbeddedInlineType.from_model(i))
 
         # Handle link_id UUID
-        link_id = ''
-        if hasattr(raw_data, 'link_id') and raw_data.link_id:
+        link_id = ""
+        if hasattr(raw_data, "link_id") and raw_data.link_id:
             link_id = str(raw_data.link_id)
 
         return cls(
             id=str(raw_data.id),
-            title=getattr(raw_data, 'title', '') or '',
-            data_type=getattr(raw_data, 'data_type', '') or '',
-            data=getattr(raw_data, 'data', '') or '',
-            md5=getattr(raw_data, 'md5', '') or '',
+            title=getattr(raw_data, "title", "") or "",
+            data_type=getattr(raw_data, "data_type", "") or "",
+            data=getattr(raw_data, "data", "") or "",
+            md5=getattr(raw_data, "md5", "") or "",
             link_id=link_id,
-            version=getattr(raw_data, 'version', 0) or 0,
-            description=getattr(raw_data, 'description', '') or '',
-            analyst=getattr(raw_data, 'analyst', '') or '',
-            status=getattr(raw_data, 'status', '') or '',
-            tlp=getattr(raw_data, 'tlp', '') or '',
-            created=getattr(raw_data, 'created', None),
-            modified=getattr(raw_data, 'modified', None),
+            version=getattr(raw_data, "version", 0) or 0,
+            description=getattr(raw_data, "description", "") or "",
+            analyst=getattr(raw_data, "analyst", "") or "",
+            status=getattr(raw_data, "status", "") or "",
+            tlp=getattr(raw_data, "tlp", "") or "",
+            created=getattr(raw_data, "created", None),
+            modified=getattr(raw_data, "modified", None),
             tool=tool,
             highlights=highlights,
             inlines=inlines,
             campaigns=extract_campaigns(raw_data),
-            bucket_list=list(getattr(raw_data, 'bucket_list', []) or []),
-            sectors=list(getattr(raw_data, 'sectors', []) or []),
+            bucket_list=list(getattr(raw_data, "bucket_list", []) or []),
+            sectors=list(getattr(raw_data, "sectors", []) or []),
             sources=extract_sources(raw_data),
             relationships=extract_relationships(raw_data),
             actions=extract_actions(raw_data),

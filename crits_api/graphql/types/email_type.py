@@ -5,19 +5,20 @@ Named email_type.py to avoid collision with Python's email module.
 """
 
 from datetime import datetime
+from typing import Any
 
 import strawberry
 
 from crits_api.graphql.types.common import (
-    extract_sources,
+    EmbeddedActionType,
+    EmbeddedRelationshipType,
+    EmbeddedTicketType,
+    SourceInfo,
+    extract_actions,
     extract_campaigns,
     extract_relationships,
-    extract_actions,
+    extract_sources,
     extract_tickets,
-    SourceInfo,
-    EmbeddedRelationshipType,
-    EmbeddedActionType,
-    EmbeddedTicketType,
 )
 
 
@@ -65,42 +66,42 @@ class EmailType:
     tickets: list[EmbeddedTicketType] = strawberry.field(default_factory=list)
 
     @classmethod
-    def from_model(cls, email) -> "EmailType":
+    def from_model(cls, email: Any) -> "EmailType":
         """Create EmailType from Email MongoEngine model."""
         # Handle raw_header which may be a special field type
-        raw_header = ''
-        if hasattr(email, 'raw_header'):
+        raw_header = ""
+        if hasattr(email, "raw_header"):
             rh = email.raw_header
             if rh:
                 raw_header = str(rh) if not isinstance(rh, str) else rh
 
         return cls(
             id=str(email.id),
-            subject=getattr(email, 'subject', '') or '',
-            from_address=getattr(email, 'from_address', '') or '',
-            sender=getattr(email, 'sender', '') or '',
-            reply_to=getattr(email, 'reply_to', '') or '',
-            to=list(getattr(email, 'to', []) or []),
-            cc=list(getattr(email, 'cc', []) or []),
-            date=getattr(email, 'date', '') or '',
-            isodate=getattr(email, 'isodate', None),
-            message_id=getattr(email, 'message_id', '') or '',
-            originating_ip=getattr(email, 'originating_ip', '') or '',
-            x_originating_ip=getattr(email, 'x_originating_ip', '') or '',
-            x_mailer=getattr(email, 'x_mailer', '') or '',
-            helo=getattr(email, 'helo', '') or '',
-            boundary=getattr(email, 'boundary', '') or '',
-            raw_body=getattr(email, 'raw_body', '') or '',
+            subject=getattr(email, "subject", "") or "",
+            from_address=getattr(email, "from_address", "") or "",
+            sender=getattr(email, "sender", "") or "",
+            reply_to=getattr(email, "reply_to", "") or "",
+            to=list(getattr(email, "to", []) or []),
+            cc=list(getattr(email, "cc", []) or []),
+            date=getattr(email, "date", "") or "",
+            isodate=getattr(email, "isodate", None),
+            message_id=getattr(email, "message_id", "") or "",
+            originating_ip=getattr(email, "originating_ip", "") or "",
+            x_originating_ip=getattr(email, "x_originating_ip", "") or "",
+            x_mailer=getattr(email, "x_mailer", "") or "",
+            helo=getattr(email, "helo", "") or "",
+            boundary=getattr(email, "boundary", "") or "",
+            raw_body=getattr(email, "raw_body", "") or "",
             raw_header=raw_header,
-            description=getattr(email, 'description', '') or '',
-            analyst=getattr(email, 'analyst', '') or '',
-            status=getattr(email, 'status', '') or '',
-            tlp=getattr(email, 'tlp', '') or '',
-            created=getattr(email, 'created', None),
-            modified=getattr(email, 'modified', None),
+            description=getattr(email, "description", "") or "",
+            analyst=getattr(email, "analyst", "") or "",
+            status=getattr(email, "status", "") or "",
+            tlp=getattr(email, "tlp", "") or "",
+            created=getattr(email, "created", None),
+            modified=getattr(email, "modified", None),
             campaigns=extract_campaigns(email),
-            bucket_list=list(getattr(email, 'bucket_list', []) or []),
-            sectors=list(getattr(email, 'sectors', []) or []),
+            bucket_list=list(getattr(email, "bucket_list", []) or []),
+            sectors=list(getattr(email, "sectors", []) or []),
             sources=extract_sources(email),
             relationships=extract_relationships(email),
             actions=extract_actions(email),

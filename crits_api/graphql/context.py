@@ -38,10 +38,7 @@ async def get_context(request: Request) -> GraphQLContext:
         acl = load_user_acl(user)
         sources = load_user_sources(user)
 
-        logger.debug(
-            f"Created context for user {user.username} "
-            f"with {len(sources)} source(s)"
-        )
+        logger.debug(f"Created context for user {user.username} with {len(sources)} source(s)")
 
         return GraphQLContext(
             request=request,

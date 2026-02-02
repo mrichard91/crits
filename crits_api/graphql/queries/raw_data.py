@@ -3,7 +3,6 @@ RawData queries for CRITs GraphQL API.
 """
 
 import logging
-from typing import Optional
 
 import strawberry
 from strawberry.types import Info
@@ -21,9 +20,10 @@ class RawDataQueries:
 
     @strawberry.field(description="Get a single raw data object by ID")
     @require_permission("RawData.read")
-    def raw_data(self, info: Info, id: str) -> Optional[RawDataType]:
+    def raw_data(self, info: Info, id: str) -> RawDataType | None:
         """Get a single raw data object by its ID."""
         from bson import ObjectId
+
         from crits.raw_data.raw_data import RawData
 
         ctx: GraphQLContext = info.context
@@ -53,10 +53,10 @@ class RawDataQueries:
         info: Info,
         limit: int = 25,
         offset: int = 0,
-        title_contains: Optional[str] = None,
-        data_type: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        title_contains: str | None = None,
+        data_type: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> list[RawDataType]:
         """List raw data objects with optional filtering."""
         from crits.raw_data.raw_data import RawData
@@ -84,7 +84,7 @@ class RawDataQueries:
             if campaign:
                 queryset = queryset.filter(campaign__name=campaign)
 
-            queryset = queryset.order_by('-modified')
+            queryset = queryset.order_by("-modified")
             raw_data_list = queryset.skip(offset).limit(limit)
 
             return [RawDataType.from_model(rd) for rd in raw_data_list]
@@ -98,9 +98,9 @@ class RawDataQueries:
     def raw_data_count(
         self,
         info: Info,
-        data_type: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        data_type: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> int:
         """Count raw data objects matching the filters."""
         from crits.raw_data.raw_data import RawData
@@ -137,7 +137,7 @@ class RawDataQueries:
         from crits.raw_data.raw_data import RawData
 
         try:
-            types = RawData.objects.distinct('data_type')
+            types = RawData.objects.distinct("data_type")
             return sorted([t for t in types if t])
         except Exception as e:
             logger.error(f"Error getting raw data types: {e}")

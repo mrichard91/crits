@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Redis client for session access (binary mode for pickle data)
-_redis_client: Optional[redis.Redis] = None
+_redis_client: redis.Redis | None = None
 
 
 async def get_redis_client() -> redis.Redis:
@@ -35,7 +35,7 @@ async def get_redis_client() -> redis.Redis:
     return _redis_client
 
 
-async def get_session_data(session_key: str) -> Optional[dict]:
+async def get_session_data(session_key: str) -> dict | None:
     """
     Load session data from Redis (Django cache session backend).
 

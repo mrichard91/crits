@@ -3,7 +3,6 @@ Certificate queries for CRITs GraphQL API.
 """
 
 import logging
-from typing import Optional
 
 import strawberry
 from strawberry.types import Info
@@ -21,9 +20,10 @@ class CertificateQueries:
 
     @strawberry.field(description="Get a single certificate by ID")
     @require_permission("Certificate.read")
-    def certificate(self, info: Info, id: str) -> Optional[CertificateType]:
+    def certificate(self, info: Info, id: str) -> CertificateType | None:
         """Get a single certificate by its ID."""
         from bson import ObjectId
+
         from crits.certificates.certificate import Certificate
 
         ctx: GraphQLContext = info.context
@@ -53,10 +53,10 @@ class CertificateQueries:
         info: Info,
         limit: int = 25,
         offset: int = 0,
-        filename_contains: Optional[str] = None,
-        md5: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        filename_contains: str | None = None,
+        md5: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> list[CertificateType]:
         """List certificates with optional filtering."""
         from crits.certificates.certificate import Certificate
@@ -84,7 +84,7 @@ class CertificateQueries:
             if campaign:
                 queryset = queryset.filter(campaign__name=campaign)
 
-            queryset = queryset.order_by('-modified')
+            queryset = queryset.order_by("-modified")
             certs = queryset.skip(offset).limit(limit)
 
             return [CertificateType.from_model(c) for c in certs]
@@ -98,8 +98,8 @@ class CertificateQueries:
     def certificates_count(
         self,
         info: Info,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> int:
         """Count certificates matching the filters."""
         from crits.certificates.certificate import Certificate

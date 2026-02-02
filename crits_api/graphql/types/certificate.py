@@ -3,19 +3,20 @@ Certificate GraphQL type for CRITs API.
 """
 
 from datetime import datetime
+from typing import Any
 
 import strawberry
 
 from crits_api.graphql.types.common import (
-    extract_sources,
+    EmbeddedActionType,
+    EmbeddedRelationshipType,
+    EmbeddedTicketType,
+    SourceInfo,
+    extract_actions,
     extract_campaigns,
     extract_relationships,
-    extract_actions,
+    extract_sources,
     extract_tickets,
-    SourceInfo,
-    EmbeddedRelationshipType,
-    EmbeddedActionType,
-    EmbeddedTicketType,
 )
 
 
@@ -51,23 +52,23 @@ class CertificateType:
     tickets: list[EmbeddedTicketType] = strawberry.field(default_factory=list)
 
     @classmethod
-    def from_model(cls, cert) -> "CertificateType":
+    def from_model(cls, cert: Any) -> "CertificateType":
         """Create CertificateType from Certificate MongoEngine model."""
         return cls(
             id=str(cert.id),
-            filename=getattr(cert, 'filename', '') or '',
-            filetype=getattr(cert, 'filetype', '') or '',
-            md5=getattr(cert, 'md5', '') or '',
-            size=getattr(cert, 'size', 0) or 0,
-            description=getattr(cert, 'description', '') or '',
-            analyst=getattr(cert, 'analyst', '') or '',
-            status=getattr(cert, 'status', '') or '',
-            tlp=getattr(cert, 'tlp', '') or '',
-            created=getattr(cert, 'created', None),
-            modified=getattr(cert, 'modified', None),
+            filename=getattr(cert, "filename", "") or "",
+            filetype=getattr(cert, "filetype", "") or "",
+            md5=getattr(cert, "md5", "") or "",
+            size=getattr(cert, "size", 0) or 0,
+            description=getattr(cert, "description", "") or "",
+            analyst=getattr(cert, "analyst", "") or "",
+            status=getattr(cert, "status", "") or "",
+            tlp=getattr(cert, "tlp", "") or "",
+            created=getattr(cert, "created", None),
+            modified=getattr(cert, "modified", None),
             campaigns=extract_campaigns(cert),
-            bucket_list=list(getattr(cert, 'bucket_list', []) or []),
-            sectors=list(getattr(cert, 'sectors', []) or []),
+            bucket_list=list(getattr(cert, "bucket_list", []) or []),
+            sectors=list(getattr(cert, "sectors", []) or []),
             sources=extract_sources(cert),
             relationships=extract_relationships(cert),
             actions=extract_actions(cert),

@@ -3,19 +3,20 @@ PCAP GraphQL type for CRITs API.
 """
 
 from datetime import datetime
+from typing import Any
 
 import strawberry
 
 from crits_api.graphql.types.common import (
-    extract_sources,
+    EmbeddedActionType,
+    EmbeddedRelationshipType,
+    EmbeddedTicketType,
+    SourceInfo,
+    extract_actions,
     extract_campaigns,
     extract_relationships,
-    extract_actions,
+    extract_sources,
     extract_tickets,
-    SourceInfo,
-    EmbeddedRelationshipType,
-    EmbeddedActionType,
-    EmbeddedTicketType,
 )
 
 
@@ -51,23 +52,23 @@ class PCAPType:
     tickets: list[EmbeddedTicketType] = strawberry.field(default_factory=list)
 
     @classmethod
-    def from_model(cls, pcap) -> "PCAPType":
+    def from_model(cls, pcap: Any) -> "PCAPType":
         """Create PCAPType from PCAP MongoEngine model."""
         return cls(
             id=str(pcap.id),
-            filename=getattr(pcap, 'filename', '') or '',
-            content_type=getattr(pcap, 'contentType', '') or '',
-            md5=getattr(pcap, 'md5', '') or '',
-            length=getattr(pcap, 'length', 0) or 0,
-            description=getattr(pcap, 'description', '') or '',
-            analyst=getattr(pcap, 'analyst', '') or '',
-            status=getattr(pcap, 'status', '') or '',
-            tlp=getattr(pcap, 'tlp', '') or '',
-            created=getattr(pcap, 'created', None),
-            modified=getattr(pcap, 'modified', None),
+            filename=getattr(pcap, "filename", "") or "",
+            content_type=getattr(pcap, "contentType", "") or "",
+            md5=getattr(pcap, "md5", "") or "",
+            length=getattr(pcap, "length", 0) or 0,
+            description=getattr(pcap, "description", "") or "",
+            analyst=getattr(pcap, "analyst", "") or "",
+            status=getattr(pcap, "status", "") or "",
+            tlp=getattr(pcap, "tlp", "") or "",
+            created=getattr(pcap, "created", None),
+            modified=getattr(pcap, "modified", None),
             campaigns=extract_campaigns(pcap),
-            bucket_list=list(getattr(pcap, 'bucket_list', []) or []),
-            sectors=list(getattr(pcap, 'sectors', []) or []),
+            bucket_list=list(getattr(pcap, "bucket_list", []) or []),
+            sectors=list(getattr(pcap, "sectors", []) or []),
             sources=extract_sources(pcap),
             relationships=extract_relationships(pcap),
             actions=extract_actions(pcap),

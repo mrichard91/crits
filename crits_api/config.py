@@ -6,7 +6,6 @@ Uses Pydantic settings for environment variable management.
 
 import os
 from functools import lru_cache
-from typing import Optional
 
 from pydantic_settings import BaseSettings
 
@@ -30,8 +29,8 @@ class Settings(BaseSettings):
     mongo_host: str = "localhost"
     mongo_port: int = 27017
     mongo_database: str = "crits"
-    mongo_username: Optional[str] = None
-    mongo_password: Optional[str] = None
+    mongo_username: str | None = None
+    mongo_password: str | None = None
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"

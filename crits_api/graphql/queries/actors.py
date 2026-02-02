@@ -3,7 +3,6 @@ Actor queries for CRITs GraphQL API.
 """
 
 import logging
-from typing import Optional
 
 import strawberry
 from strawberry.types import Info
@@ -21,9 +20,10 @@ class ActorQueries:
 
     @strawberry.field(description="Get a single actor by ID")
     @require_permission("Actor.read")
-    def actor(self, info: Info, id: str) -> Optional[ActorType]:
+    def actor(self, info: Info, id: str) -> ActorType | None:
         """Get a single actor by its ID."""
         from bson import ObjectId
+
         from crits.actors.actor import Actor
 
         ctx: GraphQLContext = info.context
@@ -53,9 +53,9 @@ class ActorQueries:
         info: Info,
         limit: int = 25,
         offset: int = 0,
-        name_contains: Optional[str] = None,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        name_contains: str | None = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> list[ActorType]:
         """List actors with optional filtering."""
         from crits.actors.actor import Actor
@@ -80,7 +80,7 @@ class ActorQueries:
             if campaign:
                 queryset = queryset.filter(campaign__name=campaign)
 
-            queryset = queryset.order_by('-modified')
+            queryset = queryset.order_by("-modified")
             actors = queryset.skip(offset).limit(limit)
 
             return [ActorType.from_model(a) for a in actors]
@@ -94,8 +94,8 @@ class ActorQueries:
     def actors_count(
         self,
         info: Info,
-        status: Optional[str] = None,
-        campaign: Optional[str] = None,
+        status: str | None = None,
+        campaign: str | None = None,
     ) -> int:
         """Count actors matching the filters."""
         from crits.actors.actor import Actor

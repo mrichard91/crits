@@ -3,19 +3,20 @@ Backdoor GraphQL type for CRITs API.
 """
 
 from datetime import datetime
+from typing import Any
 
 import strawberry
 
 from crits_api.graphql.types.common import (
-    extract_sources,
+    EmbeddedActionType,
+    EmbeddedRelationshipType,
+    EmbeddedTicketType,
+    SourceInfo,
+    extract_actions,
     extract_campaigns,
     extract_relationships,
-    extract_actions,
+    extract_sources,
     extract_tickets,
-    SourceInfo,
-    EmbeddedRelationshipType,
-    EmbeddedActionType,
-    EmbeddedTicketType,
 )
 
 
@@ -50,22 +51,22 @@ class BackdoorType:
     tickets: list[EmbeddedTicketType] = strawberry.field(default_factory=list)
 
     @classmethod
-    def from_model(cls, backdoor) -> "BackdoorType":
+    def from_model(cls, backdoor: Any) -> "BackdoorType":
         """Create BackdoorType from Backdoor MongoEngine model."""
         return cls(
             id=str(backdoor.id),
-            name=getattr(backdoor, 'name', '') or '',
-            description=getattr(backdoor, 'description', '') or '',
-            aliases=list(getattr(backdoor, 'aliases', []) or []),
-            version=getattr(backdoor, 'version', '') or '',
-            analyst=getattr(backdoor, 'analyst', '') or '',
-            status=getattr(backdoor, 'status', '') or '',
-            tlp=getattr(backdoor, 'tlp', '') or '',
-            created=getattr(backdoor, 'created', None),
-            modified=getattr(backdoor, 'modified', None),
+            name=getattr(backdoor, "name", "") or "",
+            description=getattr(backdoor, "description", "") or "",
+            aliases=list(getattr(backdoor, "aliases", []) or []),
+            version=getattr(backdoor, "version", "") or "",
+            analyst=getattr(backdoor, "analyst", "") or "",
+            status=getattr(backdoor, "status", "") or "",
+            tlp=getattr(backdoor, "tlp", "") or "",
+            created=getattr(backdoor, "created", None),
+            modified=getattr(backdoor, "modified", None),
             campaigns=extract_campaigns(backdoor),
-            bucket_list=list(getattr(backdoor, 'bucket_list', []) or []),
-            sectors=list(getattr(backdoor, 'sectors', []) or []),
+            bucket_list=list(getattr(backdoor, "bucket_list", []) or []),
+            sectors=list(getattr(backdoor, "sectors", []) or []),
             sources=extract_sources(backdoor),
             relationships=extract_relationships(backdoor),
             actions=extract_actions(backdoor),
