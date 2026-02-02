@@ -4,7 +4,7 @@
 
 This document outlines the comprehensive migration of CRITs from a Python 2.7/Django 1.x application to a modern Python 3.12+/FastAPI/React stack. The migration preserves the core functionality and visual identity while modernizing the architecture for maintainability, performance, and security.
 
-### Current State
+### Original State (Pre-Migration)
 - **Backend**: Python 2.7, Django 1.x, Tastypie REST API
 - **Frontend**: Server-side Django templates, jQuery 1.10, jTable
 - **Database**: MongoDB via MongoEngine 0.8.9 (patched)
@@ -12,310 +12,466 @@ This document outlines the comprehensive migration of CRITs from a Python 2.7/Dj
 - **Tasks**: Celery with django-celery, thread/process pools
 - **Deploy**: Single Dockerfile (dev), Apache/mod_wsgi (prod)
 
-### Target State
-- **Backend**: Python 3.12+, FastAPI, Strawberry GraphQL
-- **Frontend**: React 18+, Tailwind CSS, TanStack components
-- **Database**: MongoDB via Beanie ODM (async), Pydantic models
-- **Auth**: GitHub OAuth via authlib, JWT sessions
-- **Tasks**: Celery 5+ with Redis broker, async workers
-- **Deploy**: Docker Compose stack (nginx, api, ui, worker, mongo, redis)
+### Current State (Phase 1-2 Complete)
+- **Backend**: Python 3.12, Django 4.2 (working), Tastypie disabled
+- **Frontend**: Django templates, jQuery (unchanged)
+- **Database**: MongoDB 7.x via MongoEngine 0.28+, PyMongo 4.6+
+- **Auth**: CRITs auth (working), GitHub OAuth (planned)
+- **Tasks**: Celery 5.3+ with Redis broker
+- **Deploy**: Docker Compose stack (nginx, web, mongo, redis) ✅
+
+### Target State (Incremental)
+- **Backend**: Django 4.2 (legacy UI) + FastAPI (GraphQL API) running side-by-side
+- **API**: Strawberry GraphQL with FastAPI, replacing Tastypie REST
+- **Frontend**: React 18+ (future), consuming GraphQL API
+- **Database**: MongoDB via MongoEngine (shared with Django), optimized queries
+- **Auth**: Shared session/JWT between Django and FastAPI
+- **Caching**: Redis with 15-minute default TTL, mutation-based invalidation
+- **Deploy**: Docker Compose with nginx routing `/api/graphql` → FastAPI
+
+### Architecture Decision: Side-by-Side Operation
+
+**Rationale**: Rather than a "big bang" replacement, we run Django and FastAPI concurrently:
+
+1. **nginx** routes requests:
+   - `/api/graphql` → FastAPI (new GraphQL API)
+   - `/*` → Django (existing web UI)
+
+2. **Shared MongoEngine models**: FastAPI uses the same models as Django, no data migration needed
+
+3. **Shared authentication**: User sessions/tokens work across both services
+
+4. **Incremental migration**: New React UI can be built against GraphQL while Django UI remains functional
 
 ---
 
-## Phase 1: Python 3.12 Migration & Project Modernization
+## Phase 1: Python 3.12 Migration & Project Modernization ✅ COMPLETE
 
-### 1a. Create pyproject.toml and Modern Project Structure
-- [ ] Create `pyproject.toml` with project metadata, Python 3.12+ requirement
-- [ ] Define dependencies with version constraints (split dev/prod)
-- [ ] Configure build system (hatchling or setuptools)
-- [ ] Add tool configurations (ruff, mypy, pytest)
-- [ ] Create `src/` directory structure for new code
+### 1a. Create pyproject.toml and Modern Project Structure ✅
+- [x] Create `pyproject.toml` with project metadata, Python 3.12+ requirement
+- [x] Define dependencies with version constraints (split dev/prod)
+- [x] Configure build system (hatchling or setuptools)
+- [x] Add tool configurations (ruff, mypy, pytest)
+- [ ] Create `src/` directory structure for new code (deferred - using existing structure)
 
-### 1b. Set Up Development Environment
-- [ ] Create `requirements-legacy.txt` snapshot of current deps
-- [ ] Add `.python-version` file for pyenv (3.12.x)
-- [ ] Create `Makefile` with common commands (install, lint, test, run)
-- [ ] Set up pre-commit hooks configuration
-- [ ] Add VS Code / PyCharm project settings
+### 1b. Set Up Development Environment ✅
+- [x] Create `requirements-legacy.txt` snapshot of current deps
+- [x] Add `.python-version` file for pyenv (3.12.x)
+- [x] Create `Makefile` with common commands (install, lint, test, run)
+- [ ] Set up pre-commit hooks configuration (optional)
+- [ ] Add VS Code / PyCharm project settings (optional)
 
-### 1c. Python 2 to 3 Syntax Migration - Core Module
-- [ ] Run `2to3` tool on `crits/core/` directory
-- [ ] Fix print statements → print() functions
-- [ ] Fix unicode/str handling (u"" prefixes, encode/decode)
-- [ ] Update dict methods (.keys(), .values(), .items() return views)
-- [ ] Fix integer division (// vs /)
-- [ ] Update exception syntax (except E as e:)
-- [ ] Fix imports (ConfigParser, urllib, etc.)
+### 1c. Python 2 to 3 Syntax Migration - Core Module ✅
+- [x] Fix print statements → print() functions
+- [x] Fix unicode/str handling (removed .decode() on strings)
+- [x] Update dict methods (.keys(), .values(), .items() return views)
+- [x] Fix integer division (// vs /)
+- [x] Update exception syntax (except E as e:)
+- [x] Fix imports (ConfigParser, urllib, etc.)
+- [x] Replace `cgi.escape()` with `html.escape()`
 
-### 1d. Python 2 to 3 Syntax Migration - App Modules
-- [ ] Migrate `crits/actors/` module
-- [ ] Migrate `crits/backdoors/` module
-- [ ] Migrate `crits/campaigns/` module
-- [ ] Migrate `crits/certificates/` module
-- [ ] Migrate `crits/comments/` module
-- [ ] Migrate `crits/dashboards/` module
-- [ ] Migrate `crits/domains/` module
-- [ ] Migrate `crits/emails/` module
-- [ ] Migrate `crits/events/` module
-- [ ] Migrate `crits/exploits/` module
-- [ ] Migrate `crits/indicators/` module
-- [ ] Migrate `crits/ips/` module
-- [ ] Migrate `crits/locations/` module
-- [ ] Migrate `crits/notifications/` module
-- [ ] Migrate `crits/objects/` module
-- [ ] Migrate `crits/pcaps/` module
-- [ ] Migrate `crits/raw_data/` module
-- [ ] Migrate `crits/relationships/` module
-- [ ] Migrate `crits/samples/` module
-- [ ] Migrate `crits/screenshots/` module
-- [ ] Migrate `crits/services/` module
-- [ ] Migrate `crits/signatures/` module
-- [ ] Migrate `crits/stats/` module
-- [ ] Migrate `crits/targets/` module
-- [ ] Migrate `crits/vocabulary/` module
+### 1d. Python 2 to 3 Syntax Migration - App Modules ✅
+- [x] All 27 TLO modules migrated and working with Python 3.12
+- [x] Fixed `{% ifequal %}` / `{% ifnotequal %}` → `{% if %}` in templates
+- [x] Fixed `is_ajax()` removal in Django 4.0+ (compatibility shim added)
+- [x] Fixed `Cursor.count()` → `count_documents()` for PyMongo 4.0+
+- [x] Fixed `is_safe_url()` → added `allowed_hosts` parameter
 
-### 1e. Update Dependencies to Python 3 Compatible Versions
-- [ ] Update MongoEngine to 0.27+ (Python 3 compatible)
-- [ ] Update PyMongo to 4.6+ (Python 3.12 compatible)
-- [ ] Update Django to 4.2 LTS (temporary, before FastAPI migration)
-- [ ] Replace pycrypto with cryptography library
-- [ ] Update Pillow to 10.x
-- [ ] Update python-magic to latest
-- [ ] Update lxml to latest
-- [ ] Update requests to latest
-- [ ] Update PyYAML to latest
-- [ ] Update celery to 5.3+
-- [ ] Update python-dateutil to latest
-- [ ] Remove/replace deprecated packages (simplejson, anyjson)
+### 1e. Update Dependencies to Python 3 Compatible Versions ✅
+- [x] Update MongoEngine to 0.28+ (Python 3 compatible)
+- [x] Update PyMongo to 4.6+ (Python 3.12 compatible)
+- [x] Update Django to 4.2 LTS
+- [x] Replace pycrypto with cryptography library
+- [x] Update Pillow to 10.x
+- [x] Update python-magic to latest
+- [x] Update lxml to latest
+- [x] Update requests to latest
+- [x] Update PyYAML to latest
+- [x] Update celery to 5.3+
+- [x] Update python-dateutil to latest
+- [x] Remove/replace deprecated packages (simplejson, anyjson)
 
-### 1f. Fix MongoEngine Compatibility Issues
-- [ ] Update Document class definitions for new API
-- [ ] Fix queryset operations (no_dereference, etc.)
-- [ ] Update field definitions (StringField, etc.)
-- [ ] Fix GridFS file handling for new API
-- [ ] Update connection management code
-- [ ] Test all model save/load operations
+### 1f. Fix MongoEngine Compatibility Issues ✅
+- [x] Update Document class definitions for new API
+- [x] Fix queryset operations (no_dereference, etc.)
+- [x] Update field definitions (StringField, etc.)
+- [x] Fix GridFS file handling for new API
+- [x] Update connection management code
+- [x] Test all model save/load operations
 
-### 1g. Validate Python 3.12 Migration
-- [ ] Run existing test suite with Python 3.12
-- [ ] Fix failing tests due to migration
-- [ ] Add type hints to core modules (gradual)
-- [ ] Run mypy on migrated code
-- [ ] Run ruff linter and fix issues
-- [ ] Create migration test script for CI
+### 1g. Validate Python 3.12 Migration ✅
+- [x] Core functionality working (login, dashboard, domains, users)
+- [ ] Add type hints to core modules (gradual - deferred)
+- [ ] Run mypy on migrated code (deferred)
+- [ ] Comprehensive test coverage (deferred to Phase 8)
 
 ---
 
-## Phase 2: Docker Stack Foundation
+## Phase 2: Docker Stack Foundation ✅ COMPLETE
 
-### 2a. Create Base Docker Infrastructure
-- [ ] Create `docker/` directory structure
-- [ ] Write `docker/Dockerfile.api` (Python 3.12 FastAPI)
-- [ ] Write `docker/Dockerfile.ui` (Node 20 + nginx)
-- [ ] Write `docker/Dockerfile.worker` (Celery worker)
-- [ ] Create `.dockerignore` with proper exclusions
-- [ ] Create `docker/nginx/nginx.conf` for reverse proxy
+### 2a. Create Base Docker Infrastructure ✅
+- [x] Create `docker/` directory structure
+- [x] Write `docker/Dockerfile.web` (Python 3.12 Django + Gunicorn)
+- [ ] Write `docker/Dockerfile.api` (FastAPI - Phase 3)
+- [ ] Write `docker/Dockerfile.ui` (Node 20 + nginx - Phase 5)
+- [x] Create `.dockerignore` with proper exclusions
+- [x] Create `docker/nginx.conf` for reverse proxy
 
-### 2b. Create Docker Compose Configuration
-- [ ] Write `docker-compose.yml` for development
-- [ ] Write `docker-compose.prod.yml` for production
-- [ ] Configure MongoDB service with persistence
-- [ ] Configure Redis service for caching/broker
-- [ ] Configure nginx service with SSL support
-- [ ] Add healthchecks for all services
-- [ ] Configure named volumes for data persistence
-- [ ] Set up inter-service networking
+### 2b. Create Docker Compose Configuration ✅
+- [x] Write `docker-compose.yml` for development
+- [ ] Write `docker-compose.prod.yml` for production (deferred)
+- [x] Configure MongoDB service with persistence
+- [x] Configure Redis service for caching/broker
+- [x] Configure nginx service (SSL deferred to production)
+- [x] Add healthchecks for all services
+- [x] Configure named volumes for data persistence
+- [x] Set up inter-service networking
 
-### 2c. Create Environment Configuration
-- [ ] Create `.env.example` with all variables
-- [ ] Document all environment variables
-- [ ] Create `docker/env/` with per-service env files
-- [ ] Add secrets management approach (Docker secrets or env)
-- [ ] Configure MongoDB authentication
-- [ ] Configure Redis authentication
+### 2c. Create Environment Configuration ✅
+- [x] Document environment variables in docker-compose.yml
+- [x] Configure CSRF_TRUSTED_ORIGINS for proxy setup
+- [x] Configure SECURE_COOKIES for HTTP development
+- [ ] Add secrets management approach (deferred to production)
+- [ ] Configure MongoDB authentication (deferred to production)
+- [ ] Configure Redis authentication (deferred to production)
 
-### 2d. Database Migration Scripts
-- [ ] Create MongoDB initialization script
-- [ ] Create index creation script for collections
-- [ ] Create data migration script from legacy format
-- [ ] Add backup/restore utilities
-- [ ] Create seed data for development
-
----
-
-## Phase 3: FastAPI Backend Implementation
-
-### 3a. Create FastAPI Application Structure
-- [ ] Create `src/crits_api/` package
-- [ ] Create `src/crits_api/main.py` with FastAPI app
-- [ ] Create `src/crits_api/config.py` with Pydantic settings
-- [ ] Create `src/crits_api/dependencies.py` for DI
-- [ ] Set up CORS middleware configuration
-- [ ] Set up request logging middleware
-- [ ] Create health check endpoints
-
-### 3b. Implement Beanie ODM Models - Core
-- [ ] Create `src/crits_api/models/` package
-- [ ] Create `base.py` with CritsDocument base class
-- [ ] Create `user.py` with User model
-- [ ] Create `role.py` with Role model
-- [ ] Create `source.py` with Source and SourceAccess models
-- [ ] Create `audit.py` with AuditLog model
-- [ ] Create `config.py` with CRITsConfig model
-- [ ] Create `comment.py` with Comment model
-- [ ] Create `relationship.py` with Relationship model
-
-### 3c. Implement Beanie ODM Models - TLOs (Top-Level Objects)
-- [ ] Create `actor.py` with Actor model
-- [ ] Create `backdoor.py` with Backdoor model
-- [ ] Create `campaign.py` with Campaign model
-- [ ] Create `certificate.py` with Certificate model
-- [ ] Create `domain.py` with Domain model
-- [ ] Create `email.py` with Email model
-- [ ] Create `event.py` with Event model
-- [ ] Create `exploit.py` with Exploit model
-- [ ] Create `indicator.py` with Indicator model
-- [ ] Create `ip.py` with IP model
-- [ ] Create `pcap.py` with PCAP model
-- [ ] Create `raw_data.py` with RawData model
-- [ ] Create `sample.py` with Sample model
-- [ ] Create `screenshot.py` with Screenshot model
-- [ ] Create `signature.py` with Signature model
-- [ ] Create `target.py` with Target model
-
-### 3d. Implement Pydantic Schemas
-- [ ] Create `src/crits_api/schemas/` package
-- [ ] Create input/output schemas for each TLO
-- [ ] Create pagination schemas
-- [ ] Create filter/search schemas
-- [ ] Create error response schemas
-- [ ] Add OpenAPI schema customizations
-
-### 3e. GitHub OAuth Implementation
-- [ ] Install authlib dependency
-- [ ] Create `src/crits_api/auth/` package
-- [ ] Create `oauth.py` with GitHub OAuth client
-- [ ] Create `jwt.py` with JWT token handling
-- [ ] Create `dependencies.py` with auth dependencies
-- [ ] Implement login redirect endpoint
-- [ ] Implement OAuth callback endpoint
-- [ ] Implement token refresh endpoint
-- [ ] Implement logout endpoint
-- [ ] Create user provisioning from GitHub profile
-- [ ] Map GitHub organizations to CRITs roles
-
-### 3f. REST API Endpoints - Core
-- [ ] Create `src/crits_api/routers/` package
-- [ ] Create `auth.py` router (login, logout, me)
-- [ ] Create `users.py` router (CRUD, preferences)
-- [ ] Create `roles.py` router (CRUD, permissions)
-- [ ] Create `sources.py` router (CRUD, access)
-- [ ] Create `config.py` router (system settings)
-- [ ] Create `audit.py` router (log viewing)
-- [ ] Create `search.py` router (global search)
-- [ ] Create `dashboard.py` router (stats, widgets)
-
-### 3g. REST API Endpoints - TLOs
-- [ ] Create `actors.py` router with full CRUD
-- [ ] Create `backdoors.py` router with full CRUD
-- [ ] Create `campaigns.py` router with full CRUD
-- [ ] Create `certificates.py` router with full CRUD
-- [ ] Create `domains.py` router with full CRUD
-- [ ] Create `emails.py` router with full CRUD
-- [ ] Create `events.py` router with full CRUD
-- [ ] Create `exploits.py` router with full CRUD
-- [ ] Create `indicators.py` router with full CRUD
-- [ ] Create `ips.py` router with full CRUD
-- [ ] Create `pcaps.py` router with full CRUD
-- [ ] Create `raw_data.py` router with full CRUD
-- [ ] Create `samples.py` router with full CRUD
-- [ ] Create `screenshots.py` router with full CRUD
-- [ ] Create `signatures.py` router with full CRUD
-- [ ] Create `targets.py` router with full CRUD
-
-### 3h. File Upload/Download Handling
-- [ ] Implement GridFS async file storage
-- [ ] Create file upload endpoint with streaming
-- [ ] Create file download endpoint with streaming
-- [ ] Implement file type detection
-- [ ] Add virus/malware upload safety measures
-- [ ] Implement file hash calculation (MD5, SHA1, SHA256)
+### 2d. Database Migration Scripts (Partial)
+- [x] Create MongoDB initialization via Django management commands
+- [ ] Create index creation script for collections (Phase 3)
+- [x] Data migration not needed (same MongoDB, same models)
+- [ ] Add backup/restore utilities (deferred)
+- [ ] Create seed data for development (deferred)
 
 ---
 
-## Phase 4: Strawberry GraphQL Server
+## Phase 3: FastAPI + Strawberry GraphQL API ✅ COMPLETE
 
-### 4a. GraphQL Schema Foundation
-- [ ] Install strawberry-graphql with FastAPI integration
-- [ ] Create `src/crits_api/graphql/` package
-- [ ] Create `schema.py` with root Query and Mutation types
-- [ ] Create `context.py` with request context
-- [ ] Create `dataloaders.py` for N+1 prevention
-- [ ] Mount GraphQL endpoint on FastAPI app
-- [ ] Configure GraphQL playground/explorer
+> **Architecture Decision**: The GraphQL API runs alongside Django, sharing MongoEngine models.
+> nginx routes `/api/graphql` to FastAPI while Django serves the legacy UI.
 
-### 4b. GraphQL Types - Core
-- [ ] Create `types/user.py` with UserType
-- [ ] Create `types/role.py` with RoleType
-- [ ] Create `types/source.py` with SourceType
-- [ ] Create `types/comment.py` with CommentType
-- [ ] Create `types/relationship.py` with RelationshipType
-- [ ] Create `types/audit.py` with AuditLogType
-- [ ] Create `types/pagination.py` with Connection types
+### 3a. FastAPI Application Structure ✅
+- [x] Create `crits_api/` package in project root
+- [x] Create `crits_api/main.py` with FastAPI app
+- [x] Create `crits_api/config.py` with Pydantic settings
+- [x] Set up CORS middleware (allow Django frontend origin)
+- [x] Set up exception handling middleware
+- [x] Create health check endpoint (`/api/health`)
+- [x] Create `docker/Dockerfile.api` for FastAPI service
+- [x] Update `docker-compose.yml` with api service
+- [x] Update `docker/nginx.conf` to route `/api/graphql` → FastAPI
 
-### 4c. GraphQL Types - TLOs
-- [ ] Create `types/actor.py` with ActorType
-- [ ] Create `types/backdoor.py` with BackdoorType
-- [ ] Create `types/campaign.py` with CampaignType
-- [ ] Create `types/certificate.py` with CertificateType
-- [ ] Create `types/domain.py` with DomainType
-- [ ] Create `types/email.py` with EmailType
-- [ ] Create `types/event.py` with EventType
-- [ ] Create `types/exploit.py` with ExploitType
-- [ ] Create `types/indicator.py` with IndicatorType
-- [ ] Create `types/ip.py` with IPType
-- [ ] Create `types/pcap.py` with PCAPType
-- [ ] Create `types/raw_data.py` with RawDataType
-- [ ] Create `types/sample.py` with SampleType
-- [ ] Create `types/screenshot.py` with ScreenshotType
-- [ ] Create `types/signature.py` with SignatureType
-- [ ] Create `types/target.py` with TargetType
+### 3b. Shared MongoEngine Models (No Migration) ✅
+
+> **Key Decision**: Reuse existing MongoEngine models from `crits/` instead of creating Beanie models.
+> This allows Django and FastAPI to share the same data layer without data migration.
+
+- [x] Import MongoEngine models from `crits/` directly in resolvers
+- [x] Django setup initializes MongoEngine connection for FastAPI
+- [x] Verified MongoEngine works in FastAPI context (sync driver)
+
+### 3c. Authentication & Request Context ✅
+
+> **Key Requirement**: Share authentication with Django; populate request context with user details.
+
+- [x] Create `crits_api/auth/` package
+- [x] Create `context.py` with `GraphQLContext` class containing:
+  - `user: CRITsUser` - authenticated user object
+  - `acl: dict` - merged permissions from user's roles
+  - `sources: list` - user's accessible sources by TLP level
+  - `sources_hash: str` - hash for cache key generation
+  - `request: Request` - FastAPI request object
+- [x] Create `session.py` with Django session validation:
+  - Read `sessionid` cookie from request
+  - Load session from Redis (pickle deserialization)
+  - Resolve `_auth_user_id` to CRITsUser
+- [x] Create `permissions.py` with permission check utilities:
+  - `require_permission(acl_string)` - decorator for resolvers
+  - `require_authenticated` - decorator for auth-required resolvers
+  - `check_source_access(user, sources, tlp)` - source/TLP filter
+  - `filter_by_sources(queryset, user)` - query-level filtering
+- [x] Update Django to use Redis-backed sessions for sharing
+
+### 3d. Permission Replication from Django ✅
+
+> **Key Requirement**: Apply the same permission checks as Django code.
+
+**Permission Model (from `crits/core/role.py` and `crits/core/user.py`):**
+
+| Permission Type | Example | Check Method |
+|----------------|---------|--------------|
+| Interface Access | `api_interface` | `user.has_access_to(GeneralACL.API_INTERFACE)` |
+| TLO Read/Write | `Sample.read` | `user.has_access_to(SampleACL.READ)` |
+| Sub-object Access | `Sample.comments_add` | `user.has_access_to(SampleACL.COMMENTS_ADD)` |
+| Source Access | read + TLP level | `user.check_source_tlp(object)` |
+| Superuser | all | `user.is_superuser` bypasses checks |
+
+- [x] Reuse `user.has_access_to()` via GraphQLContext
+- [x] Reuse `user.filter_dict_source_tlp()` for query-level filtering
+- [x] Create resolver decorators: `@require_permission`, `@require_authenticated`
+- [x] Source/TLP filtering applied in indicator queries
+
+### 3e. Redis Caching Strategy (Foundation)
+
+> **Key Requirement**: 15-minute default TTL, mutation-based invalidation.
+
+- [x] Create `crits_api/cache/` package structure
+- [x] Create `redis_client.py` with async Redis connection
+- [x] Create `keys.py` with cache key generation (includes user_sources_hash)
+- [x] Create `decorators.py` with `@cached` and `@invalidates` decorators
+- [ ] Implement cache invalidation on mutations (Phase 4)
+- [ ] Add cache hit/miss metrics logging
+
+### 3f. MongoDB Query Optimization (Foundation)
+
+> **Key Requirement**: Don't assume old Django code is optimal. Optimize queries.
+
+- [x] Create `crits_api/db/` package with connection utilities
+- [x] Use `.order_by()` for consistent pagination
+- [x] Implement offset-based pagination (cursor-based deferred)
+- [ ] Implement DataLoader pattern for relationship resolution (Phase 4)
+- [ ] Add MongoDB indexes for GraphQL query patterns (Phase 4)
+- [ ] Monitor and log slow queries (>100ms)
+
+### 3g. Architecture Summary (Phase 3)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                            nginx (:8080)                            │
+│  ┌──────────────────────────┐  ┌──────────────────────────────────┐ │
+│  │  /api/graphql → api:8001 │  │  /* → web:8000 (Django)          │ │
+│  └──────────────────────────┘  └──────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
+         │                                    │
+         ▼                                    ▼
+┌─────────────────────┐              ┌─────────────────────┐
+│  FastAPI + Strawberry│              │  Django 4.2         │
+│  (:8001)            │              │  (:8000)            │
+│                     │              │                     │
+│  ┌───────────────┐  │              │  ┌───────────────┐  │
+│  │ GraphQL Schema│  │              │  │ Views/Forms   │  │
+│  └───────────────┘  │              │  └───────────────┘  │
+│  ┌───────────────┐  │              │  ┌───────────────┐  │
+│  │ Auth Context  │◄─┼──────────────┼──│ Sessions      │  │
+│  └───────────────┘  │   (shared)   │  └───────────────┘  │
+│  ┌───────────────┐  │              │  ┌───────────────┐  │
+│  │ Caching Layer │  │              │  │ Templates     │  │
+│  └───────────────┘  │              │  └───────────────┘  │
+└─────────┬───────────┘              └─────────┬───────────┘
+          │                                    │
+          │         ┌───────────────┐          │
+          │         │  MongoEngine  │          │
+          └────────►│   (shared)    │◄─────────┘
+                    └───────┬───────┘
+                            │
+                    ┌───────▼───────┐
+                    │  MongoDB 7.x  │
+                    └───────────────┘
+
+┌─────────────────────┐
+│  Redis 7.x          │
+│  - Session store    │
+│  - GraphQL cache    │
+│  - (15-min TTL)     │
+└─────────────────────┘
+```
+
+**Key Integration Points:**
+1. **nginx** routes `/api/graphql` to FastAPI, everything else to Django
+2. **Session sharing**: FastAPI reads Django's `sessionid` cookie from Redis
+3. **MongoEngine models**: Shared between Django and FastAPI (no duplication)
+4. **Cache layer**: FastAPI uses Redis for 15-minute query caching
+5. **Permission checks**: Both services use same ACL logic from `crits/core/`
+
+---
+
+## Phase 4: Strawberry GraphQL Schema Implementation 🔄 IN PROGRESS
+
+> **Dependencies**: Phase 3 (FastAPI foundation, auth context, caching)
+
+### 4a. GraphQL Schema Foundation ✅
+- [x] Install `strawberry-graphql[fastapi]` dependency
+- [x] Create `crits_api/graphql/` package
+- [x] Create `schema.py` with root `Query` and `Mutation` types
+- [x] Create `context.py` with `get_context()` dependency
+- [x] Mount GraphQL at `/api/graphql` on FastAPI app
+- [x] Configure GraphiQL playground (dev only)
+- [ ] Create `dataloaders.py` with DataLoader instances for each TLO
+- [ ] Add query depth limiting (max 10 levels)
+- [ ] Add query complexity limiting
+
+### 4b. GraphQL Types - Core ✅
+- [x] Create `crits_api/graphql/types/` package
+- [x] Create `user.py` with `UserType` (excludes sensitive fields)
+- [x] Create `common.py` with shared types:
+  - `ObjectID` scalar (MongoDB ObjectId)
+  - `DateTime` scalar (ISO8601)
+  - `TLPLevel` enum (WHITE, GREEN, AMBER, RED)
+  - `TLOType` enum (all 16 TLO types)
+- [x] Create `pagination.py` with basic pagination types
+- [ ] Create `role.py` with `RoleType` and `PermissionType`
+- [ ] Create `source.py` with `SourceType` and `SourceAccessType`
+- [ ] Create `comment.py` with `CommentType`
+- [ ] Create `relationship.py` with `RelationshipType`
+
+### 4c. GraphQL Types - TLOs (16 Types) 🔄
+
+Each TLO type includes:
+- Core fields from MongoEngine model
+- Relationship resolvers (campaigns, comments, related objects)
+- Permission-aware field resolvers for sensitive data
+- Source/TLP filtering on nested collections
+
+- [ ] Create `actor.py` with `ActorType`
+- [ ] Create `backdoor.py` with `BackdoorType`
+- [ ] Create `campaign.py` with `CampaignType`
+- [ ] Create `certificate.py` with `CertificateType`
+- [ ] Create `domain.py` with `DomainType`
+- [ ] Create `email_type.py` with `EmailType` (avoid `email.py` collision)
+- [ ] Create `event.py` with `EventType`
+- [ ] Create `exploit.py` with `ExploitType`
+- [x] Create `indicator.py` with `IndicatorType` ✅
+- [ ] Create `ip.py` with `IPType`
+- [ ] Create `pcap.py` with `PCAPType`
+- [ ] Create `raw_data.py` with `RawDataType`
+- [ ] Create `sample.py` with `SampleType` (special: file handling)
+- [ ] Create `screenshot.py` with `ScreenshotType`
+- [ ] Create `signature.py` with `SignatureType`
+- [ ] Create `target.py` with `TargetType`
 
 ### 4d. GraphQL Queries
-- [ ] Implement single-object queries (actor, sample, etc.)
-- [ ] Implement list queries with pagination
-- [ ] Implement filter arguments for each type
-- [ ] Implement search query with full-text search
-- [ ] Implement relationship traversal queries
-- [ ] Implement dashboard statistics queries
-- [ ] Implement audit log queries
+
+**Single Object Queries** (16 queries):
+```graphql
+actor(id: ID!): Actor
+domain(id: ID!): Domain
+sample(id: ID!): Sample
+# ... etc for each TLO
+```
+
+**List Queries with Pagination** (16 queries):
+```graphql
+actors(first: Int, after: String, filter: ActorFilter): ActorConnection!
+domains(first: Int, after: String, filter: DomainFilter): DomainConnection!
+samples(first: Int, after: String, filter: SampleFilter): SampleConnection!
+# ... etc for each TLO
+```
+
+**Special Queries**:
+```graphql
+# Global search across all TLOs
+search(query: String!, types: [TLOType!], first: Int): SearchResultConnection!
+
+# Dashboard statistics
+dashboardStats: DashboardStats!
+
+# Current user info
+me: User!
+
+# Relationship traversal
+relatedObjects(id: ID!, type: TLOType!, depth: Int = 1): [RelatedObject!]!
+```
+
+- [ ] Create `crits_api/graphql/queries/` package
+- [ ] Implement single-object queries with permission checks
+- [ ] Implement list queries with cursor-based pagination
+- [ ] Implement filter input types for each TLO
+- [ ] Implement `search` query with MongoDB text search
+- [ ] Implement `dashboardStats` with aggregation pipeline
+- [ ] Implement `me` query for current user
+- [ ] Implement `relatedObjects` with depth limiting
 
 ### 4e. GraphQL Mutations
-- [ ] Implement create mutations for each TLO
-- [ ] Implement update mutations for each TLO
-- [ ] Implement delete mutations for each TLO
-- [ ] Implement relationship mutations (add/remove)
+
+**CRUD Mutations per TLO** (pattern for each):
+```graphql
+type Mutation {
+  createDomain(input: CreateDomainInput!): DomainMutationResult!
+  updateDomain(id: ID!, input: UpdateDomainInput!): DomainMutationResult!
+  deleteDomain(id: ID!): DeleteResult!
+}
+```
+
+**Relationship Mutations**:
+```graphql
+addRelationship(fromId: ID!, fromType: TLOType!, toId: ID!, toType: TLOType!, relType: String!): RelationshipResult!
+removeRelationship(id: ID!): DeleteResult!
+```
+
+**Comment Mutations**:
+```graphql
+addComment(objectId: ID!, objectType: TLOType!, comment: String!): CommentResult!
+editComment(id: ID!, comment: String!): CommentResult!
+deleteComment(id: ID!): DeleteResult!
+```
+
+**Bulk Operations**:
+```graphql
+bulkAddToCampaign(ids: [ID!]!, types: [TLOType!]!, campaignId: ID!): BulkResult!
+bulkUpdateStatus(ids: [ID!]!, types: [TLOType!]!, status: String!): BulkResult!
+bulkDelete(ids: [ID!]!, types: [TLOType!]!): BulkResult!
+```
+
+- [ ] Create `crits_api/graphql/mutations/` package
+- [ ] Implement create mutations with validation
+- [ ] Implement update mutations with partial updates
+- [ ] Implement delete mutations (soft delete with audit)
+- [ ] Implement relationship mutations
 - [ ] Implement comment mutations
-- [ ] Implement bulk operations
-- [ ] Implement file upload mutations
+- [ ] Implement bulk operations with batch processing
+- [ ] All mutations invalidate relevant cache keys (Phase 3e)
 
-### 4f. GraphQL Authorization
-- [ ] Create `auth/permissions.py` with permission decorators
-- [ ] Implement field-level authorization
-- [ ] Implement source-based access control
-- [ ] Implement role-based query filtering
-- [ ] Add authorization to all resolvers
-- [ ] Create permission denied error handling
-- [ ] Test authorization edge cases
+### 4f. GraphQL Authorization (Integrated)
 
-### 4g. GraphQL Caching with Redis
-- [ ] Create `cache/redis.py` with Redis client
-- [ ] Implement query result caching
-- [ ] Create cache key generation strategy
-- [ ] Implement cache invalidation on mutations
-- [ ] Add cache headers to responses
-- [ ] Create cache warming for common queries
-- [ ] Monitor cache hit/miss rates
+All resolvers use the permission utilities from Phase 3d:
+
+```python
+@strawberry.type
+class Query:
+    @strawberry.field
+    @require_permission("Sample.read")
+    async def sample(self, info: Info, id: ID) -> Optional[SampleType]:
+        ctx = info.context
+        sample = await get_sample(id)
+        if not ctx.user.check_source_tlp(sample):
+            return None  # User can't see this sample
+        return SampleType.from_model(sample)
+
+    @strawberry.field
+    @require_permission("Sample.read")
+    async def samples(self, info: Info, first: int = 20, after: str = None) -> SampleConnection:
+        ctx = info.context
+        # Query-level source/TLP filtering
+        query = ctx.user.filter_dict_source_tlp({})
+        return await paginate_samples(query, first, after)
+```
+
+- [ ] Apply `@require_permission` to all query resolvers
+- [ ] Apply `@require_permission` to all mutation resolvers
+- [ ] Implement field-level permissions for sensitive fields
+- [ ] Implement source/TLP filtering in all list queries
+- [ ] Create custom `PermissionDenied` GraphQL error type
+- [ ] Test all permission combinations
+
+### 4g. File Upload/Download (Special Handling)
+
+Samples and other TLOs may have associated files stored in GridFS.
+
+```graphql
+type Mutation {
+  uploadSample(file: Upload!, metadata: SampleMetadataInput!): SampleUploadResult!
+}
+
+type Sample {
+  # File download URL (pre-signed, time-limited)
+  downloadUrl: String @requirePermission("Sample.download")
+}
+```
+
+- [ ] Implement multipart file upload mutation
+- [ ] Implement secure download URL generation
+- [ ] Implement file streaming for large files
+- [ ] Add file type detection and validation
+- [ ] Calculate and verify file hashes (MD5, SHA1, SHA256, SSDEEP)
 
 ---
 
@@ -527,32 +683,29 @@ This document outlines the comprehensive migration of CRITs from a Python 2.7/Dj
 
 ### 9b. Code Removal List
 
-The following code/features should be removed as they are obsolete:
+> **Note**: Django is intentionally kept running alongside FastAPI during the transition.
+> Django code removal happens only AFTER React frontend fully replaces Django templates.
 
-**Containerization (keep Docker only):**
-- [ ] Remove `Vagrantfile` - Vagrant VM configuration
-- [ ] Remove `.vagrant/` directory if present
-- [ ] Remove Vagrant references in documentation
-
-**Deployment Tools:**
+**Phase 3-4 (Now): Safe to Remove**
+- [x] Remove `Vagrantfile` - Vagrant VM configuration
+- [x] Remove `.vagrant/` directory if present
 - [ ] Remove `fabfile.py` - Fabric deployment automation
 - [ ] Remove `script/bootstrap` - Legacy bootstrap script
 - [ ] Remove `script/server` - Legacy dev server script
 - [ ] Remove `django.wsgi` - Apache mod_wsgi config
-- [ ] Remove `wsgi.py` - Legacy WSGI entry point
+- [ ] Remove all Tastypie API files (`api.py`) - replaced by GraphQL
 
-**Legacy Django Code (after FastAPI migration):**
+**Phase 6+ (After React UI): Django Code Removal**
 - [ ] Remove `crits/settings.py` - Django settings
 - [ ] Remove `crits/urls.py` - Django URL router
 - [ ] Remove `manage.py` - Django management script
 - [ ] Remove all `views.py` files
 - [ ] Remove all `forms.py` files
 - [ ] Remove all Django templates (`templates/` directories)
-- [ ] Remove all Tastypie API files (`api.py`)
 - [ ] Remove Django middleware code
-- [ ] Remove Django admin configurations
+- [ ] Remove `wsgi.py` - Legacy WSGI entry point
 
-**Legacy Frontend:**
+**Phase 6+ (After React UI): Legacy Frontend Removal**
 - [ ] Remove `extras/www/` static files directory
 - [ ] Remove jQuery and all jQuery plugins
 - [ ] Remove jTable library
@@ -560,12 +713,11 @@ The following code/features should be removed as they are obsolete:
 - [ ] Remove legacy CSS files
 - [ ] Remove legacy JavaScript files
 
-**Legacy Authentication:**
-- [ ] Remove LDAP authentication code
-- [ ] Remove TOTP implementation (or reimplement if needed)
-- [ ] Remove CRITsAuthBackend
-- [ ] Remove CRITsRemoteUserBackend
-- [ ] Remove API key authentication (replace with JWT)
+**Deferred: Authentication Changes**
+- [ ] LDAP authentication - keep if needed, or migrate to SAML/OIDC
+- [ ] TOTP implementation - keep or reimplement with modern library
+- [ ] CRITsAuthBackend - keep until React UI complete
+- [ ] API key authentication - evaluate JWT replacement timeline
 
 **Deprecated Dependencies:**
 - [ ] Remove django-tastypie
@@ -632,25 +784,32 @@ The following code/features should be removed as they are obsolete:
 
 ## Appendix A: Dependency Mapping
 
-### Python Dependencies (Legacy → Modern)
+### Python Dependencies (Legacy → Current → Target)
 
-| Legacy | Modern | Notes |
-|--------|--------|-------|
-| Django 1.x | FastAPI 0.109+ | Complete framework change |
-| MongoEngine 0.8.9 | Beanie 1.25+ | Async ODM with Pydantic |
-| PyMongo 3.2.2 | Motor 3.3+ | Async MongoDB driver |
-| django-tastypie | FastAPI routers | Built-in REST support |
-| pycrypto | cryptography 42+ | Security-maintained |
-| python-ldap | N/A | Removed (GitHub OAuth only) |
-| django-celery | celery 5.3+ | Direct Celery usage |
-| Pillow 3.x | Pillow 10+ | Image processing |
-| simplejson | stdlib json | No longer needed |
+| Legacy | Current (Phase 1-2) | Target (Phase 3+) | Notes |
+|--------|---------------------|-------------------|-------|
+| Python 2.7 | Python 3.12 ✅ | Python 3.12 | Complete |
+| Django 1.x | Django 4.2 ✅ | Django 4.2 + FastAPI | Side-by-side |
+| MongoEngine 0.8.9 | MongoEngine 0.28+ ✅ | MongoEngine 0.28+ | **Shared between Django & FastAPI** |
+| PyMongo 3.2.2 | PyMongo 4.6+ ✅ | PyMongo 4.6+ | Sync driver (adequate for our scale) |
+| django-tastypie | Disabled ✅ | Strawberry GraphQL | GraphQL replaces REST |
+| pycrypto | cryptography 42+ ✅ | cryptography 42+ | Complete |
+| django-celery | celery 5.3+ ✅ | celery 5.3+ | Direct Celery usage |
+| Pillow 3.x | Pillow 10+ ✅ | Pillow 10+ | Complete |
+| N/A | N/A | Redis 5.0+ | Caching (15-min TTL) |
+| N/A | N/A | strawberry-graphql | GraphQL server |
+
+> **Note**: We chose to keep MongoEngine instead of migrating to Beanie because:
+> 1. Django and FastAPI can share the same models
+> 2. No data migration required
+> 3. Existing code patterns still work
+> 4. PyMongo sync driver is adequate for our query patterns
 
 ### Frontend Dependencies (Legacy → Modern)
 
 | Legacy | Modern | Notes |
 |--------|--------|-------|
-| jQuery 1.10 | React 18 | Complete rewrite |
+| jQuery 1.10 | React 18 | Complete rewrite (Phase 5-6) |
 | jQuery UI | Radix UI / Headless UI | Accessible components |
 | jTable | TanStack Table | Virtual tables |
 | jQuery GridSter | react-grid-layout | Dashboard widgets |
@@ -661,41 +820,62 @@ The following code/features should be removed as they are obsolete:
 
 ## Appendix B: Migration Phases Summary
 
-| Phase | Focus | Dependencies | Est. Complexity |
-|-------|-------|--------------|-----------------|
-| 1 | Python 3.12 Migration | None | High |
-| 2 | Docker Stack | Phase 1 | Medium |
-| 3 | FastAPI Backend | Phase 1, 2 | High |
-| 4 | GraphQL Server | Phase 3 | High |
-| 5 | React Foundation | Phase 2 | Medium |
-| 6 | React Features | Phase 4, 5 | High |
-| 7 | Worker Framework | Phase 3 | Medium |
-| 8 | Testing | Phase 3-7 | Medium |
-| 9 | Documentation | Phase 1-8 | Low |
+| Phase | Focus | Status | Dependencies |
+|-------|-------|--------|--------------|
+| 1 | Python 3.12 Migration | ✅ Complete | None |
+| 2 | Docker Stack | ✅ Complete | Phase 1 |
+| 3 | FastAPI + GraphQL Foundation | ✅ Complete | Phase 1, 2 |
+| 4 | GraphQL Schema Implementation | 🔄 In Progress | Phase 3 |
+| 5 | React Foundation | Planned | Phase 4 |
+| 6 | React Features | Planned | Phase 5 |
+| 7 | Worker Framework | Planned | Phase 3 |
+| 8 | Testing | Planned | Phase 3-7 |
+| 9 | Documentation | Ongoing | Low |
 | 10 | Production | Phase 1-9 | Medium |
 
 ---
 
 ## Appendix C: Risk Mitigation
 
-### High-Risk Items
+### High-Risk Items (Updated)
 
-1. **MongoEngine → Beanie Migration**: Data model changes could cause data loss
-   - Mitigation: Extensive testing with production data copies
-   - Mitigation: Create reversible migration scripts
+1. ~~**MongoEngine → Beanie Migration**~~: **ELIMINATED** - We keep MongoEngine
+   - No data migration needed
+   - Django and FastAPI share same models
+   - Risk reduced to zero
 
-2. **Authentication Change**: Users losing access during transition
-   - Mitigation: Parallel auth systems during transition
-   - Mitigation: Clear communication and migration docs
+2. **Permission Parity**: GraphQL API must enforce same permissions as Django
+   - Mitigation: Comprehensive permission test suite
+   - Mitigation: Side-by-side testing of Django vs GraphQL results
+   - Mitigation: Reuse existing permission check code where possible
 
-3. **Frontend Rewrite**: Feature parity gaps
-   - Mitigation: Comprehensive feature audit before migration
-   - Mitigation: Incremental deployment with feature flags
+3. **Cache Consistency**: Stale cache could show unauthorized data
+   - Mitigation: Include user's source access hash in cache keys
+   - Mitigation: Aggressive cache invalidation on permission changes
+   - Mitigation: Short TTL (15 minutes) limits stale data window
+
+4. **Authentication Sharing**: Django sessions must work with FastAPI
+   - Mitigation: FastAPI reads Django session cookies
+   - Mitigation: Shared Redis session backend
+   - Mitigation: Fallback to JWT for API-only clients
+
+5. **Frontend Rewrite**: Feature parity gaps
+   - Mitigation: Django UI remains functional throughout transition
+   - Mitigation: Incremental React page rollout
+   - Mitigation: Feature flags to switch between old/new UI
 
 ### Rollback Strategy
 
-Each phase should be deployable independently with rollback capability:
-- Maintain legacy system in parallel during migration
-- Use database migrations that can be reversed
-- Keep Docker images tagged by version
-- Document rollback procedures for each phase
+Each phase is independently deployable with rollback capability:
+- **Phase 3-4**: nginx can route `/api/graphql` back to 404; Django unaffected
+- **Phase 5-6**: React UI is separate container; revert nginx to serve Django
+- Database unchanged throughout (no migrations needed)
+- Docker images tagged by git commit for easy rollback
+
+### Architectural Benefits of Side-by-Side Approach
+
+1. **Zero downtime migration**: Users continue using Django UI while GraphQL is built
+2. **Incremental validation**: Test GraphQL queries against Django results
+3. **No data migration**: Same MongoDB, same MongoEngine models
+4. **Gradual frontend migration**: Replace one page at a time with React
+5. **Easy rollback**: Just change nginx routing

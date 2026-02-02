@@ -391,16 +391,12 @@ _TEMPLATE_LOADERS = [
 #        'LOCATION': 'unix:/data/memcached.sock',
 #    }
 #}
+# Redis cache backend - used for sessions and caching
+# This allows session sharing between Django and the FastAPI GraphQL API
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-crits',
-    }
-}
-
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': os.environ.get('REDIS_URL', 'redis://redis:6379/0'),
     }
 }
 
@@ -606,10 +602,12 @@ if old_mongoengine:
     _MIDDLEWARE += ('crits.core.user.AuthenticationMiddleware',)
 
 
-    SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
+    # Use cache-backed sessions for sharing with GraphQL API
+    SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+    SESSION_CACHE_ALIAS = "default"
     #SESSION_ENGINE = 'mongoengine.django.sessions'
     #SESSION_ENGINE = 'django_mongoengine.sessions'
-    SESSION_SERIALIZER = 'mongoengine.django.sessions.BSONSerializer'
+    SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
 
     AUTHENTICATION_BACKENDS = (
         'django.contrib.auth.backends.ModelBackend',
@@ -684,10 +682,12 @@ else:
     # Whitenoise for static file serving in production
     _MIDDLEWARE += ('whitenoise.middleware.WhiteNoiseMiddleware',)
 
-    SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
+    # Use cache-backed sessions for sharing with GraphQL API
+    SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+    SESSION_CACHE_ALIAS = "default"
     #SESSION_ENGINE = 'django_mongoengine.sessions'
 
-    SESSION_SERIALIZER = 'django_mongoengine.sessions.BSONSerializer'
+    SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
 
     AUTHENTICATION_BACKENDS = (
 

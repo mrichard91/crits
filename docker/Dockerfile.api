@@ -1,0 +1,56 @@
+# CRITs GraphQL API Dockerfile
+# FastAPI + Strawberry GraphQL service
+#
+# Usage: docker compose up
+
+FROM python:3.12-slim-bookworm
+
+LABEL maintainer="CRITs Development Team"
+LABEL description="CRITs GraphQL API service"
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Build essentials for compiling Python packages
+    build-essential \
+    gcc \
+    g++ \
+    # For cryptography package
+    libffi-dev \
+    libssl-dev \
+    # For lxml package
+    libxml2-dev \
+    libxslt1-dev \
+    # For python-magic
+    libmagic1 \
+    # General utilities
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv for fast package management
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Set working directory
+WORKDIR /app
+
+# Copy project files
+COPY pyproject.toml uv.lock ./
+COPY crits/ ./crits/
+COPY crits_api/ ./crits_api/
+
+# Install dependencies
+RUN uv sync --frozen
+
+# Expose port
+EXPOSE 8001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8001/api/health || exit 1
+
+# Run uvicorn
+CMD ["uv", "run", "uvicorn", "crits_api.main:app", "--host", "0.0.0.0", "--port", "8001"]

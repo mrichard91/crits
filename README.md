@@ -23,6 +23,7 @@ Visit our [website](https://crits.github.io) for more information, documentation
 | Web UI (Login/Dashboard) | ✅ Working |
 | User Management | ✅ Working |
 | Domains | ✅ Working |
+| GraphQL API (FastAPI + Strawberry) | ✅ Working |
 | REST API (tastypie) | ❌ Disabled (incompatible) |
 | Services/Plugins | ⚠️ Untested |
 
@@ -34,10 +35,11 @@ Visit our [website](https://crits.github.io) for more information, documentation
 - IP management (requires source permissions)
 - User administration
 - Basic CRUD operations
+- GraphQL API for programmatic access (indicators query)
 
 ### Known Limitations
 
-- **REST API disabled**: The legacy tastypie-based API is incompatible with modern MongoEngine. A new API using FastAPI + Strawberry GraphQL is planned.
+- **REST API disabled**: The legacy tastypie-based API is incompatible with modern MongoEngine. A new GraphQL API using FastAPI + Strawberry is now available.
 - **Some features untested**: Services, bulk operations, and some advanced features may have compatibility issues.
 - **Source permissions**: Some operations require proper source access configuration.
 
@@ -101,6 +103,7 @@ populate_tlds(True)
 |---------|------|-------------|
 | nginx | 8080 | Reverse proxy, serves static files |
 | web | - | Django/Gunicorn application |
+| api | - | FastAPI + GraphQL API server |
 | mongodb | 27017 | MongoDB database |
 | redis | 6379 | Redis cache |
 
@@ -114,6 +117,80 @@ populate_tlds(True)
 | `SECURE_SSL_REDIRECT` | `false` | Redirect HTTP to HTTPS |
 | `CSRF_TRUSTED_ORIGINS` | localhost | Comma-separated trusted origins |
 | `CRITS_INIT_DB` | `false` | Initialize database on startup |
+
+## GraphQL API
+
+CRITs includes a modern GraphQL API built with FastAPI and Strawberry. The API shares authentication with the Django web UI via session cookies.
+
+### Endpoint
+
+- **URL**: `http://localhost:8080/api/graphql`
+- **GraphiQL**: Available at the same URL in your browser for interactive exploration
+
+### Authentication
+
+The API uses Django session authentication. Log in to the web UI first, then your session cookie will authenticate GraphQL requests.
+
+### Example Queries
+
+**Health check (no auth required):**
+```graphql
+query {
+  health
+}
+```
+
+**Get current user:**
+```graphql
+query {
+  me {
+    username
+    email
+    isAdmin
+  }
+}
+```
+
+**List indicators:**
+```graphql
+query {
+  indicators(limit: 10) {
+    id
+    value
+    indType
+    status
+    tlp
+    campaigns
+  }
+}
+```
+
+**Filter indicators by type:**
+```graphql
+query {
+  indicators(indType: "Address - ipv4-addr", limit: 5) {
+    id
+    value
+    description
+  }
+}
+```
+
+**Get indicator count:**
+```graphql
+query {
+  indicatorsCount
+  indicatorTypes
+}
+```
+
+### Test Data
+
+To create sample indicators for testing:
+
+```bash
+docker compose exec web uv run python scripts/bootstrap_test_data.py
+```
 
 ## Legacy Installation
 
