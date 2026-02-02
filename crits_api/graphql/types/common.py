@@ -63,22 +63,130 @@ class TLOType(Enum):
 
 
 @strawberry.type
+class SourceInstance:
+    """A specific instance of source information."""
+
+    date: datetime | None = None
+    analyst: str = ""
+    method: str = ""
+    reference: str = ""
+    tlp: str = ""
+
+
+@strawberry.type
 class SourceInfo:
     """Information about a data source."""
 
     name: str
-    instances: list["SourceInstance"]
+    instances: list[SourceInstance] = strawberry.field(default_factory=list)
+
+    @classmethod
+    def from_model(cls, source) -> "SourceInfo":
+        """Create SourceInfo from EmbeddedSource model."""
+        instances = []
+        if hasattr(source, 'instances') and source.instances:
+            for inst in source.instances:
+                instances.append(SourceInstance(
+                    date=getattr(inst, 'date', None),
+                    analyst=getattr(inst, 'analyst', '') or '',
+                    method=getattr(inst, 'method', '') or '',
+                    reference=getattr(inst, 'reference', '') or '',
+                    tlp=getattr(inst, 'tlp', '') or '',
+                ))
+        return cls(
+            name=getattr(source, 'name', '') or '',
+            instances=instances,
+        )
 
 
 @strawberry.type
-class SourceInstance:
-    """A specific instance of source information."""
+class EmbeddedCampaignType:
+    """Campaign association with confidence level."""
 
-    date: datetime
-    analyst: str
-    method: str = ""
-    reference: str = ""
-    tlp: TLPLevel = TLPLevel.WHITE
+    name: str
+    confidence: str = ""
+    analyst: str = ""
+    date: datetime | None = None
+
+    @classmethod
+    def from_model(cls, campaign) -> "EmbeddedCampaignType":
+        """Create from EmbeddedCampaign model."""
+        return cls(
+            name=getattr(campaign, 'name', '') or '',
+            confidence=getattr(campaign, 'confidence', '') or '',
+            analyst=getattr(campaign, 'analyst', '') or '',
+            date=getattr(campaign, 'date', None),
+        )
+
+
+@strawberry.type
+class EmbeddedRelationshipType:
+    """Relationship to another TLO."""
+
+    relationship: str = ""
+    rel_type: str = ""
+    rel_date: datetime | None = None
+    analyst: str = ""
+    rel_confidence: str = ""
+    rel_reason: str = ""
+
+    @classmethod
+    def from_model(cls, rel) -> "EmbeddedRelationshipType":
+        """Create from EmbeddedRelationship model."""
+        return cls(
+            relationship=str(getattr(rel, 'relationship', '') or ''),
+            rel_type=getattr(rel, 'rel_type', '') or '',
+            rel_date=getattr(rel, 'rel_date', None),
+            analyst=getattr(rel, 'analyst', '') or '',
+            rel_confidence=getattr(rel, 'rel_confidence', '') or '',
+            rel_reason=getattr(rel, 'rel_reason', '') or '',
+        )
+
+
+@strawberry.type
+class EmbeddedActionType:
+    """Action taken on an object."""
+
+    action_type: str = ""
+    analyst: str = ""
+    begin_date: datetime | None = None
+    end_date: datetime | None = None
+    performed_date: datetime | None = None
+    active: str = ""
+    reason: str = ""
+    date: datetime | None = None
+
+    @classmethod
+    def from_model(cls, action) -> "EmbeddedActionType":
+        """Create from EmbeddedAction model."""
+        return cls(
+            action_type=getattr(action, 'action_type', '') or '',
+            analyst=getattr(action, 'analyst', '') or '',
+            begin_date=getattr(action, 'begin_date', None),
+            end_date=getattr(action, 'end_date', None),
+            performed_date=getattr(action, 'performed_date', None),
+            active=getattr(action, 'active', '') or '',
+            reason=getattr(action, 'reason', '') or '',
+            date=getattr(action, 'date', None),
+        )
+
+
+@strawberry.type
+class EmbeddedTicketType:
+    """Ticket reference."""
+
+    ticket_number: str = ""
+    analyst: str = ""
+    date: datetime | None = None
+
+    @classmethod
+    def from_model(cls, ticket) -> "EmbeddedTicketType":
+        """Create from EmbeddedTicket model."""
+        return cls(
+            ticket_number=getattr(ticket, 'ticket_number', '') or '',
+            analyst=getattr(ticket, 'analyst', '') or '',
+            date=getattr(ticket, 'date', None),
+        )
 
 
 @strawberry.type
@@ -99,3 +207,58 @@ class BulkResult:
     succeeded: int
     failed: int
     errors: list[str] = strawberry.field(default_factory=list)
+
+
+def extract_sources(obj) -> list[SourceInfo]:
+    """Extract source list from a CRITs object."""
+    sources = []
+    if hasattr(obj, 'source') and obj.source:
+        for src in obj.source:
+            sources.append(SourceInfo.from_model(src))
+    return sources
+
+
+def extract_campaigns(obj) -> list[str]:
+    """Extract campaign names from a CRITs object."""
+    campaigns = []
+    if hasattr(obj, 'campaign') and obj.campaign:
+        for c in obj.campaign:
+            if hasattr(c, 'name'):
+                campaigns.append(c.name)
+    return campaigns
+
+
+def extract_campaign_details(obj) -> list[EmbeddedCampaignType]:
+    """Extract full campaign details from a CRITs object."""
+    campaigns = []
+    if hasattr(obj, 'campaign') and obj.campaign:
+        for c in obj.campaign:
+            campaigns.append(EmbeddedCampaignType.from_model(c))
+    return campaigns
+
+
+def extract_relationships(obj) -> list[EmbeddedRelationshipType]:
+    """Extract relationships from a CRITs object."""
+    rels = []
+    if hasattr(obj, 'relationships') and obj.relationships:
+        for r in obj.relationships:
+            rels.append(EmbeddedRelationshipType.from_model(r))
+    return rels
+
+
+def extract_actions(obj) -> list[EmbeddedActionType]:
+    """Extract actions from a CRITs object."""
+    actions = []
+    if hasattr(obj, 'actions') and obj.actions:
+        for a in obj.actions:
+            actions.append(EmbeddedActionType.from_model(a))
+    return actions
+
+
+def extract_tickets(obj) -> list[EmbeddedTicketType]:
+    """Extract tickets from a CRITs object."""
+    tickets = []
+    if hasattr(obj, 'tickets') and obj.tickets:
+        for t in obj.tickets:
+            tickets.append(EmbeddedTicketType.from_model(t))
+    return tickets

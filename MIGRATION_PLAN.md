@@ -307,13 +307,13 @@ This document outlines the comprehensive migration of CRITs from a Python 2.7/Dj
   - `DateTime` scalar (ISO8601)
   - `TLPLevel` enum (WHITE, GREEN, AMBER, RED)
   - `TLOType` enum (all 16 TLO types)
+  - `SourceInfo` and `SourceInstance` types
+  - `EmbeddedCampaignType`, `EmbeddedRelationshipType`, `EmbeddedActionType`
 - [x] Create `pagination.py` with basic pagination types
 - [ ] Create `role.py` with `RoleType` and `PermissionType`
-- [ ] Create `source.py` with `SourceType` and `SourceAccessType`
-- [ ] Create `comment.py` with `CommentType`
-- [ ] Create `relationship.py` with `RelationshipType`
+- [ ] Create `comment.py` with `CommentType` (comments are in relationships currently)
 
-### 4c. GraphQL Types - TLOs (16 Types) 🔄
+### 4c. GraphQL Types - TLOs (16 Types) ✅
 
 Each TLO type includes:
 - Core fields from MongoEngine model
@@ -321,24 +321,24 @@ Each TLO type includes:
 - Permission-aware field resolvers for sensitive data
 - Source/TLP filtering on nested collections
 
-- [ ] Create `actor.py` with `ActorType`
-- [ ] Create `backdoor.py` with `BackdoorType`
-- [ ] Create `campaign.py` with `CampaignType`
-- [ ] Create `certificate.py` with `CertificateType`
-- [ ] Create `domain.py` with `DomainType`
-- [ ] Create `email_type.py` with `EmailType` (avoid `email.py` collision)
-- [ ] Create `event.py` with `EventType`
-- [ ] Create `exploit.py` with `ExploitType`
-- [x] Create `indicator.py` with `IndicatorType` ✅
-- [ ] Create `ip.py` with `IPType`
-- [ ] Create `pcap.py` with `PCAPType`
-- [ ] Create `raw_data.py` with `RawDataType`
-- [ ] Create `sample.py` with `SampleType` (special: file handling)
-- [ ] Create `screenshot.py` with `ScreenshotType`
-- [ ] Create `signature.py` with `SignatureType`
-- [ ] Create `target.py` with `TargetType`
+- [x] Create `actor.py` with `ActorType`
+- [x] Create `backdoor.py` with `BackdoorType`
+- [x] Create `campaign.py` with `CampaignType`
+- [x] Create `certificate.py` with `CertificateType`
+- [x] Create `domain.py` with `DomainType`
+- [x] Create `email_type.py` with `EmailType` (avoid `email.py` collision)
+- [x] Create `event.py` with `EventType`
+- [x] Create `exploit.py` with `ExploitType`
+- [x] Create `indicator.py` with `IndicatorType`
+- [x] Create `ip.py` with `IPType`
+- [x] Create `pcap.py` with `PCAPType`
+- [x] Create `raw_data.py` with `RawDataType`
+- [x] Create `sample.py` with `SampleType`
+- [x] Create `screenshot.py` with `ScreenshotType`
+- [x] Create `signature.py` with `SignatureType`
+- [x] Create `target.py` with `TargetType`
 
-### 4d. GraphQL Queries
+### 4d. GraphQL Queries ✅ (Core Complete)
 
 **Single Object Queries** (16 queries):
 ```graphql
@@ -371,14 +371,16 @@ me: User!
 relatedObjects(id: ID!, type: TLOType!, depth: Int = 1): [RelatedObject!]!
 ```
 
-- [ ] Create `crits_api/graphql/queries/` package
-- [ ] Implement single-object queries with permission checks
-- [ ] Implement list queries with cursor-based pagination
-- [ ] Implement filter input types for each TLO
+- [x] Create `crits_api/graphql/queries/` package
+- [x] Implement single-object queries with permission checks
+- [x] Implement list queries with offset-based pagination
+- [x] Implement filter parameters for each TLO (type, status, campaign, value search)
+- [x] Implement count queries for each TLO
+- [x] Implement `me` query for current user
 - [ ] Implement `search` query with MongoDB text search
 - [ ] Implement `dashboardStats` with aggregation pipeline
-- [ ] Implement `me` query for current user
 - [ ] Implement `relatedObjects` with depth limiting
+- [ ] Migrate to cursor-based pagination (optional enhancement)
 
 ### 4e. GraphQL Mutations
 
