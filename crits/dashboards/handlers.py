@@ -20,7 +20,7 @@ from crits.samples.sample import Sample
 from django.http import HttpResponse
 import json
 from django.utils.html import escape as html_escape
-import cgi
+import html
 import datetime
 from django.http import HttpRequest
 from crits.dashboards.utilities import getHREFLink, get_obj_name_from_title, get_obj_type_from_string
@@ -481,7 +481,7 @@ def get_table_data(request=None,obj=None,user=None,searchTerm="",
         return {'Result': "ERROR", 'Message': response['msg']}
     response['crits_type'] = obj_type
     # Escape term for rendering in the UI.
-    response['term'] = cgi.escape(term)
+    response['term'] = html.escape(term)
     response['data'] = response['data'].to_dict(excludes, includes)
     response['Records'] = parseDocObjectsToStrings(response.pop('data'), obj)
     response['TotalRecordCount'] = response.pop('count')

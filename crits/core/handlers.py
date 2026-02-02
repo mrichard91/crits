@@ -1,4 +1,4 @@
-import cgi
+import html
 import os
 import datetime
 import html.parser
@@ -2017,7 +2017,7 @@ def data_query(col_obj, user, limit=25, skip=0, sort=[], query={},
     docs = None
     try:
         if not issubclass(col_obj,CritsSourceDocument):
-            results['count'] = col.find(query).count()
+            results['count'] = col.count_documents(query)
             if count:
                 results['result'] = "OK"
                 return results
@@ -2343,7 +2343,7 @@ def jtable_ajax_list(col_obj,url,urlfieldparam,request,excludes=[],includes=[],q
             return {'Result': "ERROR", 'Message': response['msg']}
         response['crits_type'] = col_obj._meta['crits_type']
         # Escape term for rendering in the UI.
-        response['term'] = cgi.escape(term)
+        response['term'] = html.escape(term)
         response['data'] = response['data'].to_dict(excludes, includes)
         # Convert data_query to jtable stuff
         response['Records'] = response.pop('data')
@@ -3652,7 +3652,8 @@ def validate_next(next_url=None):
         if next_url.startswith(prefix):
             tmp_url = tmp_url.replace(prefix, '/', 1)
         next_url = urlunquote(tmp_url)
-        if not is_safe_url(next_url):
+        # Django 3+ requires allowed_hosts parameter
+        if not is_safe_url(next_url, allowed_hosts={None}):
             raise Exception
         resolve(urlparse(next_url).path)
         response['success'] = True

@@ -48,6 +48,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY crits/ ./crits/
 COPY scripts/ ./scripts/
+COPY extras/ ./extras/
 COPY manage.py wsgi.py ./
 COPY docker/entrypoint.sh /entrypoint.sh
 

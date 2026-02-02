@@ -1097,10 +1097,10 @@
 	               {%if not isDefaultOnDashboard %}
 	                    <label>Max Rows:</label>
 	                    <select id='maxRows'>
-	                        <option {%ifequal maxRows 1%}selected{%endifequal%}>1</option>
-	                        <option {%ifequal maxRows 3%}selected{%endifequal%}>3</option>
+	                        <option {%if maxRows == 1%}selected{%endif%}>1</option>
+	                        <option {%if maxRows == 3%}selected{%endif%}>3</option>
 	                        <option {%if not maxRows or maxRows == 5 %}selected{%endif%}>5</option>
-	                        <option {%ifequal maxRows 10%}selected{%endifequal%}>10</option>
+	                        <option {%if maxRows == 10%}selected{%endif%}>10</option>
 	                    </select>
 	                {%endif%}
 	            </div>

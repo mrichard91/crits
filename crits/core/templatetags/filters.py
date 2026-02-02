@@ -1,4 +1,4 @@
-import cgi
+import html
 import re
 import string
 
@@ -135,7 +135,7 @@ def to_line_table(value):
         lhtml = '<tr class="file_line" data-position="%d">' % l
         lhtml += '\n<td class="add_highlight ui-icon ui-icon-star"></td><td class="line_num">'
         lhtml += '<span class="line_number">%d</span></td>\n' % l
-        lhtml += '<td class="line_pre"><pre>%s</pre></td>\n</tr>\n' % cgi.escape(line)
+        lhtml += '<td class="line_pre"><pre>%s</pre></td>\n</tr>\n' % html.escape(line)
         html += lhtml
     html += '</tbody>\n</table>\n</div>\n'
     return html
@@ -150,7 +150,7 @@ def cgi_escape(value):
     :returns: str
     """
 
-    return cgi.escape(value)
+    return html.escape(value)
 
 @register.filter
 def to_dict(obj):
