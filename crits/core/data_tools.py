@@ -431,7 +431,7 @@ def make_hex(md5=None, data=None):
         data = get_file(md5)
     length = 16
     hex_data = ''
-    digits = 4 if isinstance(data, unicode) else 2
+    digits = 4 if isinstance(data, str) else 2
     for i in range(0, len(data), length):
         s = data[i:i+length]
         hexa = ' '.join(["%0*X" % (digits, ord(x))  for x in s])
