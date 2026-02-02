@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CRITs base styles */
+@layer base {
+  html {
+    font-size: 14px;
+  }
+
+  body {
+    @apply bg-light-bg text-light-text dark:bg-dark-bg dark:text-dark-text;
+    @apply font-sans antialiased;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-light-bg-secondary dark:bg-dark-bg-secondary;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-light-border dark:bg-dark-border rounded;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-light-text-muted dark:bg-dark-text-muted;
+  }
+}
+
+@layer components {
+  /* CRITs link style */
+  .crits-link {
+    @apply text-crits-blue hover:underline cursor-pointer;
+  }
+
+  /* CRITs table styles */
+  .crits-table {
+    @apply w-full border-collapse text-sm;
+  }
+
+  .crits-table th {
+    @apply bg-light-bg-secondary dark:bg-dark-bg-secondary;
+    @apply border border-light-border dark:border-dark-border;
+    @apply px-3 py-2 text-left font-semibold;
+  }
+
+  .crits-table td {
+    @apply border border-light-border dark:border-dark-border;
+    @apply px-3 py-2;
+  }
+
+  .crits-table tr:hover td {
+    @apply bg-light-bg-tertiary dark:bg-dark-bg-tertiary;
+  }
+
+  /* CRITs button styles */
+  .crits-btn {
+    @apply px-4 py-2 rounded;
+    @apply border border-light-border dark:border-dark-border;
+    @apply bg-light-bg-secondary dark:bg-dark-bg-secondary;
+    @apply text-light-text-secondary dark:text-dark-text-secondary;
+    @apply hover:bg-light-bg-tertiary dark:hover:bg-dark-bg-tertiary;
+    @apply transition-colors duration-150;
+    @apply text-sm font-medium;
+  }
+
+  .crits-btn-primary {
+    @apply bg-crits-blue text-white border-crits-blue;
+    @apply hover:bg-crits-blue-hover;
+  }
+
+  /* CRITs input styles */
+  .crits-input {
+    @apply w-full px-3 py-2 rounded;
+    @apply border border-light-border dark:border-dark-border;
+    @apply bg-white dark:bg-dark-bg-secondary;
+    @apply text-light-text dark:text-dark-text;
+    @apply placeholder:text-light-text-muted dark:placeholder:text-dark-text-muted;
+    @apply focus:outline-none focus:ring-2 focus:ring-crits-blue-focus focus:border-crits-blue;
+    @apply text-sm;
+  }
+
+  /* CRITs card styles */
+  .crits-card {
+    @apply bg-white dark:bg-dark-bg-secondary;
+    @apply border border-light-border dark:border-dark-border;
+    @apply rounded shadow-crits dark:shadow-crits-dark;
+  }
+}
