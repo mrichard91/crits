@@ -58,7 +58,7 @@ This document outlines the comprehensive migration of CRITs from a Python 2.7/Dj
 - [x] Create `requirements-legacy.txt` snapshot of current deps
 - [x] Add `.python-version` file for pyenv (3.12.x)
 - [x] Create `Makefile` with common commands (install, lint, test, run)
-- [ ] Set up pre-commit hooks configuration (optional)
+- [x] Set up pre-commit hooks configuration (ruff, mypy, trailing whitespace)
 - [ ] Add VS Code / PyCharm project settings (optional)
 
 ### 1c. Python 2 to 3 Syntax Migration - Core Module ✅
@@ -101,8 +101,10 @@ This document outlines the comprehensive migration of CRITs from a Python 2.7/Dj
 
 ### 1g. Validate Python 3.12 Migration ✅
 - [x] Core functionality working (login, dashboard, domains, users)
-- [ ] Add type hints to core modules (gradual - deferred)
-- [ ] Run mypy on migrated code (deferred)
+- [x] Add type hints to crits_api modules (PR #17)
+- [x] Configure mypy with strict mode for crits_api/
+- [x] Set up pre-commit hooks (ruff lint/format, mypy, trailing whitespace)
+- [x] Fix Python 2 `unicode` type references throughout codebase (PR #16)
 - [ ] Comprehensive test coverage (deferred to Phase 8)
 
 ---
@@ -284,7 +286,7 @@ This document outlines the comprehensive migration of CRITs from a Python 2.7/Dj
 
 ---
 
-## Phase 4: Strawberry GraphQL Schema Implementation 🔄 IN PROGRESS
+## Phase 4: Strawberry GraphQL Schema Implementation ✅ COMPLETE (Core)
 
 > **Dependencies**: Phase 3 (FastAPI foundation, auth context, caching)
 
@@ -827,7 +829,7 @@ type Sample {
 | 1 | Python 3.12 Migration | ✅ Complete | None |
 | 2 | Docker Stack | ✅ Complete | Phase 1 |
 | 3 | FastAPI + GraphQL Foundation | ✅ Complete | Phase 1, 2 |
-| 4 | GraphQL Schema Implementation | 🔄 In Progress | Phase 3 |
+| 4 | GraphQL Schema Implementation | ✅ Complete (Core) | Phase 3 |
 | 5 | React Foundation | Planned | Phase 4 |
 | 6 | React Features | Planned | Phase 5 |
 | 7 | Worker Framework | Planned | Phase 3 |
