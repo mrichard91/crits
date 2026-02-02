@@ -12,6 +12,8 @@
 #
 # Access:
 #   Web UI: http://localhost:8080
+#   GraphQL API: http://localhost:8080/api/graphql
+#   GraphiQL: http://localhost:8080/api/graphql (browser)
 
 services:
   mongodb:
@@ -92,6 +94,45 @@ services:
       retries: 3
       start_period: 60s
 
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: crits-api
+    restart: unless-stopped
+    environment:
+      # MongoDB connection
+      - MONGO_HOST=mongodb
+      - MONGO_PORT=27017
+      - MONGO_DATABASE=crits
+      # Redis connection (for sessions/caching)
+      - REDIS_URL=redis://redis:6379/0
+      # Django settings (for shared model imports)
+      - DJANGO_SETTINGS_MODULE=crits.settings
+      - DEBUG=${DEBUG:-true}
+      # Security
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      # Cache settings
+      - CACHE_DEFAULT_TTL=900
+      - CACHE_ENABLED=true
+      # GraphQL settings
+      - GRAPHIQL_ENABLED=true
+      # CORS
+      - CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
+    expose:
+      - "8001"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
   nginx:
     image: nginx:alpine
     container_name: crits-nginx
@@ -103,6 +144,7 @@ services:
       - "8080:80"
     depends_on:
       - web
+      - api
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost/login/"]
       interval: 30s
