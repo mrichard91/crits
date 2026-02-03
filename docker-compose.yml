@@ -31,8 +31,9 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
-    ports:
-      - "27017:27017"  # Expose for debugging; remove in production
+    # Internal only - other containers reach mongodb via service name
+    expose:
+      - "27017"
 
   redis:
     image: redis:7-alpine
@@ -43,8 +44,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    ports:
-      - "6379:6379"  # Expose for debugging; remove in production
+    # Internal only - other containers reach redis via service name
+    expose:
+      - "6379"
 
   web:
     build:
@@ -69,6 +71,7 @@ services:
       # Security settings for development (disable for HTTP access)
       - SECURE_SSL_REDIRECT=false
       - SECURE_COOKIES=false
+      - SECURE_CROSS_ORIGIN_OPENER_POLICY=
       # CSRF trusted origins (add your host IP/domain here)
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-http://localhost:8080,http://localhost,http://127.0.0.1:8080,http://127.0.0.1,http://192.168.1.129:8080,http://192.168.1.129}
       # Database initialization (set to true on first run)

@@ -3,8 +3,9 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Layout } from '@/components/layout/Layout'
 import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
-import { IndicatorsPage } from '@/pages/IndicatorsPage'
-import { IndicatorDetailPage } from '@/pages/IndicatorDetailPage'
+import { TLOListPage } from '@/pages/TLOListPage'
+import { TLODetailPage } from '@/pages/TLODetailPage'
+import { TLO_CONFIGS } from '@/lib/tloConfig'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth()
@@ -37,8 +38,12 @@ function App() {
         }
       >
         <Route index element={<DashboardPage />} />
-        <Route path="indicators" element={<IndicatorsPage />} />
-        <Route path="indicators/:id" element={<IndicatorDetailPage />} />
+        {Object.values(TLO_CONFIGS).map((config) => (
+          <Route key={config.type} path={config.route.slice(1)}>
+            <Route index element={<TLOListPage config={config} />} />
+            <Route path=":id" element={<TLODetailPage config={config} />} />
+          </Route>
+        ))}
       </Route>
     </Routes>
   )

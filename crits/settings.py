@@ -103,6 +103,8 @@ else:
     SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'true').lower() in ('true', '1', 'yes')
     SECURE_HSTS_SECONDS = 0 #change this to non-zero for more security
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    # Disable COOP header over plain HTTP (browsers reject it on non-HTTPS non-localhost origins)
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = os.environ.get('SECURE_CROSS_ORIGIN_OPENER_POLICY', 'same-origin') or None
 
 DATABASES = {
     'default': {

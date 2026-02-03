@@ -37,35 +37,8 @@ export interface SourceInstance {
   tlp?: TLPLevel
 }
 
-// Indicator type
-export interface Indicator {
-  id: string
-  value: string
-  indicatorType: string
-  status: Status
-  confidence: string
-  impact: string
-  created: string
-  modified: string
-  sources: SourceInfo[]
-  campaigns: string[]
-  bucketList: string[]
-}
-
-// Pagination
-export interface PageInfo {
-  hasNextPage: boolean
-  hasPreviousPage: boolean
-  startCursor?: string
-  endCursor?: string
-  totalCount: number
-}
-
-export interface Connection<T> {
-  edges: Array<{
-    node: T
-    cursor: string
-  }>
-  pageInfo: PageInfo
+// Generic list result (flat list with offset/limit pagination)
+export interface ListResult<T> {
+  items: T[]
   totalCount: number
 }

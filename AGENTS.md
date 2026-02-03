@@ -390,43 +390,33 @@ class Query:
 
 **Objective**: Build React frontend preserving CRITs visual identity.
 
+> **Detailed documentation**: See [`ui/ARCHITECTURE.md`](ui/ARCHITECTURE.md) for the full React UI architecture, config-driven TLO system, GraphQL integration details, and instructions for adding/modifying TLO types.
+
 **Directory Structure**:
 ```
 ui/
 ├── src/
+│   ├── App.tsx                # Routes (auto-generated from TLO config)
 │   ├── main.tsx
-│   ├── App.tsx
 │   ├── components/
-│   │   ├── Layout/
-│   │   │   ├── Header.tsx
-│   │   │   ├── Sidebar.tsx
-│   │   │   └── Footer.tsx
-│   │   ├── DataTable/
-│   │   │   ├── VirtualTable.tsx
-│   │   │   ├── TablePagination.tsx
-│   │   │   └── ColumnConfig.tsx
-│   │   ├── TLO/
-│   │   │   ├── ActorCard.tsx
-│   │   │   ├── SampleCard.tsx
-│   │   │   └── ...
-│   │   └── ...
-│   ├── pages/
-│   │   ├── Dashboard.tsx
-│   │   ├── actors/
-│   │   │   ├── ActorList.tsx
-│   │   │   └── ActorDetail.tsx
-│   │   └── ...
+│   │   ├── layout/            # Layout, Header, Sidebar
+│   │   └── ui/                # Badge, Button, Card, Input, Spinner, Table
+│   ├── contexts/              # AuthContext, ThemeContext
 │   ├── hooks/
-│   │   ├── useAuth.ts
-│   │   ├── useGraphQL.ts
-│   │   └── ...
-│   ├── graphql/
-│   │   ├── queries/
-│   │   └── mutations/
-│   ├── styles/
-│   │   └── crits-theme.css    # CRITs color preservation
-│   └── lib/
-│       └── utils.ts
+│   │   ├── useTLOList.ts      # Generic list data hook
+│   │   └── useTLODetail.ts    # Generic detail data hook
+│   ├── lib/
+│   │   ├── graphql.ts         # GraphQL client + raw fetch helper
+│   │   ├── tloConfig.ts       # Config registry for all 16 TLO types
+│   │   └── utils.ts           # cn(), formatDate(), truncate()
+│   ├── pages/
+│   │   ├── DashboardPage.tsx  # Overview dashboard
+│   │   ├── LoginPage.tsx
+│   │   ├── TLOListPage.tsx    # Generic config-driven list page
+│   │   └── TLODetailPage.tsx  # Generic config-driven detail page
+│   └── types/
+│       └── index.ts           # TLOType, Status, SourceInfo, etc.
+├── ARCHITECTURE.md            # Full UI documentation
 ├── tailwind.config.js
 ├── vite.config.ts
 └── package.json

@@ -1,41 +1,37 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Target, Globe, Server, FileCode, Users, Award, ArrowRight } from 'lucide-react'
-import { graphqlClient } from '@/lib/graphql'
+import { gqlQuery } from '@/lib/graphql'
 import { Card, CardHeader, CardTitle, CardContent, Spinner, Badge } from '@/components/ui'
 
 const STATS_QUERY = `
   query DashboardStats {
-    indicatorCount
-    domainCount
-    ipCount
-    sampleCount
-    actorCount
-    campaignCount
+    indicatorsCount
+    domainsCount
+    ipsCount
+    samplesCount
+    actorsCount
+    campaignsCount
   }
 `
 
 interface StatsData {
-  indicatorCount: number
-  domainCount: number
-  ipCount: number
-  sampleCount: number
-  actorCount: number
-  campaignCount: number
+  indicatorsCount: number
+  domainsCount: number
+  ipsCount: number
+  samplesCount: number
+  actorsCount: number
+  campaignsCount: number
 }
 
 const RECENT_INDICATORS_QUERY = `
   query RecentIndicators {
-    indicators(first: 5) {
-      edges {
-        node {
-          id
-          value
-          indicatorType
-          status
-          created
-        }
-      }
+    indicators(limit: 5) {
+      id
+      value
+      indType
+      status
+      created
     }
   }
 `
@@ -43,74 +39,72 @@ const RECENT_INDICATORS_QUERY = `
 interface RecentIndicator {
   id: string
   value: string
-  indicatorType: string
+  indType: string
   status: string
   created: string
 }
 
 interface RecentIndicatorsData {
-  indicators: {
-    edges: Array<{
-      node: RecentIndicator
-    }>
-  }
+  indicators: RecentIndicator[]
 }
 
 export function DashboardPage() {
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboard-stats'],
-    queryFn: () => graphqlClient.request<StatsData>(STATS_QUERY),
+    queryFn: () => gqlQuery<StatsData>(STATS_QUERY),
   })
 
   const { data: recentData, isLoading: recentLoading } = useQuery({
     queryKey: ['recent-indicators'],
-    queryFn: () => graphqlClient.request<RecentIndicatorsData>(RECENT_INDICATORS_QUERY),
+    queryFn: () => gqlQuery<RecentIndicatorsData>(RECENT_INDICATORS_QUERY),
   })
 
   const statCards = [
     {
       label: 'Indicators',
-      value: stats?.indicatorCount ?? 0,
+      value: stats?.indicatorsCount ?? 0,
       icon: Target,
       color: 'text-blue-500',
       to: '/indicators',
     },
     {
       label: 'Domains',
-      value: stats?.domainCount ?? 0,
+      value: stats?.domainsCount ?? 0,
       icon: Globe,
       color: 'text-green-500',
       to: '/domains',
     },
     {
       label: 'IPs',
-      value: stats?.ipCount ?? 0,
+      value: stats?.ipsCount ?? 0,
       icon: Server,
       color: 'text-purple-500',
       to: '/ips',
     },
     {
       label: 'Samples',
-      value: stats?.sampleCount ?? 0,
+      value: stats?.samplesCount ?? 0,
       icon: FileCode,
       color: 'text-orange-500',
       to: '/samples',
     },
     {
       label: 'Actors',
-      value: stats?.actorCount ?? 0,
+      value: stats?.actorsCount ?? 0,
       icon: Users,
       color: 'text-red-500',
       to: '/actors',
     },
     {
       label: 'Campaigns',
-      value: stats?.campaignCount ?? 0,
+      value: stats?.campaignsCount ?? 0,
       icon: Award,
       color: 'text-yellow-500',
       to: '/campaigns',
     },
   ]
+
+  const recentIndicators = recentData?.indicators ?? []
 
   return (
     <div className="space-y-6">
@@ -165,40 +159,40 @@ export function DashboardPage() {
             <div className="flex justify-center py-8">
               <Spinner />
             </div>
-          ) : recentData?.indicators.edges.length === 0 ? (
+          ) : recentIndicators.length === 0 ? (
             <p className="text-center text-light-text-muted dark:text-dark-text-muted py-8">
               No indicators yet
             </p>
           ) : (
             <div className="space-y-3">
-              {recentData?.indicators.edges.map(({ node }) => (
+              {recentIndicators.map((indicator) => (
                 <Link
-                  key={node.id}
-                  to={`/indicators/${node.id}`}
+                  key={indicator.id}
+                  to={`/indicators/${indicator.id}`}
                   className="block p-3 rounded border border-light-border dark:border-dark-border hover:bg-light-bg-secondary dark:hover:bg-dark-bg-secondary transition-colors"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Target className="h-4 w-4 text-crits-blue flex-shrink-0" />
-                      <span className="font-mono text-sm truncate max-w-md">{node.value}</span>
+                      <span className="font-mono text-sm truncate max-w-md">{indicator.value}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="info">{node.indicatorType}</Badge>
+                      <Badge variant="info">{indicator.indType}</Badge>
                       <Badge
                         variant={
-                          node.status === 'Analyzed'
+                          indicator.status === 'Analyzed'
                             ? 'success'
-                            : node.status === 'In Progress'
+                            : indicator.status === 'In Progress'
                               ? 'warning'
                               : 'default'
                         }
                       >
-                        {node.status}
+                        {indicator.status}
                       </Badge>
                     </div>
                   </div>
                   <p className="text-xs text-light-text-muted dark:text-dark-text-muted mt-1 ml-7">
-                    Created {new Date(node.created).toLocaleDateString()}
+                    Created {new Date(indicator.created).toLocaleDateString()}
                   </p>
                 </Link>
               ))}
