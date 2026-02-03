@@ -158,7 +158,10 @@ class SampleQueries:
     def samples_count(
         self,
         info: Info,
+        filename_contains: str | None = None,
         filetype: str | None = None,
+        md5: str | None = None,
+        sha256: str | None = None,
         status: str | None = None,
         campaign: str | None = None,
     ) -> int:
@@ -175,8 +178,17 @@ class SampleQueries:
                 if source_filter:
                     queryset = queryset.filter(__raw__=source_filter)
 
+            if filename_contains:
+                queryset = queryset.filter(filename__icontains=filename_contains)
+
             if filetype:
                 queryset = queryset.filter(filetype__icontains=filetype)
+
+            if md5:
+                queryset = queryset.filter(md5=md5.lower())
+
+            if sha256:
+                queryset = queryset.filter(sha256=sha256.lower())
 
             if status:
                 queryset = queryset.filter(status=status)

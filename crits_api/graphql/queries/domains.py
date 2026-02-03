@@ -98,6 +98,7 @@ class DomainQueries:
     def domains_count(
         self,
         info: Info,
+        domain_contains: str | None = None,
         record_type: str | None = None,
         status: str | None = None,
         campaign: str | None = None,
@@ -114,6 +115,9 @@ class DomainQueries:
                 source_filter = ctx.get_source_filter()
                 if source_filter:
                     queryset = queryset.filter(__raw__=source_filter)
+
+            if domain_contains:
+                queryset = queryset.filter(domain__icontains=domain_contains)
 
             if record_type:
                 queryset = queryset.filter(record_type=record_type)

@@ -98,6 +98,8 @@ class EmailQueries:
     def emails_count(
         self,
         info: Info,
+        subject_contains: str | None = None,
+        from_address: str | None = None,
         status: str | None = None,
         campaign: str | None = None,
     ) -> int:
@@ -113,6 +115,12 @@ class EmailQueries:
                 source_filter = ctx.get_source_filter()
                 if source_filter:
                     queryset = queryset.filter(__raw__=source_filter)
+
+            if subject_contains:
+                queryset = queryset.filter(subject__icontains=subject_contains)
+
+            if from_address:
+                queryset = queryset.filter(from_address__icontains=from_address)
 
             if status:
                 queryset = queryset.filter(status=status)

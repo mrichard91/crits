@@ -191,6 +191,15 @@ class EmbeddedTicketType:
 
 
 @strawberry.type
+class MutationResult:
+    """Standard result type for create/update mutations."""
+
+    success: bool
+    message: str = ""
+    id: str = ""
+
+
+@strawberry.type
 class DeleteResult:
     """Result of a delete operation."""
 

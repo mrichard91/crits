@@ -94,6 +94,7 @@ class BackdoorQueries:
     def backdoors_count(
         self,
         info: Info,
+        name_contains: str | None = None,
         status: str | None = None,
         campaign: str | None = None,
     ) -> int:
@@ -109,6 +110,9 @@ class BackdoorQueries:
                 source_filter = ctx.get_source_filter()
                 if source_filter:
                     queryset = queryset.filter(__raw__=source_filter)
+
+            if name_contains:
+                queryset = queryset.filter(name__icontains=name_contains)
 
             if status:
                 queryset = queryset.filter(status=status)

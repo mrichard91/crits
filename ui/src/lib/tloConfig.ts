@@ -40,6 +40,15 @@ export interface TLODetailFieldDef {
   type: 'text' | 'badge' | 'date' | 'mono' | 'list' | 'pre'
 }
 
+export interface TLOCreateFieldDef {
+  key: string // GraphQL mutation param name (camelCase)
+  label: string // Form label
+  type: 'text' | 'textarea' | 'select'
+  required?: boolean
+  placeholder?: string
+  optionsQuery?: string // For select: GQL query returning string[]
+}
+
 export interface TLOConfig {
   // Identity
   type: TLOType
@@ -71,6 +80,10 @@ export interface TLOConfig {
 
   // Detail page field groups
   detailFields: TLODetailFieldDef[]
+
+  // Create mutation (if supported)
+  gqlCreate?: string // "createIndicator", etc.
+  createFields?: TLOCreateFieldDef[]
 }
 
 const commonListFields = ['id', 'status', 'created', 'modified']
@@ -162,6 +175,34 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'threatTypes', label: 'Threat Types', type: 'list' },
       { key: 'attackTypes', label: 'Attack Types', type: 'list' },
     ],
+    gqlCreate: 'createIndicator',
+    createFields: [
+      {
+        key: 'value',
+        label: 'Value',
+        type: 'text',
+        required: true,
+        placeholder: 'e.g. 192.168.1.1',
+      },
+      {
+        key: 'indType',
+        label: 'Type',
+        type: 'select',
+        required: true,
+        optionsQuery: 'indicatorTypes',
+      },
+      {
+        key: 'source',
+        label: 'Source',
+        type: 'select',
+        required: true,
+        optionsQuery: 'sourceNames',
+      },
+      { key: 'threatType', label: 'Threat Type', type: 'text', placeholder: 'e.g. unknown' },
+      { key: 'attackType', label: 'Attack Type', type: 'text', placeholder: 'e.g. unknown' },
+      { key: 'description', label: 'Description', type: 'textarea' },
+      { key: 'campaign', label: 'Campaign', type: 'select', optionsQuery: 'campaignNames' },
+    ],
   },
 
   Actor: {
@@ -205,6 +246,19 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'sophistications', label: 'Sophistications', type: 'list' },
       { key: 'threatTypes', label: 'Threat Types', type: 'list' },
     ],
+    gqlCreate: 'createActor',
+    createFields: [
+      { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'Actor name' },
+      {
+        key: 'source',
+        label: 'Source',
+        type: 'select',
+        required: true,
+        optionsQuery: 'sourceNames',
+      },
+      { key: 'description', label: 'Description', type: 'textarea' },
+      { key: 'campaign', label: 'Campaign', type: 'select', optionsQuery: 'campaignNames' },
+    ],
   },
 
   Backdoor: {
@@ -232,6 +286,19 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       campaignFilter,
     ],
     detailFields: [...commonDetailDisplay],
+    gqlCreate: 'createBackdoor',
+    createFields: [
+      { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'Backdoor name' },
+      {
+        key: 'source',
+        label: 'Source',
+        type: 'select',
+        required: true,
+        optionsQuery: 'sourceNames',
+      },
+      { key: 'description', label: 'Description', type: 'textarea' },
+      { key: 'campaign', label: 'Campaign', type: 'select', optionsQuery: 'campaignNames' },
+    ],
   },
 
   Campaign: {
@@ -263,6 +330,11 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       ...commonDetailDisplay,
       { key: 'active', label: 'Active', type: 'badge' },
       { key: 'aliases', label: 'Aliases', type: 'list' },
+    ],
+    gqlCreate: 'createCampaign',
+    createFields: [
+      { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'Campaign name' },
+      { key: 'description', label: 'Description', type: 'textarea' },
     ],
   },
 
@@ -331,6 +403,24 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'recordType', label: 'Record Type', type: 'badge' },
       { key: 'watchlistEnabled', label: 'Watchlist', type: 'text' },
     ],
+    gqlCreate: 'createDomain',
+    createFields: [
+      {
+        key: 'domain',
+        label: 'Domain',
+        type: 'text',
+        required: true,
+        placeholder: 'e.g. example.com',
+      },
+      {
+        key: 'source',
+        label: 'Source',
+        type: 'select',
+        required: true,
+        optionsQuery: 'sourceNames',
+      },
+      { key: 'campaign', label: 'Campaign', type: 'select', optionsQuery: 'campaignNames' },
+    ],
   },
 
   Email: {
@@ -362,6 +452,32 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
     detailFields: [
       ...commonDetailDisplay,
       { key: 'fromAddress', label: 'From Address', type: 'mono' },
+    ],
+    gqlCreate: 'createEmail',
+    createFields: [
+      {
+        key: 'fromAddress',
+        label: 'From Address',
+        type: 'text',
+        required: true,
+        placeholder: 'sender@example.com',
+      },
+      {
+        key: 'subject',
+        label: 'Subject',
+        type: 'text',
+        required: true,
+        placeholder: 'Email subject',
+      },
+      {
+        key: 'source',
+        label: 'Source',
+        type: 'select',
+        required: true,
+        optionsQuery: 'sourceNames',
+      },
+      { key: 'description', label: 'Description', type: 'textarea' },
+      { key: 'campaign', label: 'Campaign', type: 'select', optionsQuery: 'campaignNames' },
     ],
   },
 
@@ -396,6 +512,27 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'eventType', label: 'Event Type', type: 'badge' },
       { key: 'eventId', label: 'Event ID', type: 'mono' },
     ],
+    gqlCreate: 'createEvent',
+    createFields: [
+      { key: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Event title' },
+      {
+        key: 'eventType',
+        label: 'Event Type',
+        type: 'select',
+        required: true,
+        optionsQuery: 'eventTypes',
+      },
+      {
+        key: 'source',
+        label: 'Source',
+        type: 'select',
+        required: true,
+        optionsQuery: 'sourceNames',
+      },
+      { key: 'description', label: 'Description', type: 'textarea', required: true },
+      { key: 'date', label: 'Date', type: 'text', placeholder: 'YYYY-MM-DD (defaults to now)' },
+      { key: 'campaign', label: 'Campaign', type: 'select', optionsQuery: 'campaignNames' },
+    ],
   },
 
   Exploit: {
@@ -425,6 +562,20 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       campaignFilter,
     ],
     detailFields: [...commonDetailDisplay, { key: 'cve', label: 'CVE', type: 'mono' }],
+    gqlCreate: 'createExploit',
+    createFields: [
+      { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'Exploit name' },
+      {
+        key: 'source',
+        label: 'Source',
+        type: 'select',
+        required: true,
+        optionsQuery: 'sourceNames',
+      },
+      { key: 'cve', label: 'CVE', type: 'text', placeholder: 'e.g. CVE-2024-1234' },
+      { key: 'description', label: 'Description', type: 'textarea' },
+      { key: 'campaign', label: 'Campaign', type: 'select', optionsQuery: 'campaignNames' },
+    ],
   },
 
   IP: {
@@ -454,6 +605,26 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       campaignFilter,
     ],
     detailFields: [...commonDetailDisplay, { key: 'ipType', label: 'IP Type', type: 'badge' }],
+    gqlCreate: 'createIp',
+    createFields: [
+      {
+        key: 'ipAddress',
+        label: 'IP Address',
+        type: 'text',
+        required: true,
+        placeholder: 'e.g. 192.168.1.1',
+      },
+      { key: 'ipType', label: 'IP Type', type: 'select', required: true, optionsQuery: 'ipTypes' },
+      {
+        key: 'source',
+        label: 'Source',
+        type: 'select',
+        required: true,
+        optionsQuery: 'sourceNames',
+      },
+      { key: 'description', label: 'Description', type: 'textarea' },
+      { key: 'campaign', label: 'Campaign', type: 'select', optionsQuery: 'campaignNames' },
+    ],
   },
 
   PCAP: {
@@ -662,6 +833,18 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       ...commonDetailDisplay,
       { key: 'department', label: 'Department', type: 'text' },
       { key: 'division', label: 'Division', type: 'text' },
+    ],
+    gqlCreate: 'createTarget',
+    createFields: [
+      {
+        key: 'emailAddress',
+        label: 'Email Address',
+        type: 'text',
+        required: true,
+        placeholder: 'target@example.com',
+      },
+      { key: 'description', label: 'Description', type: 'textarea' },
+      { key: 'campaign', label: 'Campaign', type: 'select', optionsQuery: 'campaignNames' },
     ],
   },
 }

@@ -98,6 +98,7 @@ class IPQueries:
     def ips_count(
         self,
         info: Info,
+        ip_contains: str | None = None,
         ip_type: str | None = None,
         status: str | None = None,
         campaign: str | None = None,
@@ -114,6 +115,9 @@ class IPQueries:
                 source_filter = ctx.get_source_filter()
                 if source_filter:
                     queryset = queryset.filter(__raw__=source_filter)
+
+            if ip_contains:
+                queryset = queryset.filter(ip__icontains=ip_contains)
 
             if ip_type:
                 queryset = queryset.filter(ip_type=ip_type)

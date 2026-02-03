@@ -9,6 +9,18 @@ from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_authenticated
+from crits_api.graphql.mutations import (
+    ActorMutations,
+    BackdoorMutations,
+    CampaignMutations,
+    DomainMutations,
+    EmailMutations,
+    EventMutations,
+    ExploitMutations,
+    IndicatorMutations,
+    IPMutations,
+    TargetMutations,
+)
 from crits_api.graphql.queries.actors import ActorQueries
 from crits_api.graphql.queries.backdoors import BackdoorQueries
 from crits_api.graphql.queries.campaigns import CampaignQueries
@@ -82,6 +94,15 @@ class Query(
         ctx: GraphQLContext = info.context
         return ctx.has_permission(permission)
 
+    @strawberry.field(description="Get source names the current user can write to")
+    @require_authenticated
+    def source_names(self, info: Info) -> list[str]:
+        """Get list of source names the user has write access to."""
+        ctx: GraphQLContext = info.context
+        if ctx.is_superuser:
+            return sorted(s.name for s in ctx.sources)
+        return sorted(s.name for s in ctx.sources if s.write)
+
     @strawberry.field(description="List available TLO types")
     def tlo_types(self) -> list[TLOType]:
         """Get list of all Top-Level Object types."""
@@ -89,10 +110,21 @@ class Query(
 
 
 @strawberry.type
-class Mutation:
+class Mutation(
+    IndicatorMutations,
+    ActorMutations,
+    BackdoorMutations,
+    CampaignMutations,
+    DomainMutations,
+    EmailMutations,
+    EventMutations,
+    ExploitMutations,
+    IPMutations,
+    TargetMutations,
+):
     """Root mutation type for CRITs GraphQL API."""
 
-    @strawberry.mutation(description="Placeholder mutation - API is read-only initially")
+    @strawberry.mutation(description="Test mutation - returns a greeting")
     @require_authenticated
     def ping(self, info: Info) -> str:
         """
