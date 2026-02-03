@@ -35,11 +35,7 @@ export function LoginPage() {
       {/* Theme toggle */}
       <div className="absolute top-4 right-4">
         <Button variant="ghost" size="sm" onClick={toggleTheme}>
-          {theme === 'dark' ? (
-            <Sun className="h-5 w-5" />
-          ) : (
-            <Moon className="h-5 w-5" />
-          )}
+          {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
         </Button>
       </div>
 
@@ -47,9 +43,7 @@ export function LoginPage() {
       <div className="text-center mb-8">
         <div className="flex items-center justify-center gap-3 mb-2">
           <Shield className="h-12 w-12 text-crits-blue" />
-          <h1 className="text-4xl font-bold text-light-text dark:text-dark-text">
-            CRITs
-          </h1>
+          <h1 className="text-4xl font-bold text-light-text dark:text-dark-text">CRITs</h1>
         </div>
         <p className="text-light-text-secondary dark:text-dark-text-secondary">
           Collaborative Research Into Threats
@@ -65,11 +59,7 @@ export function LoginPage() {
           <p className="text-light-text-secondary dark:text-dark-text-secondary mb-6">
             Sign in with your CRITs account to access the threat intelligence platform.
           </p>
-          <Button
-            variant="primary"
-            className="w-full"
-            onClick={handleLogin}
-          >
+          <Button variant="primary" className="w-full" onClick={handleLogin}>
             Sign In
           </Button>
         </CardContent>

@@ -6,16 +6,14 @@ export interface CardProps {
 }
 
 export function Card({ children, className }: CardProps) {
-  return (
-    <div className={cn('crits-card p-4', className)}>
-      {children}
-    </div>
-  )
+  return <div className={cn('crits-card p-4', className)}>{children}</div>
 }
 
 export function CardHeader({ children, className }: CardProps) {
   return (
-    <div className={cn('mb-4 pb-3 border-b border-light-border dark:border-dark-border', className)}>
+    <div
+      className={cn('mb-4 pb-3 border-b border-light-border dark:border-dark-border', className)}
+    >
       {children}
     </div>
   )

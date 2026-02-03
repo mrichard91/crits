@@ -5,9 +5,6 @@ export const graphqlClient = new GraphQLClient('/api/graphql', {
 })
 
 // Helper to make typed queries
-export async function query<T>(
-  document: string,
-  variables?: Record<string, unknown>
-): Promise<T> {
+export async function query<T>(document: string, variables?: Record<string, unknown>): Promise<T> {
   return graphqlClient.request<T>(document, variables)
 }

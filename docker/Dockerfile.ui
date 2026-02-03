@@ -1,8 +1,8 @@
 # Build stage - using pnpm for supply chain security
 FROM node:20-alpine AS builder
 
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@10 --activate
+# Enable corepack and activate the exact pnpm version from package.json
+RUN corepack enable && corepack prepare pnpm@10.28.2 --activate
 
 WORKDIR /app
 
