@@ -36,6 +36,8 @@ export default [
         HTMLDivElement: 'readonly',
         HTMLSelectElement: 'readonly',
         localStorage: 'readonly',
+        File: 'readonly',
+        FormData: 'readonly',
         React: 'readonly',
         JSX: 'readonly',
       },
