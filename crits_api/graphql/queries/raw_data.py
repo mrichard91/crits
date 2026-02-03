@@ -98,6 +98,7 @@ class RawDataQueries:
     def raw_data_count(
         self,
         info: Info,
+        title_contains: str | None = None,
         data_type: str | None = None,
         status: str | None = None,
         campaign: str | None = None,
@@ -114,6 +115,9 @@ class RawDataQueries:
                 source_filter = ctx.get_source_filter()
                 if source_filter:
                     queryset = queryset.filter(__raw__=source_filter)
+
+            if title_contains:
+                queryset = queryset.filter(title__icontains=title_contains)
 
             if data_type:
                 queryset = queryset.filter(data_type=data_type)

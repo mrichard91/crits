@@ -98,6 +98,7 @@ class EventQueries:
     def events_count(
         self,
         info: Info,
+        title_contains: str | None = None,
         event_type: str | None = None,
         status: str | None = None,
         campaign: str | None = None,
@@ -114,6 +115,9 @@ class EventQueries:
                 source_filter = ctx.get_source_filter()
                 if source_filter:
                     queryset = queryset.filter(__raw__=source_filter)
+
+            if title_contains:
+                queryset = queryset.filter(title__icontains=title_contains)
 
             if event_type:
                 queryset = queryset.filter(event_type=event_type)

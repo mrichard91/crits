@@ -131,6 +131,7 @@ class IndicatorQueries:
         self,
         info: Info,
         ind_type: str | None = None,
+        value_contains: str | None = None,
         status: str | None = None,
         campaign: str | None = None,
     ) -> int:
@@ -139,6 +140,7 @@ class IndicatorQueries:
 
         Args:
             ind_type: Filter by indicator type
+            value_contains: Filter by value containing this string (case-insensitive)
             status: Filter by status
             campaign: Filter by campaign name
 
@@ -160,6 +162,9 @@ class IndicatorQueries:
 
             if ind_type:
                 queryset = queryset.filter(ind_type=ind_type)
+
+            if value_contains:
+                queryset = queryset.filter(value__icontains=value_contains)
 
             if status:
                 queryset = queryset.filter(status=status)

@@ -90,6 +90,7 @@ class ScreenshotQueries:
     def screenshots_count(
         self,
         info: Info,
+        filename_contains: str | None = None,
         tag: str | None = None,
     ) -> int:
         """Count screenshots matching the filters."""
@@ -104,6 +105,9 @@ class ScreenshotQueries:
                 source_filter = ctx.get_source_filter()
                 if source_filter:
                     queryset = queryset.filter(__raw__=source_filter)
+
+            if filename_contains:
+                queryset = queryset.filter(filename__icontains=filename_contains)
 
             if tag:
                 queryset = queryset.filter(tags=tag)

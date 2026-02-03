@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Search, ChevronLeft, ChevronRight, Eye } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, Eye, Plus } from 'lucide-react'
 import { useTLOList, useTLOFilterOptions, PAGE_SIZE } from '@/hooks/useTLOList'
+import { AddTLODialog } from '@/components/AddTLODialog'
 import type { TLOConfig, TLOColumnDef, TLOFilterDef } from '@/lib/tloConfig'
 import {
   Card,
@@ -198,6 +200,7 @@ function SelectFilter({
 }
 
 export function TLOListPage({ config }: TLOListPageProps) {
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
 
   const page = parseInt(searchParams.get('page') || '1', 10)
@@ -244,7 +247,22 @@ export function TLOListPage({ config }: TLOListPageProps) {
             {totalCount.toLocaleString()} total {config.label.toLowerCase()}
           </p>
         </div>
+        {config.gqlCreate && (
+          <Button variant="primary" onClick={() => setAddDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add {config.singular}
+          </Button>
+        )}
       </div>
+
+      {/* Add dialog */}
+      {config.gqlCreate && (
+        <AddTLODialog
+          config={config}
+          open={addDialogOpen}
+          onClose={() => setAddDialogOpen(false)}
+        />
+      )}
 
       {/* Filters */}
       <FilterBar config={config} filters={filters} onFilterChange={updateFilter} />

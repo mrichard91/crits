@@ -81,6 +81,7 @@ class CampaignQueries:
     def campaigns_count(
         self,
         info: Info,
+        name_contains: str | None = None,
         active: str | None = None,
         status: str | None = None,
     ) -> int:
@@ -89,6 +90,9 @@ class CampaignQueries:
 
         try:
             queryset = Campaign.objects
+
+            if name_contains:
+                queryset = queryset.filter(name__icontains=name_contains)
 
             if active:
                 queryset = queryset.filter(active=active)

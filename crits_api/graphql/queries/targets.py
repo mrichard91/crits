@@ -88,6 +88,7 @@ class TargetQueries:
     def targets_count(
         self,
         info: Info,
+        email_contains: str | None = None,
         department: str | None = None,
         division: str | None = None,
         status: str | None = None,
@@ -98,6 +99,9 @@ class TargetQueries:
 
         try:
             queryset = Target.objects
+
+            if email_contains:
+                queryset = queryset.filter(email_address__icontains=email_contains)
 
             if department:
                 queryset = queryset.filter(department__icontains=department)

@@ -98,6 +98,8 @@ class PCAPQueries:
     def pcaps_count(
         self,
         info: Info,
+        filename_contains: str | None = None,
+        md5: str | None = None,
         status: str | None = None,
         campaign: str | None = None,
     ) -> int:
@@ -113,6 +115,12 @@ class PCAPQueries:
                 source_filter = ctx.get_source_filter()
                 if source_filter:
                     queryset = queryset.filter(__raw__=source_filter)
+
+            if filename_contains:
+                queryset = queryset.filter(filename__icontains=filename_contains)
+
+            if md5:
+                queryset = queryset.filter(md5=md5)
 
             if status:
                 queryset = queryset.filter(status=status)
