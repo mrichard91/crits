@@ -11,7 +11,8 @@
 #   CRITS_INIT_DB=true CRITS_ADMIN_USER=admin CRITS_ADMIN_PASSWORD=changeme docker compose up
 #
 # Access:
-#   Web UI: http://localhost:8080
+#   Django UI (legacy): http://localhost:8080
+#   React UI (new): http://localhost:8080/app/
 #   GraphQL API: http://localhost:8080/api/graphql
 #   GraphiQL: http://localhost:8080/api/graphql (browser)
 
@@ -117,8 +118,8 @@ services:
       - CACHE_ENABLED=true
       # GraphQL settings
       - GRAPHIQL_ENABLED=true
-      # CORS
-      - CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
+      # CORS - include common development hosts
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080,http://192.168.1.129:8080}
     expose:
       - "8001"
     depends_on:
@@ -133,6 +134,21 @@ services:
       retries: 3
       start_period: 30s
 
+  ui:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ui
+    container_name: crits-ui
+    restart: unless-stopped
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
   nginx:
     image: nginx:alpine
     container_name: crits-nginx
@@ -145,6 +161,7 @@ services:
     depends_on:
       - web
       - api
+      - ui
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost/login/"]
       interval: 30s

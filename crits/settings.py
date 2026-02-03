@@ -94,6 +94,10 @@ else:
     LOGIN_URL = "/login/"
     # CSRF_COOKIE_HTTPONLY must be False for AJAX-based login to work (JS reads the cookie)
     CSRF_COOKIE_HTTPONLY = os.environ.get('CSRF_COOKIE_HTTPONLY', 'false').lower() in ('true', '1', 'yes')
+    # SameSite settings for cross-path API requests (React UI at /app/ calls /api/)
+    SESSION_COOKIE_SAMESITE = "Lax"
+    CSRF_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_PATH = "/"
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'true').lower() in ('true', '1', 'yes')

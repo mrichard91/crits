@@ -12,13 +12,14 @@ This document outlines the comprehensive migration of CRITs from a Python 2.7/Dj
 - **Tasks**: Celery with django-celery, thread/process pools
 - **Deploy**: Single Dockerfile (dev), Apache/mod_wsgi (prod)
 
-### Current State (Phase 1-2 Complete)
+### Current State (Phase 1-5a Complete)
 - **Backend**: Python 3.12, Django 4.2 (working), Tastypie disabled
-- **Frontend**: Django templates, jQuery (unchanged)
+- **API**: FastAPI + Strawberry GraphQL at `/api/graphql` ✅
+- **Frontend**: Django templates (legacy) + React 18 UI at `/app/` (new) ✅
 - **Database**: MongoDB 7.x via MongoEngine 0.28+, PyMongo 4.6+
-- **Auth**: CRITs auth (working), GitHub OAuth (planned)
+- **Auth**: CRITs auth (working), shared Django sessions via Redis ✅
 - **Tasks**: Celery 5.3+ with Redis broker
-- **Deploy**: Docker Compose stack (nginx, web, mongo, redis) ✅
+- **Deploy**: Docker Compose stack (nginx, web, api, ui, mongo, redis) ✅
 
 ### Target State (Incremental)
 - **Backend**: Django 4.2 (legacy UI) + FastAPI (GraphQL API) running side-by-side
@@ -35,6 +36,7 @@ This document outlines the comprehensive migration of CRITs from a Python 2.7/Dj
 
 1. **nginx** routes requests:
    - `/api/graphql` → FastAPI (new GraphQL API)
+   - `/app/` → React UI (new frontend)
    - `/*` → Django (existing web UI)
 
 2. **Shared MongoEngine models**: FastAPI uses the same models as Django, no data migration needed
@@ -114,10 +116,10 @@ This document outlines the comprehensive migration of CRITs from a Python 2.7/Dj
 ### 2a. Create Base Docker Infrastructure ✅
 - [x] Create `docker/` directory structure
 - [x] Write `docker/Dockerfile.web` (Python 3.12 Django + Gunicorn)
-- [ ] Write `docker/Dockerfile.api` (FastAPI - Phase 3)
-- [ ] Write `docker/Dockerfile.ui` (Node 20 + nginx - Phase 5)
+- [x] Write `docker/Dockerfile.api` (FastAPI - Phase 3)
+- [x] Write `docker/Dockerfile.ui` (Node 20 + pnpm + nginx - Phase 5)
 - [x] Create `.dockerignore` with proper exclusions
-- [x] Create `docker/nginx.conf` for reverse proxy
+- [x] Create `docker/nginx.conf` for reverse proxy (routes `/app/` → React, `/api/` → FastAPI)
 
 ### 2b. Create Docker Compose Configuration ✅
 - [x] Write `docker-compose.yml` for development
@@ -184,8 +186,9 @@ This document outlines the comprehensive migration of CRITs from a Python 2.7/Dj
   - `request: Request` - FastAPI request object
 - [x] Create `session.py` with Django session validation:
   - Read `sessionid` cookie from request
-  - Load session from Redis (pickle deserialization)
+  - Load session from Redis (supports both pickle and JSON deserialization)
   - Resolve `_auth_user_id` to CRITsUser
+  - Fallback to Django SessionStore for compatibility
 - [x] Create `permissions.py` with permission check utilities:
   - `require_permission(acl_string)` - decorator for resolvers
   - `require_authenticated` - decorator for auth-required resolvers
@@ -237,52 +240,52 @@ This document outlines the comprehensive migration of CRITs from a Python 2.7/Dj
 ### 3g. Architecture Summary (Phase 3)
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                            nginx (:8080)                            │
-│  ┌──────────────────────────┐  ┌──────────────────────────────────┐ │
-│  │  /api/graphql → api:8001 │  │  /* → web:8000 (Django)          │ │
-│  └──────────────────────────┘  └──────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────┘
-         │                                    │
-         ▼                                    ▼
-┌─────────────────────┐              ┌─────────────────────┐
-│  FastAPI + Strawberry│              │  Django 4.2         │
-│  (:8001)            │              │  (:8000)            │
-│                     │              │                     │
-│  ┌───────────────┐  │              │  ┌───────────────┐  │
-│  │ GraphQL Schema│  │              │  │ Views/Forms   │  │
-│  └───────────────┘  │              │  └───────────────┘  │
-│  ┌───────────────┐  │              │  ┌───────────────┐  │
-│  │ Auth Context  │◄─┼──────────────┼──│ Sessions      │  │
-│  └───────────────┘  │   (shared)   │  └───────────────┘  │
-│  ┌───────────────┐  │              │  ┌───────────────┐  │
-│  │ Caching Layer │  │              │  │ Templates     │  │
-│  └───────────────┘  │              │  └───────────────┘  │
-└─────────┬───────────┘              └─────────┬───────────┘
-          │                                    │
-          │         ┌───────────────┐          │
-          │         │  MongoEngine  │          │
-          └────────►│   (shared)    │◄─────────┘
-                    └───────┬───────┘
-                            │
-                    ┌───────▼───────┐
-                    │  MongoDB 7.x  │
-                    └───────────────┘
-
-┌─────────────────────┐
-│  Redis 7.x          │
-│  - Session store    │
-│  - GraphQL cache    │
-│  - (15-min TTL)     │
-└─────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                              nginx (:8080)                               │
+│  ┌────────────────────┐  ┌──────────────────┐  ┌─────────────────────┐  │
+│  │ /api/ → api:8001   │  │ /app/ → ui:80    │  │ /* → web:8000       │  │
+│  │ (FastAPI/GraphQL)   │  │ (React/nginx)    │  │ (Django legacy)     │  │
+│  └────────────────────┘  └──────────────────┘  └─────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────────┘
+         │                        │                        │
+         ▼                        ▼                        ▼
+┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐
+│  FastAPI + Strawberry│  │  React 18 + Vite    │  │  Django 4.2         │
+│  (:8001)            │  │  (static via nginx)  │  │  (:8000)            │
+│                     │  │                     │  │                     │
+│  ┌───────────────┐  │  │  ┌───────────────┐  │  │  ┌───────────────┐  │
+│  │ GraphQL Schema│  │  │  │ Tailwind CSS  │  │  │  │ Views/Forms   │  │
+│  └───────────────┘  │  │  │ Dark/Light    │  │  │  └───────────────┘  │
+│  ┌───────────────┐  │  │  └───────────────┘  │  │  ┌───────────────┐  │
+│  │ Auth Context  │◄─┼──┼──┐ fetch() w/    │  │  │  │ Sessions      │──┼─┐
+│  └───────────────┘  │  │  │ credentials   │  │  │  └───────────────┘  │ │
+│  ┌───────────────┐  │  │  └───────────────┘  │  │  ┌───────────────┐  │ │
+│  │ Caching Layer │  │  │  ┌───────────────┐  │  │  │ Templates     │  │ │
+│  └───────────────┘  │  │  │ pnpm (supply  │  │  │  └───────────────┘  │ │
+└─────────┬───────────┘  │  │ chain secure) │  │  └─────────┬───────────┘ │
+          │              │  └───────────────┘  │            │             │
+          │              └─────────────────────┘            │             │
+          │         ┌───────────────┐                       │             │
+          │         │  MongoEngine  │                       │             │
+          └────────►│   (shared)    │◄──────────────────────┘             │
+                    └───────┬───────┘                                     │
+                            │                                             │
+                    ┌───────▼───────┐     ┌─────────────────────┐         │
+                    │  MongoDB 7.x  │     │  Redis 7.x          │◄────────┘
+                    └───────────────┘     │  - Session store    │
+                                          │  - GraphQL cache    │
+                                          │  - (15-min TTL)     │
+                                          └─────────────────────┘
 ```
 
 **Key Integration Points:**
-1. **nginx** routes `/api/graphql` to FastAPI, everything else to Django
+1. **nginx** routes `/api/` to FastAPI, `/app/` to React UI, everything else to Django
 2. **Session sharing**: FastAPI reads Django's `sessionid` cookie from Redis
 3. **MongoEngine models**: Shared between Django and FastAPI (no duplication)
 4. **Cache layer**: FastAPI uses Redis for 15-minute query caching
 5. **Permission checks**: Both services use same ACL logic from `crits/core/`
+6. **React UI**: Uses `fetch()` with `credentials: 'include'` to call GraphQL API via same-origin cookie auth
+7. **Supply chain security**: pnpm 10.28.2 enforced for all frontend dependency management
 
 ---
 
@@ -479,36 +482,45 @@ type Sample {
 
 ---
 
-## Phase 5: React Frontend Foundation
+## Phase 5: React Frontend Foundation ✅ COMPLETE (Core)
 
-### 5a. Create React Application
-- [ ] Initialize Vite + React + TypeScript project in `ui/`
-- [ ] Configure `vite.config.ts` with proxy to API
-- [ ] Install and configure Tailwind CSS
+### 5a. Create React Application ✅
+- [x] Initialize Vite + React + TypeScript project in `ui/`
+- [x] Configure `vite.config.ts` with path aliases (@/ for src/)
+- [x] Install and configure Tailwind CSS 4.x with custom CRITs theme
+- [x] Configure TypeScript with strict mode
+- [x] Configure path aliases (@/ for src/)
+- [x] Create `docker/Dockerfile.ui` with pnpm 10 + multi-stage build
+- [x] Create `docker/nginx-ui.conf` for SPA routing (no-cache on index.html)
+- [x] Enforce pnpm 10.28.2 only (supply chain security via `only-allow pnpm` preinstall hook)
 - [ ] Set up ESLint + Prettier configuration
-- [ ] Configure path aliases (@/ for src/)
-- [ ] Set up environment variable handling
 
-### 5b. Core UI Components
-- [ ] Create `ui/src/components/` structure
-- [ ] Create `Layout/` with Header, Sidebar, Footer
-- [ ] Create `Navigation/` with NavBar, Breadcrumbs
-- [ ] Create `DataDisplay/` with Card, Badge, Tag
-- [ ] Create `Feedback/` with Toast, Alert, Modal
-- [ ] Create `Forms/` with Input, Select, Checkbox
-- [ ] Create `Buttons/` with Button, IconButton
-- [ ] Create loading spinners and skeletons
+### 5b. Core UI Components ✅
+- [x] Create `ui/src/components/` structure
+- [x] Create `ui/src/components/ui/` with reusable base components:
+  - `Button` (primary, secondary, ghost, danger variants + sizes)
+  - `Card`, `CardHeader`, `CardContent` (with dark mode support)
+  - `Badge` (info, success, warning, danger, neutral variants)
+  - `Input`, `Select` form components
+  - `Modal` dialog component
+  - Barrel export via `index.ts`
+- [x] Create `Layout` component with Header (user dropdown, dark/light toggle)
+- [x] Create loading spinners
+- [ ] Create `Navigation/` with Sidebar, Breadcrumbs
+- [ ] Create `Feedback/` with Toast, Alert
+- [ ] Create loading skeletons
 
-### 5c. Preserve CRITs Visual Identity
-- [ ] Extract color palette from existing CSS
-- [ ] Create Tailwind theme configuration
-- [ ] Create CSS variables for CRITs colors
-- [ ] Recreate header/banner styling
+### 5c. Preserve CRITs Visual Identity ✅
+- [x] Extract color palette from existing CSS
+- [x] Create Tailwind theme configuration with CRITs colors (crits-blue, crits-red, crits-green, etc.)
+- [x] Create CSS custom properties for light/dark themes
+- [x] Implement dark/light mode toggle with system preference detection
+- [x] Create ThemeContext for persistent theme state
+- [x] Style login page matching CRITs branding
 - [ ] Recreate sidebar navigation styling
 - [ ] Recreate table styling (preserve jTable look)
 - [ ] Recreate form styling
 - [ ] Recreate modal/dialog styling
-- [ ] Create Font Awesome icon integration
 
 ### 5d. Virtual Tables Implementation
 - [ ] Install TanStack Table (react-table)
@@ -523,23 +535,31 @@ type Sample {
 - [ ] Implement column visibility toggle
 - [ ] Create export functionality (CSV, JSON)
 
-### 5e. Authentication UI
-- [ ] Create login page with GitHub OAuth button
-- [ ] Create authentication context provider
-- [ ] Implement protected route wrapper
-- [ ] Create user profile dropdown
-- [ ] Implement token refresh logic
-- [ ] Create logout functionality
-- [ ] Handle authentication errors
+### 5e. Authentication UI ✅
+- [x] Create login page (redirects to Django login for shared session auth)
+- [x] Create `AuthContext` provider with `useAuth()` hook
+- [x] Implement `checkAuth()` via raw `fetch()` to GraphQL `me` query
+- [x] Use `credentials: 'include'` for same-origin cookie auth
+- [x] Implement protected route wrapper (redirects to /login if unauthenticated)
+- [x] Create user profile display in header
+- [x] Create logout functionality (redirects to Django `/logout/`)
+- [x] Handle authentication errors gracefully (catch → setUser(null))
+- [ ] Create user profile dropdown with settings
 
-### 5f. GraphQL Client Setup
-- [ ] Install urql or Apollo Client
-- [ ] Configure GraphQL client with auth headers
-- [ ] Set up client-side caching
+### 5f. GraphQL Client Setup ✅
+- [x] Create `graphqlClient` with `graphql-request` library
+- [x] Configure with `credentials: 'include'` for cookie auth
+- [x] Auth check uses raw `fetch()` for reliability
+- [x] React Query (`@tanstack/react-query`) configured with 5-min stale time
 - [ ] Create code generation for types (graphql-codegen)
 - [ ] Create custom hooks for common queries
 - [ ] Implement optimistic updates
-- [ ] Set up error handling
+
+### 5g. Routing ✅
+- [x] React Router with `basename="/app"` for `/app/` subpath
+- [x] Routes: `/login`, `/` (dashboard), `/indicators`, `/indicators/:id`
+- [x] Protected routes redirect to login when unauthenticated
+- [x] Django `validate_next()` updated to allow `/app/` redirects after login
 
 ---
 
@@ -830,8 +850,8 @@ type Sample {
 | 2 | Docker Stack | ✅ Complete | Phase 1 |
 | 3 | FastAPI + GraphQL Foundation | ✅ Complete | Phase 1, 2 |
 | 4 | GraphQL Schema Implementation | ✅ Complete (Core) | Phase 3 |
-| 5 | React Foundation | Planned | Phase 4 |
-| 6 | React Features | Planned | Phase 5 |
+| 5 | React Foundation | ✅ Complete (Core) | Phase 4 |
+| 6 | React Features | In Progress | Phase 5 |
 | 7 | Worker Framework | Planned | Phase 3 |
 | 8 | Testing | Planned | Phase 3-7 |
 | 9 | Documentation | Ongoing | Low |

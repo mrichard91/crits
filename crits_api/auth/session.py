@@ -5,6 +5,7 @@ Reads Django session cookies to authenticate users, allowing
 session sharing between Django and FastAPI services.
 """
 
+import json
 import logging
 import pickle
 from typing import TYPE_CHECKING, Optional
@@ -27,7 +28,7 @@ async def get_redis_client() -> redis.Redis:
     """Get or create Redis client for session access."""
     global _redis_client
     if _redis_client is None:
-        # Don't decode responses - session data is pickled binary
+        # Don't decode responses - session data may be pickled binary
         _redis_client = redis.from_url(
             settings.redis_url,
             decode_responses=False,
@@ -38,6 +39,9 @@ async def get_redis_client() -> redis.Redis:
 async def get_session_data(session_key: str) -> dict | None:
     """
     Load session data from Redis (Django cache session backend).
+
+    Supports both pickle and JSON serialization for compatibility
+    with sessions created before/after JSONSerializer setting.
 
     Args:
         session_key: The session ID from the cookie
@@ -60,15 +64,26 @@ async def get_session_data(session_key: str) -> dict | None:
             data = await client.get(key)
             if data:
                 logger.debug(f"Found session with key pattern: {key[:40]}...")
+
+                # Try pickle first (older sessions)
                 try:
-                    # Django cache backend uses pickle serialization
                     session_data = pickle.loads(data)
                     if isinstance(session_data, dict):
+                        logger.debug("Session loaded via pickle")
                         return session_data
-                    logger.debug(f"Session data is not a dict: {type(session_data)}")
-                except pickle.UnpicklingError as e:
-                    logger.debug(f"Failed to unpickle session data: {e}")
-                    continue
+                except (pickle.UnpicklingError, TypeError, AttributeError):
+                    pass
+
+                # Try JSON (newer sessions with JSONSerializer)
+                try:
+                    session_data = json.loads(data)
+                    if isinstance(session_data, dict):
+                        logger.debug("Session loaded via JSON")
+                        return session_data
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
+                logger.debug("Could not deserialize session data")
 
         logger.debug(f"No session found for key: {session_key[:20]}...")
         return None
