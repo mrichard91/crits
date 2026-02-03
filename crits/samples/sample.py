@@ -99,13 +99,16 @@ class Sample(CritsBaseAttributes, CritsSourceDocument, CritsActionsDocument,
         self.filedata = data
 
     def _generate_file_metadata(self, data):
-        import pydeep
         import magic
         from hashlib import md5, sha1, sha256
         try:
+            import pydeep
+        except ImportError:
+            pydeep = None
+        try:
             import pyimpfuzzy
         except ImportError:
-            pass
+            pyimpfuzzy = None
         try:
             self.filetype = magic.from_buffer(data)
             if len(self.filetype) > 1000:

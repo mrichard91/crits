@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X } from 'lucide-react'
+import { X, Upload } from 'lucide-react'
 import { useTLOCreate } from '@/hooks/useTLOCreate'
 import { useTLOFilterOptions } from '@/hooks/useTLOList'
 import type { TLOConfig, TLOCreateFieldDef } from '@/lib/tloConfig'
@@ -12,15 +12,77 @@ interface AddTLODialogProps {
   onClose: () => void
 }
 
-function CreateFieldInput({
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function FileFieldInput({
   field,
-  value,
+  file,
   onChange,
 }: {
   field: TLOCreateFieldDef
-  value: string
-  onChange: (val: string) => void
+  file: File | null
+  onChange: (file: File) => void
 }) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-1">
+        {field.label}
+        {field.required && <span className="text-status-error ml-1">*</span>}
+      </label>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={field.accept}
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) onChange(f)
+        }}
+        className="hidden"
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        className="crits-input w-full text-left flex items-center gap-2 cursor-pointer"
+      >
+        <Upload className="h-4 w-4 shrink-0 text-light-text-muted dark:text-dark-text-muted" />
+        {file ? (
+          <span className="truncate">
+            {file.name}{' '}
+            <span className="text-light-text-muted dark:text-dark-text-muted">
+              ({formatFileSize(file.size)})
+            </span>
+          </span>
+        ) : (
+          <span className="text-light-text-muted dark:text-dark-text-muted">Choose file...</span>
+        )}
+      </button>
+    </div>
+  )
+}
+
+function CreateFieldInput({
+  field,
+  value,
+  fileValue,
+  onChange,
+  onFileChange,
+}: {
+  field: TLOCreateFieldDef
+  value: string
+  fileValue: File | null
+  onChange: (val: string) => void
+  onFileChange: (file: File) => void
+}) {
+  if (field.type === 'file') {
+    return <FileFieldInput field={field} file={fileValue} onChange={onFileChange} />
+  }
+
   if (field.type === 'textarea') {
     return (
       <div>
@@ -92,10 +154,16 @@ export function AddTLODialog({ config, open, onClose }: AddTLODialogProps) {
   const navigate = useNavigate()
   const createMutation = useTLOCreate(config)
   const [formData, setFormData] = useState<Record<string, string>>({})
+  const [fileData, setFileData] = useState<Record<string, File>>({})
   const [error, setError] = useState<string | null>(null)
 
   const handleFieldChange = useCallback((key: string, value: string) => {
     setFormData((prev) => ({ ...prev, [key]: value }))
+    setError(null)
+  }, [])
+
+  const handleFileChange = useCallback((key: string, file: File) => {
+    setFileData((prev) => ({ ...prev, [key]: file }))
     setError(null)
   }, [])
 
@@ -105,7 +173,11 @@ export function AddTLODialog({ config, open, onClose }: AddTLODialogProps) {
 
     // Validate required fields
     const missingFields = (config.createFields ?? [])
-      .filter((f) => f.required && !formData[f.key]?.trim())
+      .filter((f) => {
+        if (!f.required) return false
+        if (f.type === 'file') return !fileData[f.key]
+        return !formData[f.key]?.trim()
+      })
       .map((f) => f.label)
 
     if (missingFields.length > 0) {
@@ -113,10 +185,13 @@ export function AddTLODialog({ config, open, onClose }: AddTLODialogProps) {
       return
     }
 
-    // Filter out empty values
-    const variables: Record<string, string> = {}
+    // Build variables: string values + file objects
+    const variables: Record<string, string | File> = {}
     for (const [key, val] of Object.entries(formData)) {
       if (val.trim()) variables[key] = val.trim()
+    }
+    for (const [key, file] of Object.entries(fileData)) {
+      variables[key] = file
     }
 
     try {
@@ -124,10 +199,12 @@ export function AddTLODialog({ config, open, onClose }: AddTLODialogProps) {
       if (result.id) {
         onClose()
         setFormData({})
+        setFileData({})
         navigate(`${config.route}/${result.id}`)
       } else {
         onClose()
         setFormData({})
+        setFileData({})
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
@@ -136,6 +213,7 @@ export function AddTLODialog({ config, open, onClose }: AddTLODialogProps) {
 
   const handleClose = () => {
     setFormData({})
+    setFileData({})
     setError(null)
     onClose()
   }
@@ -169,7 +247,9 @@ export function AddTLODialog({ config, open, onClose }: AddTLODialogProps) {
               key={field.key}
               field={field}
               value={formData[field.key] || ''}
+              fileValue={fileData[field.key] || null}
               onChange={(val) => handleFieldChange(field.key, val)}
+              onFileChange={(file) => handleFileChange(field.key, file)}
             />
           ))}
 

@@ -43,10 +43,11 @@ export interface TLODetailFieldDef {
 export interface TLOCreateFieldDef {
   key: string // GraphQL mutation param name (camelCase)
   label: string // Form label
-  type: 'text' | 'textarea' | 'select'
+  type: 'text' | 'textarea' | 'select' | 'file'
   required?: boolean
   placeholder?: string
   optionsQuery?: string // For select: GQL query returning string[]
+  accept?: string // For file inputs: accepted file types
 }
 
 export interface TLOConfig {
@@ -84,6 +85,7 @@ export interface TLOConfig {
   // Create mutation (if supported)
   gqlCreate?: string // "createIndicator", etc.
   createFields?: TLOCreateFieldDef[]
+  requiresFileUpload?: boolean // true if mutation uses Upload scalar
 }
 
 const commonListFields = ['id', 'status', 'created', 'modified']
@@ -365,6 +367,20 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       campaignFilter,
     ],
     detailFields: [...commonDetailDisplay, { key: 'md5', label: 'MD5', type: 'mono' }],
+    gqlCreate: 'createCertificate',
+    requiresFileUpload: true,
+    createFields: [
+      { key: 'file', label: 'Certificate File', type: 'file', required: true },
+      {
+        key: 'source',
+        label: 'Source',
+        type: 'select',
+        required: true,
+        optionsQuery: 'sourceNames',
+      },
+      { key: 'filename', label: 'Filename Override', type: 'text', placeholder: 'Optional' },
+      { key: 'description', label: 'Description', type: 'textarea' },
+    ],
   },
 
   Domain: {
@@ -654,6 +670,26 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       campaignFilter,
     ],
     detailFields: [...commonDetailDisplay, { key: 'md5', label: 'MD5', type: 'mono' }],
+    gqlCreate: 'createPcap',
+    requiresFileUpload: true,
+    createFields: [
+      {
+        key: 'file',
+        label: 'PCAP File',
+        type: 'file',
+        required: true,
+        accept: '.pcap,.pcapng,.cap',
+      },
+      {
+        key: 'source',
+        label: 'Source',
+        type: 'select',
+        required: true,
+        optionsQuery: 'sourceNames',
+      },
+      { key: 'filename', label: 'Filename Override', type: 'text', placeholder: 'Optional' },
+      { key: 'description', label: 'Description', type: 'textarea' },
+    ],
   },
 
   RawData: {
@@ -688,6 +724,28 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'dataType', label: 'Data Type', type: 'badge' },
       { key: 'version', label: 'Version', type: 'text' },
       { key: 'md5', label: 'MD5', type: 'mono' },
+    ],
+    gqlCreate: 'createRawData',
+    createFields: [
+      { key: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Raw data title' },
+      {
+        key: 'dataType',
+        label: 'Data Type',
+        type: 'select',
+        required: true,
+        optionsQuery: 'rawDataTypes',
+      },
+      {
+        key: 'source',
+        label: 'Source',
+        type: 'select',
+        required: true,
+        optionsQuery: 'sourceNames',
+      },
+      { key: 'data', label: 'Data', type: 'textarea', required: true },
+      { key: 'description', label: 'Description', type: 'textarea' },
+      { key: 'toolName', label: 'Tool Name', type: 'text' },
+      { key: 'toolVersion', label: 'Tool Version', type: 'text' },
     ],
   },
 
@@ -741,6 +799,21 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'sha256', label: 'SHA256', type: 'mono' },
       { key: 'ssdeep', label: 'SSDeep', type: 'mono' },
       { key: 'filenames', label: 'Filenames', type: 'list' },
+    ],
+    gqlCreate: 'createSample',
+    requiresFileUpload: true,
+    createFields: [
+      { key: 'file', label: 'Sample File', type: 'file', required: true },
+      {
+        key: 'source',
+        label: 'Source',
+        type: 'select',
+        required: true,
+        optionsQuery: 'sourceNames',
+      },
+      { key: 'filename', label: 'Filename Override', type: 'text', placeholder: 'Optional' },
+      { key: 'description', label: 'Description', type: 'textarea' },
+      { key: 'campaign', label: 'Campaign', type: 'select', optionsQuery: 'campaignNames' },
     ],
   },
 
@@ -798,6 +871,32 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'dataType', label: 'Data Type', type: 'badge' },
       { key: 'version', label: 'Version', type: 'text' },
       { key: 'md5', label: 'MD5', type: 'mono' },
+    ],
+    gqlCreate: 'createSignature',
+    createFields: [
+      {
+        key: 'title',
+        label: 'Title',
+        type: 'text',
+        required: true,
+        placeholder: 'Signature title',
+      },
+      {
+        key: 'dataType',
+        label: 'Data Type',
+        type: 'select',
+        required: true,
+        optionsQuery: 'signatureDataTypes',
+      },
+      {
+        key: 'source',
+        label: 'Source',
+        type: 'select',
+        required: true,
+        optionsQuery: 'sourceNames',
+      },
+      { key: 'data', label: 'Data', type: 'textarea', required: true },
+      { key: 'description', label: 'Description', type: 'textarea' },
     ],
   },
 
