@@ -26,16 +26,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           className={cn(
             'crits-input',
             error && 'border-status-error focus:border-status-error focus:ring-status-error',
-            className
+            className,
           )}
           {...props}
         />
-        {error && (
-          <p className="mt-1 text-xs text-status-error">{error}</p>
-        )}
+        {error && <p className="mt-1 text-xs text-status-error">{error}</p>}
       </div>
     )
-  }
+  },
 )
 
 Input.displayName = 'Input'

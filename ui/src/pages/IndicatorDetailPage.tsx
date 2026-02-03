@@ -1,25 +1,8 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import {
-  Target,
-  ArrowLeft,
-  Calendar,
-  User,
-  Shield,
-  Tag,
-  Activity,
-  FileText,
-} from 'lucide-react'
+import { Target, ArrowLeft, Calendar, User, Shield, Tag, Activity, FileText } from 'lucide-react'
 import { graphqlClient } from '@/lib/graphql'
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Badge,
-  Spinner,
-  Button,
-} from '@/components/ui'
+import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, Button } from '@/components/ui'
 import { formatDate } from '@/lib/utils'
 
 const INDICATOR_QUERY = `
@@ -89,8 +72,7 @@ export function IndicatorDetailPage() {
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['indicator', id],
-    queryFn: () =>
-      graphqlClient.request<IndicatorData>(INDICATOR_QUERY, { id }),
+    queryFn: () => graphqlClient.request<IndicatorData>(INDICATOR_QUERY, { id }),
     enabled: !!id,
   })
 
@@ -148,10 +130,10 @@ export function IndicatorDetailPage() {
                 indicator.status === 'Analyzed'
                   ? 'success'
                   : indicator.status === 'In Progress'
-                  ? 'warning'
-                  : indicator.status === 'Deprecated'
-                  ? 'error'
-                  : 'default'
+                    ? 'warning'
+                    : indicator.status === 'Deprecated'
+                      ? 'error'
+                      : 'default'
               }
             >
               {indicator.status}
@@ -233,9 +215,7 @@ export function IndicatorDetailPage() {
             </CardHeader>
             <CardContent>
               {indicator.sources.length === 0 ? (
-                <p className="text-light-text-muted dark:text-dark-text-muted">
-                  No sources
-                </p>
+                <p className="text-light-text-muted dark:text-dark-text-muted">No sources</p>
               ) : (
                 <div className="space-y-4">
                   {indicator.sources.map((source, idx) => (
@@ -256,9 +236,7 @@ export function IndicatorDetailPage() {
                             <span className="ml-2">• {instance.reference}</span>
                           )}
                           <span className="ml-2">• {instance.analyst}</span>
-                          <span className="ml-2">
-                            • {formatDate(instance.date)}
-                          </span>
+                          <span className="ml-2">• {formatDate(instance.date)}</span>
                         </div>
                       ))}
                     </div>
@@ -269,8 +247,7 @@ export function IndicatorDetailPage() {
           </Card>
 
           {/* Threat/Attack Types */}
-          {(indicator.threatTypes.length > 0 ||
-            indicator.attackTypes.length > 0) && (
+          {(indicator.threatTypes.length > 0 || indicator.attackTypes.length > 0) && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -326,9 +303,7 @@ export function IndicatorDetailPage() {
             </CardHeader>
             <CardContent>
               {indicator.campaigns.length === 0 ? (
-                <p className="text-light-text-muted dark:text-dark-text-muted">
-                  No campaigns
-                </p>
+                <p className="text-light-text-muted dark:text-dark-text-muted">No campaigns</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {indicator.campaigns.map((campaign) => (
@@ -349,9 +324,7 @@ export function IndicatorDetailPage() {
             </CardHeader>
             <CardContent>
               {indicator.bucketList.length === 0 ? (
-                <p className="text-light-text-muted dark:text-dark-text-muted">
-                  No tags
-                </p>
+                <p className="text-light-text-muted dark:text-dark-text-muted">No tags</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {indicator.bucketList.map((tag) => (

@@ -1,14 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import {
-  Target,
-  Globe,
-  Server,
-  FileCode,
-  Users,
-  Award,
-  ArrowRight,
-} from 'lucide-react'
+import { Target, Globe, Server, FileCode, Users, Award, ArrowRight } from 'lucide-react'
 import { graphqlClient } from '@/lib/graphql'
 import { Card, CardHeader, CardTitle, CardContent, Spinner, Badge } from '@/components/ui'
 
@@ -76,21 +68,55 @@ export function DashboardPage() {
   })
 
   const statCards = [
-    { label: 'Indicators', value: stats?.indicatorCount ?? 0, icon: Target, color: 'text-blue-500', to: '/indicators' },
-    { label: 'Domains', value: stats?.domainCount ?? 0, icon: Globe, color: 'text-green-500', to: '/domains' },
-    { label: 'IPs', value: stats?.ipCount ?? 0, icon: Server, color: 'text-purple-500', to: '/ips' },
-    { label: 'Samples', value: stats?.sampleCount ?? 0, icon: FileCode, color: 'text-orange-500', to: '/samples' },
-    { label: 'Actors', value: stats?.actorCount ?? 0, icon: Users, color: 'text-red-500', to: '/actors' },
-    { label: 'Campaigns', value: stats?.campaignCount ?? 0, icon: Award, color: 'text-yellow-500', to: '/campaigns' },
+    {
+      label: 'Indicators',
+      value: stats?.indicatorCount ?? 0,
+      icon: Target,
+      color: 'text-blue-500',
+      to: '/indicators',
+    },
+    {
+      label: 'Domains',
+      value: stats?.domainCount ?? 0,
+      icon: Globe,
+      color: 'text-green-500',
+      to: '/domains',
+    },
+    {
+      label: 'IPs',
+      value: stats?.ipCount ?? 0,
+      icon: Server,
+      color: 'text-purple-500',
+      to: '/ips',
+    },
+    {
+      label: 'Samples',
+      value: stats?.sampleCount ?? 0,
+      icon: FileCode,
+      color: 'text-orange-500',
+      to: '/samples',
+    },
+    {
+      label: 'Actors',
+      value: stats?.actorCount ?? 0,
+      icon: Users,
+      color: 'text-red-500',
+      to: '/actors',
+    },
+    {
+      label: 'Campaigns',
+      value: stats?.campaignCount ?? 0,
+      icon: Award,
+      color: 'text-yellow-500',
+      to: '/campaigns',
+    },
   ]
 
   return (
     <div className="space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold text-light-text dark:text-dark-text">
-          Dashboard
-        </h1>
+        <h1 className="text-2xl font-bold text-light-text dark:text-dark-text">Dashboard</h1>
         <p className="text-light-text-secondary dark:text-dark-text-secondary">
           Overview of your threat intelligence data
         </p>
@@ -154,9 +180,7 @@ export function DashboardPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Target className="h-4 w-4 text-crits-blue flex-shrink-0" />
-                      <span className="font-mono text-sm truncate max-w-md">
-                        {node.value}
-                      </span>
+                      <span className="font-mono text-sm truncate max-w-md">{node.value}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="info">{node.indicatorType}</Badge>
@@ -165,8 +189,8 @@ export function DashboardPage() {
                           node.status === 'Analyzed'
                             ? 'success'
                             : node.status === 'In Progress'
-                            ? 'warning'
-                            : 'default'
+                              ? 'warning'
+                              : 'default'
                         }
                       >
                         {node.status}

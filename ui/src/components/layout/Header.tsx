@@ -17,10 +17,7 @@ export function Header({ onMenuClick }: HeaderProps) {
       <div className="h-full px-4 flex items-center justify-between">
         {/* Left section */}
         <div className="flex items-center gap-4">
-          <button
-            onClick={onMenuClick}
-            className="lg:hidden p-2 text-gray-300 hover:text-white"
-          >
+          <button onClick={onMenuClick} className="lg:hidden p-2 text-gray-300 hover:text-white">
             <Menu className="h-5 w-5" />
           </button>
           <Link to="/" className="flex items-center gap-2">
@@ -40,11 +37,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             onClick={toggleTheme}
             className="text-gray-300 hover:text-white hover:bg-gray-700"
           >
-            {theme === 'dark' ? (
-              <Sun className="h-4 w-4" />
-            ) : (
-              <Moon className="h-4 w-4" />
-            )}
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
 
           {/* User menu */}

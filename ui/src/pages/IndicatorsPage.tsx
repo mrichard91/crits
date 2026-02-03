@@ -195,9 +195,7 @@ export function IndicatorsPage() {
               <Spinner size="lg" />
             </div>
           ) : error ? (
-            <div className="text-center text-status-error py-12">
-              Failed to load indicators
-            </div>
+            <div className="text-center text-status-error py-12">Failed to load indicators</div>
           ) : data?.indicators.edges.length === 0 ? (
             <div className="text-center text-light-text-muted dark:text-dark-text-muted py-12">
               No indicators found
@@ -237,10 +235,10 @@ export function IndicatorsPage() {
                             node.status === 'Analyzed'
                               ? 'success'
                               : node.status === 'In Progress'
-                              ? 'warning'
-                              : node.status === 'Deprecated'
-                              ? 'error'
-                              : 'default'
+                                ? 'warning'
+                                : node.status === 'Deprecated'
+                                  ? 'error'
+                                  : 'default'
                           }
                         >
                           {node.status}
@@ -259,14 +257,10 @@ export function IndicatorsPage() {
                             )}
                           </div>
                         ) : (
-                          <span className="text-light-text-muted dark:text-dark-text-muted">
-                            -
-                          </span>
+                          <span className="text-light-text-muted dark:text-dark-text-muted">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-xs">
-                        {formatDate(node.modified)}
-                      </TableCell>
+                      <TableCell className="text-xs">{formatDate(node.modified)}</TableCell>
                       <TableCell>
                         <Link to={`/indicators/${node.id}`}>
                           <Button variant="ghost" size="sm">

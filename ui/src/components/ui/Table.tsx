@@ -8,9 +8,7 @@ export interface TableProps {
 export function Table({ children, className }: TableProps) {
   return (
     <div className="overflow-x-auto">
-      <table className={cn('crits-table', className)}>
-        {children}
-      </table>
+      <table className={cn('crits-table', className)}>{children}</table>
     </div>
   )
 }

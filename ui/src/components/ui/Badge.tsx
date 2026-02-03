@@ -18,12 +18,10 @@ export function Badge({ children, variant = 'default', className }: BadgeProps) 
             variant === 'success',
           'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300':
             variant === 'warning',
-          'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300':
-            variant === 'error',
-          'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300':
-            variant === 'info',
+          'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300': variant === 'error',
+          'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300': variant === 'info',
         },
-        className
+        className,
       )}
     >
       {children}

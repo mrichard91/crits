@@ -47,12 +47,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   return (
     <>
       {/* Mobile overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={onClose}
-        />
-      )}
+      {isOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onClose} />}
 
       {/* Sidebar */}
       <aside
@@ -61,7 +56,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           'bg-light-bg dark:bg-dark-bg border-r border-light-border dark:border-dark-border',
           'transition-transform duration-200 ease-in-out',
           'lg:translate-x-0',
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+          isOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
         {/* Mobile close button */}
@@ -88,7 +83,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   disabled && 'opacity-50 cursor-not-allowed',
                   isActive && !disabled
                     ? 'bg-crits-blue/10 text-crits-blue font-medium'
-                    : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-light-bg-secondary dark:hover:bg-dark-bg-secondary hover:text-light-text dark:hover:text-dark-text'
+                    : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-light-bg-secondary dark:hover:bg-dark-bg-secondary hover:text-light-text dark:hover:text-dark-text',
                 )
               }
             >
