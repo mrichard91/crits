@@ -3655,7 +3655,13 @@ def validate_next(next_url=None):
         # Django 3+ requires allowed_hosts parameter
         if not is_safe_url(next_url, allowed_hosts={None}):
             raise Exception
-        resolve(urlparse(next_url).path)
+        # Allow redirects to React UI at /app/
+        parsed_path = urlparse(next_url).path
+        if parsed_path.startswith('/app/') or parsed_path == '/app':
+            # React UI paths are valid redirects (served by nginx)
+            pass
+        else:
+            resolve(parsed_path)
         response['success'] = True
         response['type'] = "already_authenticated"
         response['message'] = next_url

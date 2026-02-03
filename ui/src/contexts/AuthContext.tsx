@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { graphqlClient } from '@/lib/graphql'
 
 interface User {
   id: string
@@ -8,7 +7,7 @@ interface User {
   lastName: string
   email: string
   organization: string
-  role: string
+  roles: string[]
   isActive: boolean
 }
 
@@ -16,9 +15,8 @@ interface AuthContextType {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
-  login: (username: string, password: string) => Promise<void>
-  logout: () => Promise<void>
-  checkAuth: () => Promise<void>
+  logout: () => void
+  refetch: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -32,7 +30,7 @@ const ME_QUERY = `
       lastName
       email
       organization
-      role
+      roles
       isActive
     }
   }
@@ -44,8 +42,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
-      const data = await graphqlClient.request<{ me: User }>(ME_QUERY)
-      setUser(data.me)
+      const response = await fetch('/api/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ query: ME_QUERY }),
+      })
+      const json = await response.json()
+      if (json.data?.me) {
+        setUser(json.data.me)
+      } else {
+        setUser(null)
+      }
     } catch {
       setUser(null)
     } finally {
@@ -57,45 +65,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth()
   }, [])
 
-  const login = async (username: string, password: string) => {
-    // Login via Django endpoint (shared session)
-    const response = await fetch('/login/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        username,
-        password,
-        csrfmiddlewaretoken: getCsrfToken(),
-      }),
-      credentials: 'include',
-    })
-
-    if (!response.ok) {
-      throw new Error('Login failed')
-    }
-
-    // Check if we're authenticated now
-    await checkAuth()
-
-    if (!user) {
-      throw new Error('Login failed')
-    }
+  const logout = () => {
+    // Redirect to Django logout, then back to React login
+    window.location.href = '/logout/?next=/app/login'
   }
 
-  const logout = async () => {
-    await fetch('/logout/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        csrfmiddlewaretoken: getCsrfToken(),
-      }),
-      credentials: 'include',
-    })
-    setUser(null)
+  const refetch = async () => {
+    setIsLoading(true)
+    await checkAuth()
   }
 
   return (
@@ -104,9 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isAuthenticated: !!user,
         isLoading,
-        login,
         logout,
-        checkAuth,
+        refetch,
       }}
     >
       {children}
@@ -120,15 +96,4 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider')
   }
   return context
-}
-
-function getCsrfToken(): string {
-  const cookies = document.cookie.split(';')
-  for (const cookie of cookies) {
-    const [name, value] = cookie.trim().split('=')
-    if (name === 'csrftoken') {
-      return value
-    }
-  }
-  return ''
 }

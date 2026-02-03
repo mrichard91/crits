@@ -1,33 +1,33 @@
-import { useState } from 'react'
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Shield, Moon, Sun } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
-import { Button, Input, Card, CardContent } from '@/components/ui'
+import { Button, Card, CardContent } from '@/components/ui'
 
 export function LoginPage() {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-
-  const { login } = useAuth()
+  const { isAuthenticated, isLoading } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setIsLoading(true)
-
-    try {
-      await login(username, password)
+  // If already authenticated, go to dashboard
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
       navigate('/')
-    } catch {
-      setError('Invalid username or password')
-    } finally {
-      setIsLoading(false)
     }
+  }, [isAuthenticated, isLoading, navigate])
+
+  const handleLogin = () => {
+    // Redirect to Django login with next=/app/ to come back here after auth
+    window.location.href = '/login/?next=/app/'
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-crits-blue"></div>
+      </div>
+    )
   }
 
   return (
@@ -56,50 +56,22 @@ export function LoginPage() {
         </p>
       </div>
 
-      {/* Login form */}
+      {/* Login card */}
       <Card className="w-full max-w-md">
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <h2 className="text-xl font-semibold text-center text-light-text dark:text-dark-text mb-6">
-              Sign In
-            </h2>
-
-            {error && (
-              <div className="p-3 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded text-red-700 dark:text-red-300 text-sm">
-                {error}
-              </div>
-            )}
-
-            <Input
-              label="Username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your username"
-              required
-              autoComplete="username"
-              autoFocus
-            />
-
-            <Input
-              label="Password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              required
-              autoComplete="current-password"
-            />
-
-            <Button
-              type="submit"
-              variant="primary"
-              className="w-full"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Signing in...' : 'Sign In'}
-            </Button>
-          </form>
+        <CardContent className="text-center">
+          <h2 className="text-xl font-semibold text-light-text dark:text-dark-text mb-4">
+            Welcome to CRITs
+          </h2>
+          <p className="text-light-text-secondary dark:text-dark-text-secondary mb-6">
+            Sign in with your CRITs account to access the threat intelligence platform.
+          </p>
+          <Button
+            variant="primary"
+            className="w-full"
+            onClick={handleLogin}
+          >
+            Sign In
+          </Button>
         </CardContent>
       </Card>
 

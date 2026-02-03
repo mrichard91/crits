@@ -118,8 +118,8 @@ services:
       - CACHE_ENABLED=true
       # GraphQL settings
       - GRAPHIQL_ENABLED=true
-      # CORS
-      - CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
+      # CORS - include common development hosts
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080,http://192.168.1.129:8080}
     expose:
       - "8001"
     depends_on:
