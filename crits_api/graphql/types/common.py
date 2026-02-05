@@ -130,6 +130,7 @@ class EmbeddedRelationshipType:
     analyst: str = ""
     rel_confidence: str = ""
     rel_reason: str = ""
+    object_id: str = ""
 
     @classmethod
     def from_model(cls, rel: Any) -> "EmbeddedRelationshipType":
@@ -141,6 +142,7 @@ class EmbeddedRelationshipType:
             analyst=getattr(rel, "analyst", "") or "",
             rel_confidence=getattr(rel, "rel_confidence", "") or "",
             rel_reason=getattr(rel, "rel_reason", "") or "",
+            object_id=str(getattr(rel, "object_id", "") or ""),
         )
 
 

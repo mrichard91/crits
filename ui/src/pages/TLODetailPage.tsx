@@ -1,9 +1,22 @@
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Calendar, User, Shield, Tag, Activity, FileText } from 'lucide-react'
+import {
+  ArrowLeft,
+  Calendar,
+  User,
+  Shield,
+  Tag,
+  Activity,
+  FileText,
+  FileCode,
+  Info,
+} from 'lucide-react'
 import { useTLODetail } from '@/hooks/useTLODetail'
 import type { TLOConfig, TLODetailFieldDef } from '@/lib/tloConfig'
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, Button } from '@/components/ui'
 import { formatDate } from '@/lib/utils'
+import { RelationshipsCard } from '@/components/RelationshipsCard'
+import { SampleHashCard } from '@/components/SampleHashCard'
+import { SampleToolsCard } from '@/components/SampleToolsCard'
 
 interface TLODetailPageProps {
   config: TLOConfig
@@ -92,11 +105,147 @@ interface Source {
   instances: SourceInstance[]
 }
 
+interface Relationship {
+  objectId: string
+  relType: string
+  relationship: string
+  relConfidence: string
+  analyst: string
+}
+
+function formatCompactDate(dateStr: string | undefined | null): string {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+function SourcesCard({ sources }: { sources: Source[] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <User className="h-5 w-5" />
+          Sources ({sources.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {sources.length === 0 ? (
+          <p className="text-light-text-muted dark:text-dark-text-muted">No sources</p>
+        ) : (
+          <div className="space-y-4">
+            {sources.map((source, idx) => (
+              <div
+                key={idx}
+                className="p-3 rounded border border-light-border dark:border-dark-border"
+              >
+                <h4 className="font-medium text-light-text dark:text-dark-text mb-2">
+                  {source.name}
+                </h4>
+                {source.instances.map((instance, iidx) => (
+                  <div
+                    key={iidx}
+                    className="text-sm text-light-text-secondary dark:text-dark-text-secondary"
+                  >
+                    <span>{instance.method}</span>
+                    {instance.reference && <span className="ml-2">{instance.reference}</span>}
+                    <span className="ml-2">{instance.analyst}</span>
+                    <span className="ml-2">{formatDate(instance.date)}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function RightColumnCards({
+  campaigns,
+  bucketList,
+  sectors,
+}: {
+  campaigns: string[]
+  bucketList: string[]
+  sectors: string[]
+}) {
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Campaigns ({campaigns.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {campaigns.length === 0 ? (
+            <p className="text-light-text-muted dark:text-dark-text-muted">No campaigns</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {campaigns.map((c) => (
+                <Badge key={c}>{c}</Badge>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Tag className="h-5 w-5" />
+            Tags ({bucketList.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {bucketList.length === 0 ? (
+            <p className="text-light-text-muted dark:text-dark-text-muted">No tags</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {bucketList.map((tag) => (
+                <Badge key={tag} variant="info">
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {sectors.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Sectors ({sectors.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {sectors.map((s) => (
+                <Badge key={s} variant="info">
+                  {s}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </>
+  )
+}
+
+// Hash field keys that get their own card in sample layout
+const SAMPLE_HASH_KEYS = new Set(['md5', 'sha1', 'sha256', 'ssdeep'])
+
 export function TLODetailPage({ config }: TLODetailPageProps) {
   const { id } = useParams<{ id: string }>()
   const { item, isLoading, error } = useTLODetail(config, id ?? '')
 
   const Icon = config.icon
+  const isSampleLayout = config.customLayout === 'sample'
 
   if (isLoading) {
     return (
@@ -129,9 +278,31 @@ export function TLODetailPage({ config }: TLODetailPageProps) {
   const campaigns = (item.campaigns as string[]) ?? []
   const bucketList = (item.bucketList as string[]) ?? []
   const sources = (item.sources as Source[]) ?? []
+  const relationships = (item.relationships as Relationship[]) ?? []
+  const sectors = (item.sectors as string[]) ?? []
+  const created = item.created as string | undefined
+  const modified = item.modified as string | undefined
 
-  // Split detail fields: common ones in left column, skip status (shown in header)
-  const detailFieldsFiltered = config.detailFields.filter((f) => f.key !== 'status')
+  // For sample layout: alternate filenames
+  const filenames = isSampleLayout ? ((item.filenames as string[]) ?? []) : []
+  const altFilenames = filenames.filter((f) => f !== primaryValue)
+
+  // Filter detail fields: skip status (shown in header), and for sample layout also skip hash fields
+  const detailFieldsFiltered = config.detailFields.filter((f) => {
+    if (f.key === 'status') return false
+    if (isSampleLayout && SAMPLE_HASH_KEYS.has(f.key)) return false
+    if (isSampleLayout && f.key === 'filenames') return false
+    return true
+  })
+
+  const createdStr = formatCompactDate(created)
+  const modifiedStr = formatCompactDate(modified)
+  const dateSubtitle = [
+    createdStr && `Created ${createdStr}`,
+    modifiedStr && `Modified ${modifiedStr}`,
+  ]
+    .filter(Boolean)
+    .join(' | ')
 
   return (
     <div className="space-y-6">
@@ -147,12 +318,32 @@ export function TLODetailPage({ config }: TLODetailPageProps) {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-light-text dark:text-dark-text flex items-center gap-2">
-              <Icon className={`h-6 w-6 ${config.color}`} />
-              {config.singular} Details
+              {isSampleLayout ? (
+                <FileCode className={`h-6 w-6 ${config.color}`} />
+              ) : (
+                <Icon className={`h-6 w-6 ${config.color}`} />
+              )}
+              {isSampleLayout ? primaryValue : `${config.singular} Details`}
             </h1>
-            <p className="font-mono text-lg text-light-text-secondary dark:text-dark-text-secondary mt-1 break-all">
-              {primaryValue}
-            </p>
+            {!isSampleLayout && (
+              <p className="font-mono text-lg text-light-text-secondary dark:text-dark-text-secondary mt-1 break-all">
+                {primaryValue}
+              </p>
+            )}
+            {isSampleLayout && altFilenames.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {altFilenames.map((f) => (
+                  <Badge key={f} variant="default" className="text-xs">
+                    {f}
+                  </Badge>
+                ))}
+              </div>
+            )}
+            {dateSubtitle && (
+              <p className="text-xs text-light-text-muted dark:text-dark-text-muted mt-1">
+                {dateSubtitle}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {status && <Badge variant={statusVariant(status)}>{status}</Badge>}
@@ -161,189 +352,226 @@ export function TLODetailPage({ config }: TLODetailPageProps) {
       </div>
 
       {/* Main content grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column - Details */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Basic info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Details
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <dl className="grid grid-cols-2 gap-4">
-                {detailFieldsFiltered
-                  .filter((f) => f.type !== 'pre' && f.type !== 'list')
-                  .map((field) => (
-                    <div key={field.key}>
-                      <dt className="text-sm font-medium text-light-text-muted dark:text-dark-text-muted">
-                        {field.label}
-                      </dt>
-                      <dd className="text-light-text dark:text-dark-text mt-1">
-                        <FieldValue field={field} item={item} />
-                      </dd>
-                    </div>
-                  ))}
-              </dl>
+      {isSampleLayout ? (
+        <SampleLayout
+          item={item}
+          config={config}
+          detailFieldsFiltered={detailFieldsFiltered}
+          sources={sources}
+          relationships={relationships}
+          campaigns={campaigns}
+          bucketList={bucketList}
+          sectors={sectors}
+        />
+      ) : (
+        <DefaultLayout
+          item={item}
+          config={config}
+          detailFieldsFiltered={detailFieldsFiltered}
+          sources={sources}
+          relationships={relationships}
+          campaigns={campaigns}
+          bucketList={bucketList}
+          sectors={sectors}
+        />
+      )}
+    </div>
+  )
+}
 
-              {/* Description / pre fields */}
-              {detailFieldsFiltered
-                .filter((f) => f.type === 'pre')
-                .map((field) => {
-                  const val = getNestedValue(item, field.key)
-                  if (!val) return null
-                  return (
-                    <div
-                      key={field.key}
-                      className="mt-4 pt-4 border-t border-light-border dark:border-dark-border"
-                    >
-                      <dt className="text-sm font-medium text-light-text-muted dark:text-dark-text-muted mb-2">
-                        {field.label}
-                      </dt>
-                      <dd className="text-light-text dark:text-dark-text whitespace-pre-wrap">
-                        {String(val)}
-                      </dd>
-                    </div>
-                  )
-                })}
+interface LayoutProps {
+  item: Record<string, unknown>
+  config: TLOConfig
+  detailFieldsFiltered: TLODetailFieldDef[]
+  sources: Source[]
+  relationships: Relationship[]
+  campaigns: string[]
+  bucketList: string[]
+  sectors: string[]
+}
 
-              {/* List fields (threat types, attack types, aliases, etc.) */}
-              {detailFieldsFiltered
-                .filter((f) => f.type === 'list')
-                .map((field) => {
-                  const arr = getNestedValue(item, field.key) as string[] | undefined
-                  if (!arr?.length) return null
-                  return (
-                    <div
-                      key={field.key}
-                      className="mt-4 pt-4 border-t border-light-border dark:border-dark-border"
-                    >
-                      <dt className="text-sm font-medium text-light-text-muted dark:text-dark-text-muted mb-2">
-                        {field.label}
-                      </dt>
-                      <dd className="flex flex-wrap gap-2">
-                        {arr.map((v) => (
-                          <Badge key={v} variant="info">
-                            {v}
-                          </Badge>
-                        ))}
-                      </dd>
-                    </div>
-                  )
-                })}
-            </CardContent>
-          </Card>
+function DefaultLayout({
+  item,
+  detailFieldsFiltered,
+  sources,
+  relationships,
+  campaigns,
+  bucketList,
+  sectors,
+}: LayoutProps) {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Left column - Details */}
+      <div className="lg:col-span-2 space-y-6">
+        <DetailFieldsCard fields={detailFieldsFiltered} item={item} />
+        <SourcesCard sources={sources} />
+        <RelationshipsCard relationships={relationships} />
+      </div>
 
-          {/* Sources */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Sources ({sources.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {sources.length === 0 ? (
-                <p className="text-light-text-muted dark:text-dark-text-muted">No sources</p>
-              ) : (
-                <div className="space-y-4">
-                  {sources.map((source, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3 rounded border border-light-border dark:border-dark-border"
-                    >
-                      <h4 className="font-medium text-light-text dark:text-dark-text mb-2">
-                        {source.name}
-                      </h4>
-                      {source.instances.map((instance, iidx) => (
-                        <div
-                          key={iidx}
-                          className="text-sm text-light-text-secondary dark:text-dark-text-secondary"
-                        >
-                          <span>{instance.method}</span>
-                          {instance.reference && <span className="ml-2">{instance.reference}</span>}
-                          <span className="ml-2">{instance.analyst}</span>
-                          <span className="ml-2">{formatDate(instance.date)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right column - Metadata */}
-        <div className="space-y-6">
-          {/* Campaigns */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Campaigns ({campaigns.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {campaigns.length === 0 ? (
-                <p className="text-light-text-muted dark:text-dark-text-muted">No campaigns</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {campaigns.map((c) => (
-                    <Badge key={c}>{c}</Badge>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Bucket List (Tags) */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Tag className="h-5 w-5" />
-                Tags ({bucketList.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {bucketList.length === 0 ? (
-                <p className="text-light-text-muted dark:text-dark-text-muted">No tags</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {bucketList.map((tag) => (
-                    <Badge key={tag} variant="info">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Sectors */}
-          {(item.sectors as string[] | undefined)?.length ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
-                  Sectors ({(item.sectors as string[]).length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {(item.sectors as string[]).map((s) => (
-                    <Badge key={s} variant="info">
-                      {s}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ) : null}
-        </div>
+      {/* Right column - Metadata */}
+      <div className="space-y-6">
+        <RightColumnCards campaigns={campaigns} bucketList={bucketList} sectors={sectors} />
       </div>
     </div>
+  )
+}
+
+function SampleLayout({
+  item,
+  detailFieldsFiltered,
+  sources,
+  relationships,
+  campaigns,
+  bucketList,
+  sectors,
+}: LayoutProps) {
+  const md5 = (item.md5 as string) ?? ''
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Left column */}
+      <div className="lg:col-span-2 space-y-6">
+        {/* Compact file info */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5" />
+              File Info
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid grid-cols-2 gap-4">
+              {detailFieldsFiltered
+                .filter((f) => f.type !== 'pre' && f.type !== 'list')
+                .map((field) => (
+                  <div key={field.key}>
+                    <dt className="text-sm font-medium text-light-text-muted dark:text-dark-text-muted">
+                      {field.label}
+                    </dt>
+                    <dd className="text-light-text dark:text-dark-text mt-1">
+                      <FieldValue field={field} item={item} />
+                    </dd>
+                  </div>
+                ))}
+            </dl>
+            {detailFieldsFiltered
+              .filter((f) => f.type === 'pre')
+              .map((field) => {
+                const val = getNestedValue(item, field.key)
+                if (!val) return null
+                return (
+                  <div
+                    key={field.key}
+                    className="mt-4 pt-4 border-t border-light-border dark:border-dark-border"
+                  >
+                    <dt className="text-sm font-medium text-light-text-muted dark:text-dark-text-muted mb-2">
+                      {field.label}
+                    </dt>
+                    <dd className="text-light-text dark:text-dark-text whitespace-pre-wrap">
+                      {String(val)}
+                    </dd>
+                  </div>
+                )
+              })}
+          </CardContent>
+        </Card>
+
+        <SampleHashCard
+          md5={item.md5 as string | undefined}
+          sha1={item.sha1 as string | undefined}
+          sha256={item.sha256 as string | undefined}
+          ssdeep={item.ssdeep as string | undefined}
+        />
+
+        {md5 && <SampleToolsCard md5={md5} />}
+
+        <SourcesCard sources={sources} />
+        <RelationshipsCard relationships={relationships} />
+      </div>
+
+      {/* Right column */}
+      <div className="space-y-6">
+        <RightColumnCards campaigns={campaigns} bucketList={bucketList} sectors={sectors} />
+      </div>
+    </div>
+  )
+}
+
+function DetailFieldsCard({
+  fields,
+  item,
+}: {
+  fields: TLODetailFieldDef[]
+  item: Record<string, unknown>
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FileText className="h-5 w-5" />
+          Details
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <dl className="grid grid-cols-2 gap-4">
+          {fields
+            .filter((f) => f.type !== 'pre' && f.type !== 'list')
+            .map((field) => (
+              <div key={field.key}>
+                <dt className="text-sm font-medium text-light-text-muted dark:text-dark-text-muted">
+                  {field.label}
+                </dt>
+                <dd className="text-light-text dark:text-dark-text mt-1">
+                  <FieldValue field={field} item={item} />
+                </dd>
+              </div>
+            ))}
+        </dl>
+
+        {fields
+          .filter((f) => f.type === 'pre')
+          .map((field) => {
+            const val = getNestedValue(item, field.key)
+            if (!val) return null
+            return (
+              <div
+                key={field.key}
+                className="mt-4 pt-4 border-t border-light-border dark:border-dark-border"
+              >
+                <dt className="text-sm font-medium text-light-text-muted dark:text-dark-text-muted mb-2">
+                  {field.label}
+                </dt>
+                <dd className="text-light-text dark:text-dark-text whitespace-pre-wrap">
+                  {String(val)}
+                </dd>
+              </div>
+            )
+          })}
+
+        {fields
+          .filter((f) => f.type === 'list')
+          .map((field) => {
+            const arr = getNestedValue(item, field.key) as string[] | undefined
+            if (!arr?.length) return null
+            return (
+              <div
+                key={field.key}
+                className="mt-4 pt-4 border-t border-light-border dark:border-dark-border"
+              >
+                <dt className="text-sm font-medium text-light-text-muted dark:text-dark-text-muted mb-2">
+                  {field.label}
+                </dt>
+                <dd className="flex flex-wrap gap-2">
+                  {arr.map((v) => (
+                    <Badge key={v} variant="info">
+                      {v}
+                    </Badge>
+                  ))}
+                </dd>
+              </div>
+            )
+          })}
+      </CardContent>
+    </Card>
   )
 }

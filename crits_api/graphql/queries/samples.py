@@ -202,6 +202,62 @@ class SampleQueries:
             logger.error(f"Error counting samples: {e}")
             return 0
 
+    @strawberry.field(description="Extract ASCII and Unicode strings from a sample")
+    @require_permission("Sample.read")
+    def sample_strings(self, info: Info, md5: str) -> str | None:
+        """Extract strings from a sample by MD5."""
+        try:
+            from crits.core.data_tools import make_ascii_strings, make_unicode_strings
+
+            ascii_strings = make_ascii_strings(md5)
+            unicode_strings = make_unicode_strings(md5)
+            parts = []
+            if ascii_strings:
+                parts.append("=== ASCII Strings ===\n" + ascii_strings)
+            if unicode_strings:
+                parts.append("=== Unicode Strings ===\n" + unicode_strings)
+            return "\n\n".join(parts) if parts else None
+        except Exception as e:
+            logger.error(f"Error extracting strings for {md5}: {e}")
+            return None
+
+    @strawberry.field(description="Get hex dump of a sample")
+    @require_permission("Sample.read")
+    def sample_hex(self, info: Info, md5: str, length: int = 4096) -> str | None:
+        """Get hex dump of a sample by MD5."""
+        try:
+            from crits.core.data_tools import get_file, make_hex
+
+            data = get_file(md5)
+            if not data:
+                return None
+            chunk = data[:length]
+            return make_hex(data=chunk)
+        except Exception as e:
+            logger.error(f"Error getting hex for {md5}: {e}")
+            return None
+
+    @strawberry.field(description="XOR search across byte keys for a sample")
+    @require_permission("Sample.read")
+    def sample_xor_search(
+        self,
+        info: Info,
+        md5: str,
+        search_string: str | None = None,
+        skip_nulls: int = 0,
+    ) -> list[int]:
+        """Search for XOR keys in a sample by MD5."""
+        try:
+            from crits.core.data_tools import xor_search
+
+            results = xor_search(md5, search_string, skip_nulls)
+            if results is None:
+                return []
+            return list(results)
+        except Exception as e:
+            logger.error(f"Error in XOR search for {md5}: {e}")
+            return []
+
     @strawberry.field(description="Get distinct sample file types")
     @require_permission("Sample.read")
     def sample_filetypes(self, info: Info) -> list[str]:
