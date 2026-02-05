@@ -11,8 +11,10 @@ from crits_api.graphql.types.common import (
     EmbeddedActionType,
     EmbeddedRelationshipType,
     EmbeddedTicketType,
+    SourceInfo,
     extract_actions,
     extract_relationships,
+    extract_sources,
     extract_tickets,
 )
 
@@ -70,10 +72,12 @@ class CampaignType:
     sample_count: int = 0
 
     # Common TLO fields
+    campaigns: list[str] = strawberry.field(default_factory=list)
     bucket_list: list[str] = strawberry.field(default_factory=list)
     sectors: list[str] = strawberry.field(default_factory=list)
 
     # Relationships and metadata
+    sources: list[SourceInfo] = strawberry.field(default_factory=list)
     relationships: list[EmbeddedRelationshipType] = strawberry.field(default_factory=list)
     actions: list[EmbeddedActionType] = strawberry.field(default_factory=list)
     tickets: list[EmbeddedTicketType] = strawberry.field(default_factory=list)
@@ -111,6 +115,7 @@ class CampaignType:
             sample_count=getattr(campaign, "sample_count", 0) or 0,
             bucket_list=list(getattr(campaign, "bucket_list", []) or []),
             sectors=list(getattr(campaign, "sectors", []) or []),
+            sources=extract_sources(campaign),
             relationships=extract_relationships(campaign),
             actions=extract_actions(campaign),
             tickets=extract_tickets(campaign),

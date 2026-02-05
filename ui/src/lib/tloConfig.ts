@@ -82,6 +82,9 @@ export interface TLOConfig {
   // Detail page field groups
   detailFields: TLODetailFieldDef[]
 
+  // Custom detail page layout
+  customLayout?: 'sample'
+
   // Create mutation (if supported)
   gqlCreate?: string // "createIndicator", etc.
   createFields?: TLOCreateFieldDef[]
@@ -101,14 +104,13 @@ const commonDetailFields = [
   'bucketList',
   'sectors',
   'sources { name instances { method reference date analyst } }',
+  'relationships { objectId relType relationship relConfidence analyst }',
 ]
 
 const commonDetailDisplay: TLODetailFieldDef[] = [
   { key: 'status', label: 'Status', type: 'badge' },
   { key: 'analyst', label: 'Analyst', type: 'text' },
   { key: 'tlp', label: 'TLP', type: 'badge' },
-  { key: 'created', label: 'Created', type: 'date' },
-  { key: 'modified', label: 'Modified', type: 'date' },
   { key: 'description', label: 'Description', type: 'pre' },
 ]
 
@@ -800,6 +802,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'ssdeep', label: 'SSDeep', type: 'mono' },
       { key: 'filenames', label: 'Filenames', type: 'list' },
     ],
+    customLayout: 'sample',
     gqlCreate: 'createSample',
     requiresFileUpload: true,
     createFields: [

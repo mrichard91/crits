@@ -11,9 +11,11 @@ from crits_api.graphql.types.common import (
     EmbeddedActionType,
     EmbeddedRelationshipType,
     EmbeddedTicketType,
+    SourceInfo,
     extract_actions,
     extract_campaigns,
     extract_relationships,
+    extract_sources,
     extract_tickets,
 )
 
@@ -48,7 +50,8 @@ class TargetType:
     bucket_list: list[str] = strawberry.field(default_factory=list)
     sectors: list[str] = strawberry.field(default_factory=list)
 
-    # Relationships and metadata (no sources for Target)
+    # Relationships and metadata
+    sources: list[SourceInfo] = strawberry.field(default_factory=list)
     relationships: list[EmbeddedRelationshipType] = strawberry.field(default_factory=list)
     actions: list[EmbeddedActionType] = strawberry.field(default_factory=list)
     tickets: list[EmbeddedTicketType] = strawberry.field(default_factory=list)
@@ -76,6 +79,7 @@ class TargetType:
             campaigns=extract_campaigns(target),
             bucket_list=list(getattr(target, "bucket_list", []) or []),
             sectors=list(getattr(target, "sectors", []) or []),
+            sources=extract_sources(target),
             relationships=extract_relationships(target),
             actions=extract_actions(target),
             tickets=extract_tickets(target),

@@ -7,6 +7,13 @@ from typing import Any
 
 import strawberry
 
+from crits_api.graphql.types.common import (
+    EmbeddedRelationshipType,
+    SourceInfo,
+    extract_relationships,
+    extract_sources,
+)
+
 
 @strawberry.type
 class ConfidenceType:
@@ -47,6 +54,11 @@ class IndicatorType:
     threat_types: list[str] = strawberry.field(default_factory=list)
     attack_types: list[str] = strawberry.field(default_factory=list)
     bucket_list: list[str] = strawberry.field(default_factory=list)
+    sectors: list[str] = strawberry.field(default_factory=list)
+
+    # Relationships and metadata
+    sources: list[SourceInfo] = strawberry.field(default_factory=list)
+    relationships: list[EmbeddedRelationshipType] = strawberry.field(default_factory=list)
 
     @classmethod
     def from_model(cls, indicator: Any) -> "IndicatorType":
@@ -98,4 +110,7 @@ class IndicatorType:
             threat_types=list(getattr(indicator, "threat_types", []) or []),
             attack_types=list(getattr(indicator, "attack_types", []) or []),
             bucket_list=list(getattr(indicator, "bucket_list", []) or []),
+            sectors=list(getattr(indicator, "sectors", []) or []),
+            sources=extract_sources(indicator),
+            relationships=extract_relationships(indicator),
         )
