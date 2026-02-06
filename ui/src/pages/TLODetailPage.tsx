@@ -1,4 +1,5 @@
 import { useParams, Link } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
   Calendar,
@@ -111,6 +112,7 @@ interface Relationship {
   relationship: string
   relConfidence: string
   analyst: string
+  displayValue?: string
 }
 
 function formatCompactDate(dateStr: string | undefined | null): string {
@@ -242,6 +244,7 @@ const SAMPLE_HASH_KEYS = new Set(['md5', 'sha1', 'sha256', 'ssdeep'])
 
 export function TLODetailPage({ config }: TLODetailPageProps) {
   const { id } = useParams<{ id: string }>()
+  const queryClient = useQueryClient()
   const { item, isLoading, error } = useTLODetail(config, id ?? '')
 
   const Icon = config.icon
@@ -362,6 +365,11 @@ export function TLODetailPage({ config }: TLODetailPageProps) {
           campaigns={campaigns}
           bucketList={bucketList}
           sectors={sectors}
+          tloType={config.type}
+          tloId={id ?? ''}
+          onRelationshipChange={() =>
+            queryClient.invalidateQueries({ queryKey: [config.gqlSingle, id] })
+          }
         />
       ) : (
         <DefaultLayout
@@ -373,6 +381,11 @@ export function TLODetailPage({ config }: TLODetailPageProps) {
           campaigns={campaigns}
           bucketList={bucketList}
           sectors={sectors}
+          tloType={config.type}
+          tloId={id ?? ''}
+          onRelationshipChange={() =>
+            queryClient.invalidateQueries({ queryKey: [config.gqlSingle, id] })
+          }
         />
       )}
     </div>
@@ -388,6 +401,9 @@ interface LayoutProps {
   campaigns: string[]
   bucketList: string[]
   sectors: string[]
+  tloType: string
+  tloId: string
+  onRelationshipChange: () => void
 }
 
 function DefaultLayout({
@@ -398,6 +414,9 @@ function DefaultLayout({
   campaigns,
   bucketList,
   sectors,
+  tloType,
+  tloId,
+  onRelationshipChange,
 }: LayoutProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -405,7 +424,12 @@ function DefaultLayout({
       <div className="lg:col-span-2 space-y-6">
         <DetailFieldsCard fields={detailFieldsFiltered} item={item} />
         <SourcesCard sources={sources} />
-        <RelationshipsCard relationships={relationships} />
+        <RelationshipsCard
+          relationships={relationships}
+          tloType={tloType}
+          tloId={tloId}
+          onRelationshipChange={onRelationshipChange}
+        />
       </div>
 
       {/* Right column - Metadata */}
@@ -424,6 +448,9 @@ function SampleLayout({
   campaigns,
   bucketList,
   sectors,
+  tloType,
+  tloId,
+  onRelationshipChange,
 }: LayoutProps) {
   const md5 = (item.md5 as string) ?? ''
 
@@ -486,7 +513,12 @@ function SampleLayout({
         {md5 && <SampleToolsCard md5={md5} />}
 
         <SourcesCard sources={sources} />
-        <RelationshipsCard relationships={relationships} />
+        <RelationshipsCard
+          relationships={relationships}
+          tloType={tloType}
+          tloId={tloId}
+          onRelationshipChange={onRelationshipChange}
+        />
       </div>
 
       {/* Right column */}

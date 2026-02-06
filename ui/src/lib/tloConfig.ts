@@ -104,7 +104,7 @@ const commonDetailFields = [
   'bucketList',
   'sectors',
   'sources { name instances { method reference date analyst } }',
-  'relationships { objectId relType relationship relConfidence analyst }',
+  'relationships { objectId relType relationship relConfidence analyst displayValue }',
 ]
 
 const commonDetailDisplay: TLODetailFieldDef[] = [

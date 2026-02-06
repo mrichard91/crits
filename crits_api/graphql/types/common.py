@@ -131,19 +131,65 @@ class EmbeddedRelationshipType:
     rel_confidence: str = ""
     rel_reason: str = ""
     object_id: str = ""
+    display_value: str = ""
 
     @classmethod
     def from_model(cls, rel: Any) -> "EmbeddedRelationshipType":
         """Create from EmbeddedRelationship model."""
+        from crits.core.class_mapper import class_from_id
+
+        rel_type = getattr(rel, "rel_type", "") or ""
+        object_id = str(getattr(rel, "object_id", "") or "")
+
+        # Fetch the related object to get its display value
+        display_value = object_id  # fallback to ID
+        if rel_type and object_id:
+            try:
+                related_obj = class_from_id(rel_type, object_id)
+                if related_obj:
+                    # Get display value based on type
+                    display_value = _get_tlo_display_value(related_obj, rel_type)
+            except Exception:
+                pass  # Keep fallback to object_id
+
         return cls(
             relationship=str(getattr(rel, "relationship", "") or ""),
-            rel_type=getattr(rel, "rel_type", "") or "",
+            rel_type=rel_type,
             rel_date=getattr(rel, "rel_date", None),
             analyst=getattr(rel, "analyst", "") or "",
             rel_confidence=getattr(rel, "rel_confidence", "") or "",
             rel_reason=getattr(rel, "rel_reason", "") or "",
-            object_id=str(getattr(rel, "object_id", "") or ""),
+            object_id=object_id,
+            display_value=display_value,
         )
+
+
+def _get_tlo_display_value(obj: Any, tlo_type: str) -> str:
+    """Get the human-readable display value for a TLO."""
+    # Map TLO type to its primary display field
+    field_map = {
+        "Indicator": "value",
+        "Actor": "name",
+        "Backdoor": "name",
+        "Campaign": "name",
+        "Certificate": "filename",
+        "Domain": "domain",
+        "Email": "subject",
+        "Event": "title",
+        "Exploit": "name",
+        "IP": "ip",
+        "PCAP": "filename",
+        "RawData": "title",
+        "Sample": "filename",
+        "Screenshot": "filename",
+        "Signature": "title",
+        "Target": "email_address",
+    }
+    field = field_map.get(tlo_type, "id")
+    value = getattr(obj, field, None)
+    if value:
+        return str(value)
+    return str(getattr(obj, "id", ""))
 
 
 @strawberry.type

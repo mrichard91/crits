@@ -12,6 +12,7 @@ from crits_api.graphql.queries.indicators import IndicatorQueries
 from crits_api.graphql.queries.ips import IPQueries
 from crits_api.graphql.queries.pcaps import PCAPQueries
 from crits_api.graphql.queries.raw_data import RawDataQueries
+from crits_api.graphql.queries.relationships import RelationshipQueries
 from crits_api.graphql.queries.samples import SampleQueries
 from crits_api.graphql.queries.screenshots import ScreenshotQueries
 from crits_api.graphql.queries.signatures import SignatureQueries
@@ -30,6 +31,7 @@ __all__ = [
     "IPQueries",
     "PCAPQueries",
     "RawDataQueries",
+    "RelationshipQueries",
     "SampleQueries",
     "ScreenshotQueries",
     "SignatureQueries",
