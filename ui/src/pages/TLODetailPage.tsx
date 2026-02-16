@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
@@ -10,6 +11,7 @@ import {
   FileText,
   FileCode,
   Info,
+  Wrench,
 } from 'lucide-react'
 import { useTLODetail } from '@/hooks/useTLODetail'
 import type { TLOConfig, TLODetailFieldDef } from '@/lib/tloConfig'
@@ -453,64 +455,92 @@ function SampleLayout({
   onRelationshipChange,
 }: LayoutProps) {
   const md5 = (item.md5 as string) ?? ''
+  const [sampleTab, setSampleTab] = useState<'details' | 'tools'>('details')
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Left column */}
       <div className="lg:col-span-2 space-y-6">
-        {/* Compact file info */}
+        {/* Tabbed card: Details / Tools */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Info className="h-5 w-5" />
-              File Info
-            </CardTitle>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setSampleTab('details')}
+                className={`flex items-center gap-2 pb-1 text-sm font-medium border-b-2 transition-colors ${
+                  sampleTab === 'details'
+                    ? 'border-crits-blue text-crits-blue'
+                    : 'border-transparent text-light-text-muted dark:text-dark-text-muted hover:text-light-text dark:hover:text-dark-text'
+                }`}
+              >
+                <Info className="h-4 w-4" />
+                Details
+              </button>
+              {md5 && (
+                <button
+                  onClick={() => setSampleTab('tools')}
+                  className={`flex items-center gap-2 pb-1 text-sm font-medium border-b-2 transition-colors ${
+                    sampleTab === 'tools'
+                      ? 'border-crits-blue text-crits-blue'
+                      : 'border-transparent text-light-text-muted dark:text-dark-text-muted hover:text-light-text dark:hover:text-dark-text'
+                  }`}
+                >
+                  <Wrench className="h-4 w-4" />
+                  Tools
+                </button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
-            <dl className="grid grid-cols-2 gap-4">
-              {detailFieldsFiltered
-                .filter((f) => f.type !== 'pre' && f.type !== 'list')
-                .map((field) => (
-                  <div key={field.key}>
-                    <dt className="text-sm font-medium text-light-text-muted dark:text-dark-text-muted">
-                      {field.label}
-                    </dt>
-                    <dd className="text-light-text dark:text-dark-text mt-1">
-                      <FieldValue field={field} item={item} />
-                    </dd>
-                  </div>
-                ))}
-            </dl>
-            {detailFieldsFiltered
-              .filter((f) => f.type === 'pre')
-              .map((field) => {
-                const val = getNestedValue(item, field.key)
-                if (!val) return null
-                return (
-                  <div
-                    key={field.key}
-                    className="mt-4 pt-4 border-t border-light-border dark:border-dark-border"
-                  >
-                    <dt className="text-sm font-medium text-light-text-muted dark:text-dark-text-muted mb-2">
-                      {field.label}
-                    </dt>
-                    <dd className="text-light-text dark:text-dark-text whitespace-pre-wrap">
-                      {String(val)}
-                    </dd>
-                  </div>
-                )
-              })}
+            {sampleTab === 'details' && (
+              <div>
+                <dl className="grid grid-cols-2 gap-4">
+                  {detailFieldsFiltered
+                    .filter((f) => f.type !== 'pre' && f.type !== 'list')
+                    .map((field) => (
+                      <div key={field.key}>
+                        <dt className="text-sm font-medium text-light-text-muted dark:text-dark-text-muted">
+                          {field.label}
+                        </dt>
+                        <dd className="text-light-text dark:text-dark-text mt-1">
+                          <FieldValue field={field} item={item} />
+                        </dd>
+                      </div>
+                    ))}
+                </dl>
+                {detailFieldsFiltered
+                  .filter((f) => f.type === 'pre')
+                  .map((field) => {
+                    const val = getNestedValue(item, field.key)
+                    if (!val) return null
+                    return (
+                      <div
+                        key={field.key}
+                        className="mt-4 pt-4 border-t border-light-border dark:border-dark-border"
+                      >
+                        <dt className="text-sm font-medium text-light-text-muted dark:text-dark-text-muted mb-2">
+                          {field.label}
+                        </dt>
+                        <dd className="text-light-text dark:text-dark-text whitespace-pre-wrap">
+                          {String(val)}
+                        </dd>
+                      </div>
+                    )
+                  })}
+                <div className="mt-4 pt-4 border-t border-light-border dark:border-dark-border">
+                  <SampleHashCard
+                    md5={item.md5 as string | undefined}
+                    sha1={item.sha1 as string | undefined}
+                    sha256={item.sha256 as string | undefined}
+                    ssdeep={item.ssdeep as string | undefined}
+                    bare
+                  />
+                </div>
+              </div>
+            )}
+            {sampleTab === 'tools' && md5 && <SampleToolsCard md5={md5} bare />}
           </CardContent>
         </Card>
-
-        <SampleHashCard
-          md5={item.md5 as string | undefined}
-          sha1={item.sha1 as string | undefined}
-          sha256={item.sha256 as string | undefined}
-          ssdeep={item.ssdeep as string | undefined}
-        />
-
-        {md5 && <SampleToolsCard md5={md5} />}
 
         <SourcesCard sources={sources} />
         <RelationshipsCard

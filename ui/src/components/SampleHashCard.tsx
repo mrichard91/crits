@@ -12,6 +12,7 @@ interface SampleHashCardProps {
   sha1?: string
   sha256?: string
   ssdeep?: string
+  bare?: boolean
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -39,7 +40,29 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-export function SampleHashCard({ md5, sha1, sha256, ssdeep }: SampleHashCardProps) {
+function HashTable({ hashes }: { hashes: HashEntry[] }) {
+  return (
+    <table className="w-full text-sm">
+      <tbody>
+        {hashes.map((h) => (
+          <tr key={h.label}>
+            <td className="pr-4 py-1 font-medium text-light-text-muted dark:text-dark-text-muted whitespace-nowrap align-top">
+              {h.label}
+            </td>
+            <td className="py-1 font-mono break-all text-light-text dark:text-dark-text">
+              {h.value}
+            </td>
+            <td className="py-1 w-8 align-top">
+              <CopyButton text={h.value} />
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+export function SampleHashCard({ md5, sha1, sha256, ssdeep, bare }: SampleHashCardProps) {
   const hashes: HashEntry[] = [
     { label: 'MD5', value: md5 ?? '' },
     { label: 'SHA1', value: sha1 ?? '' },
@@ -48,6 +71,10 @@ export function SampleHashCard({ md5, sha1, sha256, ssdeep }: SampleHashCardProp
   ].filter((h) => h.value)
 
   if (hashes.length === 0) return null
+
+  if (bare) {
+    return <HashTable hashes={hashes} />
+  }
 
   return (
     <Card>
@@ -58,21 +85,7 @@ export function SampleHashCard({ md5, sha1, sha256, ssdeep }: SampleHashCardProp
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
-          {hashes.map((h) => (
-            <div key={h.label}>
-              <div className="text-xs font-medium text-light-text-muted dark:text-dark-text-muted mb-0.5">
-                {h.label}
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="font-mono text-sm break-all text-light-text dark:text-dark-text">
-                  {h.value}
-                </span>
-                <CopyButton text={h.value} />
-              </div>
-            </div>
-          ))}
-        </div>
+        <HashTable hashes={hashes} />
       </CardContent>
     </Card>
   )

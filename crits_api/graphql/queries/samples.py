@@ -14,6 +14,25 @@ from crits_api.graphql.types.sample import SampleType
 logger = logging.getLogger(__name__)
 
 
+def _read_sample_file(md5: str) -> bytes | None:
+    """Read file data from GridFS via the Sample model's filedata field.
+
+    The legacy get_file() looks up GridFS files by MD5, but MongoDB 7+
+    no longer stores MD5 checksums in GridFS .files collection by default.
+    This bypasses that by reading directly from the Sample model.
+    """
+    from crits.samples.sample import Sample
+
+    try:
+        sample = Sample.objects(md5=md5).first()
+        if sample is None or sample.filedata.grid_id is None:
+            return None
+        return sample.filedata.read()
+    except Exception as e:
+        logger.error(f"Error reading file data for {md5}: {e}")
+        return None
+
+
 @strawberry.type
 class SampleQueries:
     """Sample-related queries."""
@@ -209,8 +228,15 @@ class SampleQueries:
         try:
             from crits.core.data_tools import make_ascii_strings, make_unicode_strings
 
-            ascii_strings = make_ascii_strings(md5)
-            unicode_strings = make_unicode_strings(md5)
+            raw = _read_sample_file(md5)
+            if raw is None:
+                return None
+            # Decode bytes to str via latin-1 (preserves all byte values 0-255)
+            # so legacy Python 2 string operations in data_tools work correctly.
+            decoded = raw.decode("latin-1") if isinstance(raw, bytes) else raw
+
+            ascii_strings = make_ascii_strings(data=decoded)
+            unicode_strings = make_unicode_strings(data=decoded)
             parts = []
             if ascii_strings:
                 parts.append("=== ASCII Strings ===\n" + ascii_strings)
@@ -226,13 +252,13 @@ class SampleQueries:
     def sample_hex(self, info: Info, md5: str, length: int = 4096) -> str | None:
         """Get hex dump of a sample by MD5."""
         try:
-            from crits.core.data_tools import get_file, make_hex
+            from crits.core.data_tools import make_hex
 
-            data = get_file(md5)
-            if not data:
+            raw = _read_sample_file(md5)
+            if raw is None:
                 return None
-            chunk = data[:length]
-            return make_hex(data=chunk)
+            decoded = raw.decode("latin-1") if isinstance(raw, bytes) else raw
+            return make_hex(data=decoded[:length])
         except Exception as e:
             logger.error(f"Error getting hex for {md5}: {e}")
             return None
@@ -250,7 +276,11 @@ class SampleQueries:
         try:
             from crits.core.data_tools import xor_search
 
-            results = xor_search(md5, search_string, skip_nulls)
+            raw = _read_sample_file(md5)
+            if raw is None:
+                return []
+            decoded = raw.decode("latin-1") if isinstance(raw, bytes) else raw
+            results = xor_search(data=decoded, string=search_string, skip_nulls=skip_nulls)
             if results is None:
                 return []
             return list(results)
