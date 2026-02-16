@@ -7,6 +7,8 @@ import strawberry
 from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
+from crits_api.auth.redis_session import create_session, delete_session
+from crits_api.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +42,6 @@ class AuthMutations:
         password: str,
         totp_pass: str | None = None,
     ) -> LoginResult:
-        from django.contrib.sessions.backends.cache import SessionStore
-
         from crits.config.config import CRITsConfig
         from crits.core.totp import valid_totp
         from crits.core.user import CRITsAuthBackend, EmbeddedLoginAttempt
@@ -160,19 +160,20 @@ class AuthMutations:
         user.password_reset.reset_code = ""
         user.save()
 
-        # Create Django session
+        # Create session via Redis
         session_timeout = crits_config.session_timeout * 60 * 60  # hours to seconds
-        store = SessionStore()
-        store["_auth_user_id"] = str(user.id)
-        store.set_expiry(session_timeout)
-        store.create()
+        session_key = create_session(
+            redis_url=settings.redis_url,
+            user_id=str(user.id),
+            ttl=session_timeout,
+        )
 
         # Set session cookie on response
         if ctx.response:
             secure = _get_secure_cookie()
             ctx.response.set_cookie(
                 key="sessionid",
-                value=store.session_key,
+                value=session_key,
                 path="/",
                 httponly=True,
                 samesite="lax",
@@ -189,15 +190,15 @@ class AuthMutations:
 
     @strawberry.mutation(description="Destroy the current session and log out")
     def logout(self, info: Info) -> LogoutResult:
-        from django.contrib.sessions.backends.cache import SessionStore
-
         ctx: GraphQLContext = info.context
         session_key = ctx.request.cookies.get("sessionid")
 
         if session_key:
             try:
-                store = SessionStore(session_key=session_key)
-                store.delete()
+                delete_session(
+                    redis_url=settings.redis_url,
+                    session_key=session_key,
+                )
             except Exception as e:
                 logger.warning("Error deleting session: %s", e)
 

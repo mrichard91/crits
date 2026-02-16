@@ -112,8 +112,8 @@ services:
       - MONGO_DATABASE=crits
       # Redis connection (for sessions/caching)
       - REDIS_URL=redis://redis:6379/0
-      # Django settings (for shared model imports)
-      - DJANGO_SETTINGS_MODULE=crits.settings
+      # Minimal Django settings for model imports (no web framework)
+      - DJANGO_SETTINGS_MODULE=crits_api.db.api_settings
       - DEBUG=${DEBUG:-true}
       # Security
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}

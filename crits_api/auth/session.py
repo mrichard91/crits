@@ -137,22 +137,6 @@ async def get_user_from_session(request: Request) -> Optional["CRITsUser"]:
             except Exception as e:
                 logger.error(f"Error loading user {user_id}: {e}")
 
-    # Fallback: Try Django's session framework directly (sync)
-    try:
-        from django.contrib.sessions.backends.cache import SessionStore
-
-        store = SessionStore(session_key=session_key)
-        if store.exists(session_key):
-            user_id = store.get("_auth_user_id")
-            logger.debug(f"Django SessionStore found user_id: {user_id}")
-            if user_id:
-                user = CRITsUser.objects(id=user_id).first()
-                if user and user.is_active:
-                    logger.debug(f"Authenticated user via Django session: {user.username}")
-                    return user
-    except Exception as e:
-        logger.debug(f"Django session fallback failed: {e}")
-
     logger.debug("No authenticated user found")
     return None
 
