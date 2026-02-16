@@ -19,6 +19,7 @@ from crits_api.config import settings
 from crits_api.db.connection import connect_mongodb
 from crits_api.graphql.context import get_context
 from crits_api.graphql.schema import schema
+from crits_api.routes.download import router as download_router
 
 # Configure logging
 logging.basicConfig(
@@ -84,6 +85,9 @@ async def health_check() -> dict[str, str]:
         "version": "0.1.0",
     }
 
+
+# Mount download REST endpoint
+app.include_router(download_router)
 
 # Mount GraphQL router
 graphql_router = GraphQLRouter(

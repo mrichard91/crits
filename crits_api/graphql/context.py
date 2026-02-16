@@ -7,6 +7,7 @@ Creates a GraphQLContext for each request with user info and permissions.
 import logging
 
 from fastapi import Request
+from starlette.responses import Response
 
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.session import (
@@ -18,7 +19,7 @@ from crits_api.auth.session import (
 logger = logging.getLogger(__name__)
 
 
-async def get_context(request: Request) -> GraphQLContext:
+async def get_context(request: Request, response: Response) -> GraphQLContext:
     """
     Create GraphQL context for a request.
 
@@ -26,6 +27,7 @@ async def get_context(request: Request) -> GraphQLContext:
 
     Args:
         request: FastAPI request object
+        response: FastAPI response object (for setting cookies in mutations)
 
     Returns:
         GraphQLContext with user info and permissions
@@ -42,6 +44,7 @@ async def get_context(request: Request) -> GraphQLContext:
 
         return GraphQLContext(
             request=request,
+            response=response,
             user=user,
             acl=acl,
             sources=sources,
@@ -49,4 +52,4 @@ async def get_context(request: Request) -> GraphQLContext:
 
     # Anonymous user
     logger.debug("Created anonymous context")
-    return GraphQLContext(request=request)
+    return GraphQLContext(request=request, response=response)

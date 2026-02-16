@@ -223,7 +223,7 @@ This document outlines the comprehensive migration of CRITs from a Python 2.7/Dj
 - [x] Create `redis_client.py` with async Redis connection
 - [x] Create `keys.py` with cache key generation (includes user_sources_hash)
 - [x] Create `decorators.py` with `@cached` and `@invalidates` decorators
-- [ ] Implement cache invalidation on mutations (Phase 4)
+- [x] Implement cache invalidation on mutations (Phase 4)
 - [ ] Add cache hit/miss metrics logging
 
 ### 3f. MongoDB Query Optimization (Foundation)
@@ -301,8 +301,8 @@ This document outlines the comprehensive migration of CRITs from a Python 2.7/Dj
 - [x] Mount GraphQL at `/api/graphql` on FastAPI app
 - [x] Configure GraphiQL playground (dev only)
 - [ ] Create `dataloaders.py` with DataLoader instances for each TLO
-- [ ] Add query depth limiting (max 10 levels)
-- [ ] Add query complexity limiting
+- [x] Add query depth limiting (max 10 levels)
+- [x] Add query complexity limiting
 
 ### 4b. GraphQL Types - Core ✅
 - [x] Create `crits_api/graphql/types/` package
@@ -382,9 +382,9 @@ relatedObjects(id: ID!, type: TLOType!, depth: Int = 1): [RelatedObject!]!
 - [x] Implement filter parameters for each TLO (type, status, campaign, value search)
 - [x] Implement count queries for each TLO
 - [x] Implement `me` query for current user
-- [ ] Implement `search` query with MongoDB text search
-- [ ] Implement `dashboardStats` with aggregation pipeline
-- [ ] Implement `relatedObjects` with depth limiting
+- [x] Implement `search` query with icontains search across TLO types
+- [x] Implement `dashboardStats` with per-type counts and recent activity
+- [x] Implement `relatedObjects` with BFS depth-limited traversal
 - [ ] Migrate to cursor-based pagination (optional enhancement)
 
 ### 4e. GraphQL Mutations
@@ -418,14 +418,15 @@ bulkUpdateStatus(ids: [ID!]!, types: [TLOType!]!, status: String!): BulkResult!
 bulkDelete(ids: [ID!]!, types: [TLOType!]!): BulkResult!
 ```
 
-- [ ] Create `crits_api/graphql/mutations/` package
-- [ ] Implement create mutations with validation
-- [ ] Implement update mutations with partial updates
-- [ ] Implement delete mutations (soft delete with audit)
-- [ ] Implement relationship mutations
-- [ ] Implement comment mutations
-- [ ] Implement bulk operations with batch processing
-- [ ] All mutations invalidate relevant cache keys (Phase 3e)
+- [x] Create `crits_api/graphql/mutations/` package
+- [x] Implement create mutations with validation (16 TLO types)
+- [x] Implement update mutations with partial updates (16 TLO types)
+- [x] Implement delete mutations with audit (16 TLO types)
+- [x] Implement relationship mutations (add, remove, update)
+- [x] Implement comment mutations (add, edit, delete)
+- [x] Implement bulk operations (bulk_update_status, bulk_add_to_campaign, bulk_delete)
+- [x] Implement service mutations (run_service, run_triage, list_services)
+- [x] All mutations invalidate relevant cache keys (Phase 3e)
 
 ### 4f. GraphQL Authorization (Integrated)
 
@@ -452,11 +453,11 @@ class Query:
         return await paginate_samples(query, first, after)
 ```
 
-- [ ] Apply `@require_permission` to all query resolvers
-- [ ] Apply `@require_permission` to all mutation resolvers
-- [ ] Implement field-level permissions for sensitive fields
-- [ ] Implement source/TLP filtering in all list queries
-- [ ] Create custom `PermissionDenied` GraphQL error type
+- [x] Apply `@require_permission` to all query resolvers
+- [x] Apply `@require_permission` to all mutation resolvers
+- [x] Implement field-level permissions for sensitive fields (download_url on Sample)
+- [x] Implement source/TLP filtering in all list queries
+- [x] Create custom `PermissionDenied` GraphQL error type
 - [ ] Test all permission combinations
 
 ### 4g. File Upload/Download (Special Handling)
@@ -474,11 +475,11 @@ type Sample {
 }
 ```
 
-- [ ] Implement multipart file upload mutation
-- [ ] Implement secure download URL generation
-- [ ] Implement file streaming for large files
-- [ ] Add file type detection and validation
-- [ ] Calculate and verify file hashes (MD5, SHA1, SHA256, SSDEEP)
+- [x] Implement multipart file upload mutation (create_sample with Strawberry Upload)
+- [x] Implement secure download URL generation (download_url field on SampleType)
+- [x] Implement file streaming for large files (REST endpoint /api/download/{md5})
+- [x] Add file type detection and validation (handled by Django handlers)
+- [x] Calculate and verify file hashes (handled by Django handlers)
 
 ---
 

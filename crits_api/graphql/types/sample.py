@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 
 import strawberry
+from strawberry.types import Info
 
 from crits_api.graphql.types.common import (
     EmbeddedActionType,
@@ -60,6 +61,18 @@ class SampleType:
     relationships: list[EmbeddedRelationshipType] = strawberry.field(default_factory=list)
     actions: list[EmbeddedActionType] = strawberry.field(default_factory=list)
     tickets: list[EmbeddedTicketType] = strawberry.field(default_factory=list)
+
+    @strawberry.field(description="Download URL (requires Sample.read permission)")
+    def download_url(self, info: Info) -> str | None:
+        """Return download URL if user has permission, else None."""
+        if not self.md5:
+            return None
+        ctx = info.context
+        if not ctx.is_authenticated:
+            return None
+        if not ctx.is_superuser and not ctx.has_permission("Sample.read"):
+            return None
+        return f"/api/download/{self.md5}"
 
     @classmethod
     def from_model(cls, sample: Any) -> "SampleType":

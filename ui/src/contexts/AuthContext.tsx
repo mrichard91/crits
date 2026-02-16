@@ -15,7 +15,7 @@ interface AuthContextType {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
-  logout: () => void
+  logout: () => Promise<void>
   refetch: () => Promise<void>
 }
 
@@ -65,9 +65,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth()
   }, [])
 
-  const logout = () => {
-    // Redirect to Django logout, then back to React login
-    window.location.href = '/logout/?next=/app/login'
+  const logout = async () => {
+    try {
+      await fetch('/api/graphql', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `mutation { logout { success } }`,
+        }),
+      })
+    } catch {
+      // Even if the request fails, clear local state
+    }
+    setUser(null)
   }
 
   const refetch = async () => {

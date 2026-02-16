@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Optional
 
 from fastapi import Request
+from starlette.responses import Response
 from strawberry.fastapi import BaseContext
 
 if TYPE_CHECKING:
@@ -40,6 +41,7 @@ class GraphQLContext(BaseContext):
     """
 
     request: Request
+    response: Response | None = None
     user: Optional["CRITsUser"] = None
     acl: dict[str, Any] = field(default_factory=dict)
     sources: list[SourceAccess] = field(default_factory=list)

@@ -1,31 +1,122 @@
-import { useEffect } from 'react'
+import { useState, useEffect, FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Shield, Moon, Sun } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
-import { Button, Card, CardContent } from '@/components/ui'
+import { Button, Input, Card, CardContent, Spinner } from '@/components/ui'
+
+const LOGIN_MUTATION = `
+  mutation Login($username: String!, $password: String!, $totpPass: String) {
+    login(username: $username, password: $password, totpPass: $totpPass) {
+      success
+      message
+      status
+      totpSecret
+    }
+  }
+`
+
+interface LoginResponse {
+  login: {
+    success: boolean
+    message: string
+    status: string
+    totpSecret: string | null
+  }
+}
 
 export function LoginPage() {
-  const { isAuthenticated, isLoading } = useAuth()
+  const { isAuthenticated, isLoading: authLoading, refetch } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
 
-  // If already authenticated, go to dashboard
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [totpPass, setTotpPass] = useState('')
+  const [showTotp, setShowTotp] = useState(false)
+  const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
   useEffect(() => {
-    if (isAuthenticated && !isLoading) {
+    if (isAuthenticated && !authLoading) {
       navigate('/')
     }
-  }, [isAuthenticated, isLoading, navigate])
+  }, [isAuthenticated, authLoading, navigate])
 
-  const handleLogin = () => {
-    // Redirect to Django login with next=/app/ to come back here after auth
-    window.location.href = '/login/?next=/app/'
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setInfo('')
+    setIsSubmitting(true)
+
+    try {
+      const res = await fetch('/api/graphql', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: LOGIN_MUTATION,
+          variables: {
+            username,
+            password,
+            totpPass: showTotp ? totpPass : null,
+          },
+        }),
+      })
+
+      const json = await res.json()
+
+      if (json.errors?.length) {
+        setError(json.errors.map((err: { message: string }) => err.message).join(', '))
+        return
+      }
+
+      const result = (json.data as LoginResponse['login'] | undefined)
+        ? (json.data as { login: LoginResponse['login'] }).login
+        : null
+
+      if (!result) {
+        setError('Unexpected response from server')
+        return
+      }
+
+      switch (result.status) {
+        case 'login_successful':
+          await refetch()
+          navigate('/')
+          break
+        case 'totp_required':
+          setShowTotp(true)
+          setInfo(result.message)
+          break
+        case 'no_secret':
+          setShowTotp(true)
+          setInfo(result.message)
+          break
+        case 'secret_generated':
+          setShowTotp(false)
+          setInfo(result.message)
+          setPassword('')
+          setTotpPass('')
+          break
+        case 'login_failed':
+          setError(result.message)
+          break
+        default:
+          setError(result.message || 'Login failed')
+      }
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  if (isLoading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-crits-blue"></div>
+        <Spinner size="lg" />
       </div>
     )
   }
@@ -52,16 +143,56 @@ export function LoginPage() {
 
       {/* Login card */}
       <Card className="w-full max-w-md">
-        <CardContent className="text-center">
-          <h2 className="text-xl font-semibold text-light-text dark:text-dark-text mb-4">
-            Welcome to CRITs
-          </h2>
-          <p className="text-light-text-secondary dark:text-dark-text-secondary mb-6">
-            Sign in with your CRITs account to access the threat intelligence platform.
-          </p>
-          <Button variant="primary" className="w-full" onClick={handleLogin}>
+        <CardContent>
+          <h2 className="text-xl font-semibold text-light-text dark:text-dark-text mb-4 text-center">
             Sign In
-          </Button>
+          </h2>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
+              label="Username"
+              name="username"
+              type="text"
+              autoComplete="username"
+              autoFocus
+              required
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              disabled={isSubmitting}
+            />
+
+            <Input
+              label="Password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={isSubmitting}
+            />
+
+            {showTotp && (
+              <Input
+                label="TOTP Code"
+                name="totp"
+                type="text"
+                autoComplete="one-time-code"
+                placeholder="PIN + token"
+                value={totpPass}
+                onChange={(e) => setTotpPass(e.target.value)}
+                disabled={isSubmitting}
+              />
+            )}
+
+            {error && <p className="text-sm text-status-error">{error}</p>}
+
+            {info && !error && <p className="text-sm text-crits-blue">{info}</p>}
+
+            <Button type="submit" variant="primary" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? <Spinner size="sm" /> : 'Sign In'}
+            </Button>
+          </form>
         </CardContent>
       </Card>
 

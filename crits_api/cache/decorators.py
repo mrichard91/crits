@@ -177,6 +177,98 @@ def invalidates_object(
     return decorator
 
 
+def invalidates_sync(*type_names: str) -> Callable[[Callable[..., T]], Callable[..., T]]:
+    """
+    Sync-compatible decorator to invalidate cache after a mutation.
+
+    For use with sync resolvers (Strawberry runs them in a thread pool).
+    Fires cache invalidation as a background async task.
+
+    Usage:
+        @strawberry.mutation
+        @invalidates_sync("domain")
+        def create_domain(self, info: Info, ...) -> MutationResult:
+            ...
+    """
+
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> T:
+            result = func(*args, **kwargs)
+
+            if settings.cache_enabled:
+                _fire_invalidation(type_names)
+
+            return result
+
+        return wrapper
+
+    return decorator
+
+
+def invalidates_object_sync(
+    type_name: str,
+    id_param: str = "id",
+) -> Callable[[Callable[..., T]], Callable[..., T]]:
+    """
+    Sync-compatible decorator to invalidate cache for a specific object.
+
+    Usage:
+        @strawberry.mutation
+        @invalidates_object_sync("domain")
+        def update_domain(self, info: Info, id: str, ...) -> MutationResult:
+            ...
+    """
+
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> T:
+            result = func(*args, **kwargs)
+
+            if settings.cache_enabled:
+                object_id = kwargs.get(id_param)
+                if object_id:
+                    _fire_object_invalidation(type_name, str(object_id))
+                else:
+                    _fire_invalidation((type_name,))
+
+            return result
+
+        return wrapper
+
+    return decorator
+
+
+def _fire_invalidation(type_names: tuple[str, ...]) -> None:
+    """Fire-and-forget async cache invalidation from a sync context."""
+    import asyncio
+
+    async def _do_invalidate() -> None:
+        for type_name in type_names:
+            await cache.invalidate_type(type_name)
+
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(_do_invalidate())
+    except RuntimeError:
+        # No running loop - run synchronously
+        asyncio.run(_do_invalidate())
+
+
+def _fire_object_invalidation(type_name: str, object_id: str) -> None:
+    """Fire-and-forget async cache invalidation for a specific object."""
+    import asyncio
+
+    async def _do_invalidate() -> None:
+        await cache.invalidate_object(type_name, object_id)
+
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(_do_invalidate())
+    except RuntimeError:
+        asyncio.run(_do_invalidate())
+
+
 def _to_cacheable(obj: Any) -> Any:
     """
     Convert an object to a cacheable format.

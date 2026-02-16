@@ -5,15 +5,21 @@ Combines all query and mutation types into a single schema.
 """
 
 import strawberry
+from strawberry.extensions import QueryDepthLimiter
 from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_authenticated
+from crits_api.config import settings
+from crits_api.graphql.extensions import QueryComplexityLimiter
 from crits_api.graphql.mutations import (
     ActorMutations,
+    AuthMutations,
     BackdoorMutations,
+    BulkMutations,
     CampaignMutations,
     CertificateMutations,
+    CommentMutations,
     DomainMutations,
     EmailMutations,
     EventMutations,
@@ -24,6 +30,8 @@ from crits_api.graphql.mutations import (
     RawDataMutations,
     RelationshipMutations,
     SampleMutations,
+    ScreenshotMutations,
+    ServiceMutations,
     SignatureMutations,
     TargetMutations,
 )
@@ -31,6 +39,7 @@ from crits_api.graphql.queries.actors import ActorQueries
 from crits_api.graphql.queries.backdoors import BackdoorQueries
 from crits_api.graphql.queries.campaigns import CampaignQueries
 from crits_api.graphql.queries.certificates import CertificateQueries
+from crits_api.graphql.queries.dashboard import DashboardQueries
 from crits_api.graphql.queries.domains import DomainQueries
 from crits_api.graphql.queries.emails import EmailQueries
 from crits_api.graphql.queries.events import EventQueries
@@ -41,9 +50,11 @@ from crits_api.graphql.queries.indicators import IndicatorQueries
 from crits_api.graphql.queries.ips import IPQueries
 from crits_api.graphql.queries.pcaps import PCAPQueries
 from crits_api.graphql.queries.raw_data import RawDataQueries
+from crits_api.graphql.queries.related_objects import RelatedObjectQueries
 from crits_api.graphql.queries.relationships import RelationshipQueries
 from crits_api.graphql.queries.samples import SampleQueries
 from crits_api.graphql.queries.screenshots import ScreenshotQueries
+from crits_api.graphql.queries.search import SearchQueries
 from crits_api.graphql.queries.signatures import SignatureQueries
 from crits_api.graphql.queries.targets import TargetQueries
 from crits_api.graphql.types.common import TLOType
@@ -57,6 +68,7 @@ class Query(
     BackdoorQueries,
     CampaignQueries,
     CertificateQueries,
+    DashboardQueries,
     DomainQueries,
     EmailQueries,
     EventQueries,
@@ -64,9 +76,11 @@ class Query(
     IPQueries,
     PCAPQueries,
     RawDataQueries,
+    RelatedObjectQueries,
     RelationshipQueries,
     SampleQueries,
     ScreenshotQueries,
+    SearchQueries,
     SignatureQueries,
     TargetQueries,
 ):
@@ -119,11 +133,14 @@ class Query(
 
 @strawberry.type
 class Mutation(
+    AuthMutations,
     IndicatorMutations,
     ActorMutations,
     BackdoorMutations,
+    BulkMutations,
     CampaignMutations,
     CertificateMutations,
+    CommentMutations,
     DomainMutations,
     EmailMutations,
     EventMutations,
@@ -133,6 +150,8 @@ class Mutation(
     RawDataMutations,
     RelationshipMutations,
     SampleMutations,
+    ScreenshotMutations,
+    ServiceMutations,
     SignatureMutations,
     TargetMutations,
 ):
@@ -155,5 +174,8 @@ class Mutation(
 schema = strawberry.Schema(
     query=Query,
     mutation=Mutation,
-    # Extensions can be added here for tracing, complexity limiting, etc.
+    extensions=[
+        QueryDepthLimiter(max_depth=settings.query_depth_limit),
+        QueryComplexityLimiter,
+    ],
 )
