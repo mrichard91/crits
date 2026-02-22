@@ -398,11 +398,12 @@ def add_new_actor(name, aliases=None, description=None, source=None,
     else:
         return {"success" : False, "message" : "Missing source information."}
 
-    if not isinstance(aliases, list):
+    if aliases is not None and not isinstance(aliases, list):
         aliases = aliases.split(',')
+    if isinstance(aliases, list):
         for alias in aliases:
             alias = alias.strip()
-            if alias not in actor.aliases:
+            if alias and alias not in actor.aliases:
                 actor.aliases.append(alias)
 
     if bucket_list:

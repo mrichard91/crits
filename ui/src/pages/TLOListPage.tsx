@@ -1,6 +1,15 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Search, ChevronLeft, ChevronRight, Eye, Plus } from 'lucide-react'
+import {
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Plus,
+  ChevronUp,
+  ChevronDown,
+  ArrowUpDown,
+} from 'lucide-react'
 import { useTLOList, useTLOFilterOptions, PAGE_SIZE } from '@/hooks/useTLOList'
 import { AddTLODialog } from '@/components/AddTLODialog'
 import type { TLOConfig, TLOColumnDef, TLOFilterDef } from '@/lib/tloConfig'
@@ -199,11 +208,27 @@ function SelectFilter({
   )
 }
 
+function compareValues(a: unknown, b: unknown, colType: string): number {
+  if (a == null && b == null) return 0
+  if (a == null) return 1
+  if (b == null) return -1
+
+  if (colType === 'date') {
+    return new Date(a as string).getTime() - new Date(b as string).getTime()
+  }
+
+  const strA = String(a).toLowerCase()
+  const strB = String(b).toLowerCase()
+  return strA.localeCompare(strB)
+}
+
 export function TLOListPage({ config }: TLOListPageProps) {
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
 
   const page = parseInt(searchParams.get('page') || '1', 10)
+  const sortBy = searchParams.get('sortBy') || ''
+  const sortDir = (searchParams.get('sortDir') || '') as '' | 'asc' | 'desc'
 
   // Build filters from search params
   const filters: Record<string, string> = {}
@@ -214,6 +239,35 @@ export function TLOListPage({ config }: TLOListPageProps) {
 
   const { items, totalCount, isLoading, error } = useTLOList(config, { page, filters })
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+
+  // Client-side sorting of the current page
+  const sortedItems = useMemo(() => {
+    if (!sortBy || !sortDir) return items
+
+    const col = config.columns.find((c) => c.key === sortBy)
+    if (!col) return items
+
+    return [...items].sort((a, b) => {
+      const aVal = getNestedValue(a, col.key)
+      const bVal = getNestedValue(b, col.key)
+      const cmp = compareValues(aVal, bVal, col.type)
+      return sortDir === 'desc' ? -cmp : cmp
+    })
+  }, [items, sortBy, sortDir, config.columns])
+
+  const toggleSort = (colKey: string) => {
+    const params = new URLSearchParams(searchParams)
+    if (sortBy !== colKey) {
+      params.set('sortBy', colKey)
+      params.set('sortDir', 'asc')
+    } else if (sortDir === 'asc') {
+      params.set('sortDir', 'desc')
+    } else {
+      params.delete('sortBy')
+      params.delete('sortDir')
+    }
+    setSearchParams(params)
+  }
 
   const updateFilter = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams)
@@ -288,13 +342,27 @@ export function TLOListPage({ config }: TLOListPageProps) {
                 <TableHeader>
                   <TableRow>
                     {config.columns.map((col) => (
-                      <TableHead key={col.key}>{col.label}</TableHead>
+                      <TableHead key={col.key}>
+                        <button
+                          onClick={() => toggleSort(col.key)}
+                          className="inline-flex items-center gap-1 hover:text-light-text dark:hover:text-dark-text transition-colors"
+                        >
+                          {col.label}
+                          {sortBy === col.key && sortDir === 'asc' ? (
+                            <ChevronUp className="h-3.5 w-3.5" />
+                          ) : sortBy === col.key && sortDir === 'desc' ? (
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          ) : (
+                            <ArrowUpDown className="h-3.5 w-3.5 opacity-30" />
+                          )}
+                        </button>
+                      </TableHead>
                     ))}
                     <TableHead className="w-16">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((item) => (
+                  {sortedItems.map((item) => (
                     <TableRow key={item.id as string}>
                       {config.columns.map((col) => (
                         <TableCell key={col.key}>
