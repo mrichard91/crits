@@ -50,6 +50,18 @@ class SampleMutations:
             if result.get("success"):
                 obj = result.get("object")
                 obj_id = str(obj.id) if obj else ""
+
+                # Dispatch triage services via Celery worker
+                if obj_id:
+                    try:
+                        from crits_api.worker.tasks.analysis import run_triage_task
+
+                        username = ctx.user.username if ctx.user else "unknown"
+                        run_triage_task.delay("Sample", obj_id, username)
+                        logger.info("Dispatched triage for Sample/%s", obj_id)
+                    except Exception as triage_err:
+                        logger.warning("Failed to dispatch triage: %s", triage_err)
+
                 return MutationResult(
                     success=True,
                     message=result.get("message", "Sample created"),

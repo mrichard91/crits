@@ -199,6 +199,16 @@ def filter_by_sources(
 
 
 # Convenience decorators for common TLO operations
+def require_admin(func: Callable[..., T]) -> Callable[..., T]:
+    """
+    Decorator to require admin (control panel) access.
+
+    Checks for control_panel_read permission. Superusers bypass
+    automatically via the existing has_permission logic.
+    """
+    return require_permission("control_panel_read")(func)
+
+
 def require_read(tlo_type: str) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """Require read permission for a TLO type."""
     return require_permission(f"{tlo_type}.read")

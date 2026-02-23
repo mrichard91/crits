@@ -1,6 +1,7 @@
 """GraphQL query definitions for CRITs API."""
 
 from crits_api.graphql.queries.actors import ActorQueries
+from crits_api.graphql.queries.admin import AdminQueries
 from crits_api.graphql.queries.backdoors import BackdoorQueries
 from crits_api.graphql.queries.campaigns import CampaignQueries
 from crits_api.graphql.queries.certificates import CertificateQueries
@@ -19,6 +20,7 @@ from crits_api.graphql.queries.signatures import SignatureQueries
 from crits_api.graphql.queries.targets import TargetQueries
 
 __all__ = [
+    "AdminQueries",
     "IndicatorQueries",
     "ActorQueries",
     "BackdoorQueries",

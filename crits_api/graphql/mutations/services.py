@@ -45,8 +45,17 @@ class ServiceInfo:
 
 
 @strawberry.type
+class AnalysisStatusType:
+    """Status of a dispatched analysis task."""
+
+    success: bool
+    message: str = ""
+    analysis_id: str = ""
+
+
+@strawberry.type
 class ServiceMutations:
-    @strawberry.mutation(description="Run a service on a TLO")
+    @strawberry.mutation(description="Run a service on a TLO (async via Celery)")
     @require_authenticated
     def run_service(
         self,
@@ -55,9 +64,11 @@ class ServiceMutations:
         obj_type: str,
         obj_id: str,
         config: str | None = None,
-    ) -> MutationResult:
+    ) -> AnalysisStatusType:
         """
         Run a specific service on a TLO.
+
+        Dispatches the service to the Celery worker queue for async execution.
 
         Args:
             service_name: Name of the service to run
@@ -66,11 +77,9 @@ class ServiceMutations:
             config: Optional JSON string with custom service configuration
 
         Returns:
-            MutationResult indicating success or failure
+            AnalysisStatusType with dispatch status and analysis_id
         """
         import json
-
-        from crits.services.handlers import run_service as django_run_service
 
         ctx: GraphQLContext = info.context
         username = ctx.user.username if ctx.user else "unknown"
@@ -82,40 +91,33 @@ class ServiceMutations:
                 try:
                     custom_config = json.loads(config)
                 except json.JSONDecodeError:
-                    return MutationResult(
+                    return AnalysisStatusType(
                         success=False,
                         message="Invalid JSON in config parameter",
                     )
 
-            result = django_run_service(
-                name=service_name,
-                type_=obj_type,
-                id_=obj_id,
-                user=username,
-                custom_config=custom_config,
-            )
+            # Dispatch to Celery worker
+            from crits_api.worker.tasks.analysis import run_service_task
 
-            if result.get("success"):
-                if obj_type in _TYPE_CACHE_KEY:
-                    from crits_api.config import settings
+            task = run_service_task.delay(service_name, obj_type, obj_id, username, custom_config)
 
-                    if settings.cache_enabled:
-                        _fire_invalidation((_TYPE_CACHE_KEY[obj_type],))
-                return MutationResult(
-                    success=True,
-                    message=f"Service '{service_name}' started successfully",
-                    id=obj_id,
-                )
-            return MutationResult(
-                success=False,
-                message=result.get("message", f"Failed to run service '{service_name}'"),
+            if obj_type in _TYPE_CACHE_KEY:
+                from crits_api.config import settings
+
+                if settings.cache_enabled:
+                    _fire_invalidation((_TYPE_CACHE_KEY[obj_type],))
+
+            return AnalysisStatusType(
+                success=True,
+                message=f"Service '{service_name}' dispatched to worker",
+                analysis_id=task.id,
             )
 
         except Exception as e:
-            logger.error(f"Error running service: {e}")
-            return MutationResult(success=False, message=str(e))
+            logger.error(f"Error dispatching service: {e}")
+            return AnalysisStatusType(success=False, message=str(e))
 
-    @strawberry.mutation(description="Run all triage services on a TLO")
+    @strawberry.mutation(description="Run all triage services on a TLO (async via Celery)")
     @require_authenticated
     def run_triage(
         self,
@@ -126,6 +128,9 @@ class ServiceMutations:
         """
         Run all triage services on a TLO.
 
+        Dispatches a fan-out task to the Celery worker that runs each triage
+        service as an independent retriable subtask.
+
         Args:
             obj_type: The TLO type (e.g., "Sample", "Indicator")
             obj_id: The ObjectId of the TLO
@@ -133,22 +138,14 @@ class ServiceMutations:
         Returns:
             MutationResult indicating success or failure
         """
-        from crits.core.class_mapper import class_from_id
-        from crits.services.handlers import run_triage as django_run_triage
-
         ctx: GraphQLContext = info.context
+        username = ctx.user.username if ctx.user else "unknown"
 
         try:
-            # Get the object
-            obj = class_from_id(obj_type, obj_id)
-            if not obj:
-                return MutationResult(
-                    success=False,
-                    message=f"{obj_type} with id {obj_id} not found",
-                )
+            # Dispatch triage fan-out to Celery worker
+            from crits_api.worker.tasks.analysis import run_triage_task
 
-            # Run triage (this function returns None)
-            django_run_triage(obj, ctx.user)
+            run_triage_task.delay(obj_type, obj_id, username)
 
             if obj_type in _TYPE_CACHE_KEY:
                 from crits_api.config import settings
@@ -158,19 +155,52 @@ class ServiceMutations:
 
             return MutationResult(
                 success=True,
-                message="Triage services started",
+                message="Triage services dispatched to worker",
                 id=obj_id,
             )
 
         except Exception as e:
-            logger.error(f"Error running triage: {e}")
+            logger.error(f"Error dispatching triage: {e}")
             return MutationResult(success=False, message=str(e))
+
+    @strawberry.field(description="Get the status of a dispatched analysis task")
+    @require_authenticated
+    def analysis_status(self, info: Info, analysis_id: str) -> AnalysisStatusType:
+        """
+        Check the status of a running analysis by its analysis_id.
+
+        Args:
+            analysis_id: The UUID of the analysis record
+
+        Returns:
+            AnalysisStatusType with current status
+        """
+        try:
+            from crits.services.analysis_result import AnalysisResult
+
+            ar = AnalysisResult.objects(analysis_id=analysis_id).first()
+            if not ar:
+                return AnalysisStatusType(
+                    success=False,
+                    message=f"Analysis {analysis_id} not found",
+                    analysis_id=analysis_id,
+                )
+
+            return AnalysisStatusType(
+                success=ar.status == "completed",
+                message=f"Status: {ar.status}",
+                analysis_id=analysis_id,
+            )
+
+        except Exception as e:
+            logger.error(f"Error checking analysis status: {e}")
+            return AnalysisStatusType(success=False, message=str(e))
 
     @strawberry.field(description="List available services")
     @require_authenticated
     def list_services(self, info: Info) -> list[ServiceInfo]:
         """
-        List all available services.
+        List all available services (both modern and legacy).
 
         Returns:
             List of ServiceInfo objects describing available services
@@ -178,10 +208,35 @@ class ServiceMutations:
         from crits.services.service import CRITsService
 
         services: list[ServiceInfo] = []
+        seen_names: set[str] = set()
 
+        # Modern registered services
+        try:
+            from crits_api.worker.services.registry import (
+                ensure_services_registered,
+                get_all_services,
+            )
+
+            ensure_services_registered()
+            for name, cls in get_all_services().items():
+                services.append(
+                    ServiceInfo(
+                        name=cls.name,
+                        description=cls.description,
+                        enabled=True,
+                        run_on_triage=cls.run_on_triage,
+                        supported_types=list(cls.supported_types),
+                    )
+                )
+                seen_names.add(name)
+        except Exception as e:
+            logger.debug(f"Could not load modern services: {e}")
+
+        # Legacy DB services (not already covered by modern)
         try:
             for service in CRITsService.objects():
-                # Get supported types from the service
+                if service.name in seen_names:
+                    continue
                 supported_types: list[str] = []
                 if hasattr(service, "supported_types"):
                     supported_types = list(service.supported_types or [])

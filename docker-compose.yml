@@ -140,6 +140,56 @@ services:
       retries: 3
       start_period: 30s
 
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    container_name: crits-worker
+    restart: unless-stopped
+    environment:
+      # MongoDB connection
+      - MONGO_HOST=mongodb
+      - MONGO_PORT=27017
+      - MONGO_DATABASE=crits
+      # Redis connection (broker on DB 1, caching/sessions on DB 0)
+      - REDIS_URL=redis://redis:6379/0
+      # Minimal Django settings for model imports
+      - DJANGO_SETTINGS_MODULE=crits_api.db.api_settings
+      - DEBUG=${DEBUG:-true}
+      # Security
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+    volumes:
+      # Share uploaded files volume so workers can read GridFS-backed data
+      - crits_files:/app/files
+      - crits_logs:/app/logs
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  flower:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    container_name: crits-flower
+    restart: unless-stopped
+    profiles:
+      - monitoring
+    environment:
+      - MONGO_HOST=mongodb
+      - MONGO_PORT=27017
+      - MONGO_DATABASE=crits
+      - REDIS_URL=redis://redis:6379/0
+      - DJANGO_SETTINGS_MODULE=crits_api.db.api_settings
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+    command: ["uv", "run", "celery", "-A", "crits_api.worker.app", "flower", "--port=5555"]
+    ports:
+      - "5555:5555"
+    depends_on:
+      redis:
+        condition: service_healthy
+
   ui:
     build:
       context: .

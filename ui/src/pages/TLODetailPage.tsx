@@ -4,6 +4,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
   Calendar,
+  ChevronDown,
+  ChevronRight,
+  Plus,
   User,
   Shield,
   Tag,
@@ -15,11 +18,12 @@ import {
 } from 'lucide-react'
 import { useTLODetail } from '@/hooks/useTLODetail'
 import type { TLOConfig, TLODetailFieldDef } from '@/lib/tloConfig'
-import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, Button } from '@/components/ui'
+import { Card, CardContent, Badge, Spinner, Button } from '@/components/ui'
 import { formatDate } from '@/lib/utils'
 import { RelationshipsCard } from '@/components/RelationshipsCard'
 import { SampleHashCard } from '@/components/SampleHashCard'
 import { SampleToolsCard } from '@/components/SampleToolsCard'
+import { SampleServicesCard } from '@/components/SampleServicesCard'
 
 interface TLODetailPageProps {
   config: TLOConfig
@@ -123,120 +127,175 @@ function formatCompactDate(dateStr: string | undefined | null): string {
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-function SourcesCard({ sources }: { sources: Source[] }) {
+/* ── Collapsible sidebar section ─────────────────────────────────── */
+
+function SidebarSection({
+  icon: IconComponent,
+  label,
+  count,
+  defaultOpen,
+  children,
+  onAdd,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  count: number
+  defaultOpen?: boolean
+  children: React.ReactNode
+  onAdd?: () => void
+}) {
+  const [open, setOpen] = useState(defaultOpen ?? count > 0)
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <User className="h-5 w-5" />
-          Sources ({sources.length})
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {sources.length === 0 ? (
-          <p className="text-light-text-muted dark:text-dark-text-muted">No sources</p>
+    <div className="border-b border-light-border dark:border-dark-border last:border-b-0">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 w-full py-2.5 px-3 text-sm font-medium text-light-text dark:text-dark-text hover:bg-light-hover dark:hover:bg-dark-hover transition-colors"
+      >
+        {open ? (
+          <ChevronDown className="h-3.5 w-3.5 shrink-0" />
         ) : (
-          <div className="space-y-4">
-            {sources.map((source, idx) => (
-              <div
-                key={idx}
-                className="p-3 rounded border border-light-border dark:border-dark-border"
-              >
-                <h4 className="font-medium text-light-text dark:text-dark-text mb-2">
-                  {source.name}
-                </h4>
-                {source.instances.map((instance, iidx) => (
-                  <div
-                    key={iidx}
-                    className="text-sm text-light-text-secondary dark:text-dark-text-secondary"
-                  >
-                    <span>{instance.method}</span>
-                    {instance.reference && <span className="ml-2">{instance.reference}</span>}
-                    <span className="ml-2">{instance.analyst}</span>
-                    <span className="ml-2">{formatDate(instance.date)}</span>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
+          <ChevronRight className="h-3.5 w-3.5 shrink-0" />
         )}
-      </CardContent>
-    </Card>
+        <IconComponent className="h-4 w-4 shrink-0" />
+        <span className="flex-1 text-left">{label}</span>
+        <span className="flex items-center gap-1 shrink-0">
+          {onAdd && (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                e.stopPropagation()
+                onAdd()
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.stopPropagation()
+                  onAdd()
+                }
+              }}
+              className="inline-flex items-center justify-center h-5 w-5 rounded hover:bg-light-border dark:hover:bg-dark-border text-light-text-muted dark:text-dark-text-muted hover:text-light-text dark:hover:text-dark-text transition-colors"
+              title={`Add ${label.toLowerCase()}`}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </span>
+          )}
+          <Badge variant="default" className="text-xs px-1.5 py-0">
+            {count}
+          </Badge>
+        </span>
+      </button>
+      {open && <div className="px-3 pb-3">{children}</div>}
+    </div>
   )
 }
 
-function RightColumnCards({
+/* ── Metadata Sidebar ────────────────────────────────────────────── */
+
+function MetadataSidebar({
+  sources,
   campaigns,
   bucketList,
   sectors,
+  relationships,
+  tloType,
+  tloId,
+  onRelationshipChange,
 }: {
+  sources: Source[]
   campaigns: string[]
   bucketList: string[]
   sectors: string[]
+  relationships: Relationship[]
+  tloType: string
+  tloId: string
+  onRelationshipChange: () => void
 }) {
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            Campaigns ({campaigns.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {campaigns.length === 0 ? (
-            <p className="text-light-text-muted dark:text-dark-text-muted">No campaigns</p>
+      <Card className="overflow-hidden">
+        <div className="px-3 py-2.5 border-b border-light-border dark:border-dark-border">
+          <h3 className="text-sm font-semibold text-light-text dark:text-dark-text">Metadata</h3>
+        </div>
+
+        {/* Sources */}
+        <SidebarSection icon={User} label="Sources" count={sources.length}>
+          {sources.length === 0 ? (
+            <p className="text-xs text-light-text-muted dark:text-dark-text-muted">No sources</p>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {campaigns.map((c) => (
-                <Badge key={c}>{c}</Badge>
+            <div className="space-y-2">
+              {sources.map((source, idx) => (
+                <div key={idx}>
+                  <span className="text-sm font-medium text-light-text dark:text-dark-text">
+                    {source.name}
+                  </span>
+                  {source.instances.map((inst, iidx) => (
+                    <div
+                      key={iidx}
+                      className="text-xs text-light-text-secondary dark:text-dark-text-secondary mt-0.5 ml-2"
+                    >
+                      {inst.method && <span>{inst.method}</span>}
+                      {inst.reference && <span className="ml-1">{inst.reference}</span>}
+                      {inst.date && <span className="ml-1">{formatCompactDate(inst.date)}</span>}
+                    </div>
+                  ))}
+                </div>
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </SidebarSection>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Tag className="h-5 w-5" />
-            Tags ({bucketList.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {bucketList.length === 0 ? (
-            <p className="text-light-text-muted dark:text-dark-text-muted">No tags</p>
+        {/* Campaigns */}
+        <SidebarSection icon={Shield} label="Campaigns" count={campaigns.length}>
+          {campaigns.length === 0 ? (
+            <p className="text-xs text-light-text-muted dark:text-dark-text-muted">No campaigns</p>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
+              {campaigns.map((c) => (
+                <Badge key={c} className="text-xs">
+                  {c}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </SidebarSection>
+
+        {/* Tags */}
+        <SidebarSection icon={Tag} label="Tags" count={bucketList.length}>
+          {bucketList.length === 0 ? (
+            <p className="text-xs text-light-text-muted dark:text-dark-text-muted">No tags</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
               {bucketList.map((tag) => (
-                <Badge key={tag} variant="info">
+                <Badge key={tag} variant="info" className="text-xs">
                   {tag}
                 </Badge>
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </SidebarSection>
 
-      {sectors.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              Sectors ({sectors.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
+        {/* Sectors — only if non-empty */}
+        {sectors.length > 0 && (
+          <SidebarSection icon={Activity} label="Sectors" count={sectors.length}>
+            <div className="flex flex-wrap gap-1.5">
               {sectors.map((s) => (
-                <Badge key={s} variant="info">
+                <Badge key={s} variant="info" className="text-xs">
                   {s}
                 </Badge>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </SidebarSection>
+        )}
+      </Card>
+
+      <RelationshipsCard
+        relationships={relationships}
+        tloType={tloType}
+        tloId={tloId}
+        onRelationshipChange={onRelationshipChange}
+      />
     </>
   )
 }
@@ -421,22 +480,24 @@ function DefaultLayout({
   onRelationshipChange,
 }: LayoutProps) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Left column - Details */}
-      <div className="lg:col-span-2 space-y-6">
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* Left column - Detail content */}
+      <div className="lg:col-span-3 space-y-6">
         <DetailFieldsCard fields={detailFieldsFiltered} item={item} />
-        <SourcesCard sources={sources} />
-        <RelationshipsCard
+      </div>
+
+      {/* Right column - Metadata sidebar */}
+      <div className="lg:col-span-1 space-y-6">
+        <MetadataSidebar
+          sources={sources}
+          campaigns={campaigns}
+          bucketList={bucketList}
+          sectors={sectors}
           relationships={relationships}
           tloType={tloType}
           tloId={tloId}
           onRelationshipChange={onRelationshipChange}
         />
-      </div>
-
-      {/* Right column - Metadata */}
-      <div className="space-y-6">
-        <RightColumnCards campaigns={campaigns} bucketList={bucketList} sectors={sectors} />
       </div>
     </div>
   )
@@ -455,43 +516,52 @@ function SampleLayout({
   onRelationshipChange,
 }: LayoutProps) {
   const md5 = (item.md5 as string) ?? ''
-  const [sampleTab, setSampleTab] = useState<'details' | 'tools'>('details')
+  const [sampleTab, setSampleTab] = useState<'details' | 'tools' | 'services'>('details')
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Left column */}
-      <div className="lg:col-span-2 space-y-6">
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* Left column - Detail content */}
+      <div className="lg:col-span-3 space-y-6">
         {/* Tabbed card: Details / Tools */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-4">
+        <Card className="p-0">
+          <div className="flex items-center gap-1 px-4 pt-3 pb-0 border-b border-light-border dark:border-dark-border">
+            <button
+              onClick={() => setSampleTab('details')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                sampleTab === 'details'
+                  ? 'border-crits-blue text-crits-blue'
+                  : 'border-transparent text-light-text-muted dark:text-dark-text-muted hover:text-light-text dark:hover:text-dark-text'
+              }`}
+            >
+              <Info className="h-4 w-4" />
+              Details
+            </button>
+            {md5 && (
               <button
-                onClick={() => setSampleTab('details')}
-                className={`flex items-center gap-2 pb-1 text-sm font-medium border-b-2 transition-colors ${
-                  sampleTab === 'details'
+                onClick={() => setSampleTab('tools')}
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                  sampleTab === 'tools'
                     ? 'border-crits-blue text-crits-blue'
                     : 'border-transparent text-light-text-muted dark:text-dark-text-muted hover:text-light-text dark:hover:text-dark-text'
                 }`}
               >
-                <Info className="h-4 w-4" />
-                Details
+                <Wrench className="h-4 w-4" />
+                Tools
               </button>
-              {md5 && (
-                <button
-                  onClick={() => setSampleTab('tools')}
-                  className={`flex items-center gap-2 pb-1 text-sm font-medium border-b-2 transition-colors ${
-                    sampleTab === 'tools'
-                      ? 'border-crits-blue text-crits-blue'
-                      : 'border-transparent text-light-text-muted dark:text-dark-text-muted hover:text-light-text dark:hover:text-dark-text'
-                  }`}
-                >
-                  <Wrench className="h-4 w-4" />
-                  Tools
-                </button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
+            )}
+            <button
+              onClick={() => setSampleTab('services')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                sampleTab === 'services'
+                  ? 'border-crits-blue text-crits-blue'
+                  : 'border-transparent text-light-text-muted dark:text-dark-text-muted hover:text-light-text dark:hover:text-dark-text'
+              }`}
+            >
+              <Activity className="h-4 w-4" />
+              Services
+            </button>
+          </div>
+          <CardContent className="p-4">
             {sampleTab === 'details' && (
               <div>
                 <dl className="grid grid-cols-2 gap-4">
@@ -539,21 +609,25 @@ function SampleLayout({
               </div>
             )}
             {sampleTab === 'tools' && md5 && <SampleToolsCard md5={md5} bare />}
+            {sampleTab === 'services' && (
+              <SampleServicesCard objType={tloType} objId={tloId} bare />
+            )}
           </CardContent>
         </Card>
+      </div>
 
-        <SourcesCard sources={sources} />
-        <RelationshipsCard
+      {/* Right column - Metadata sidebar */}
+      <div className="lg:col-span-1 space-y-6">
+        <MetadataSidebar
+          sources={sources}
+          campaigns={campaigns}
+          bucketList={bucketList}
+          sectors={sectors}
           relationships={relationships}
           tloType={tloType}
           tloId={tloId}
           onRelationshipChange={onRelationshipChange}
         />
-      </div>
-
-      {/* Right column */}
-      <div className="space-y-6">
-        <RightColumnCards campaigns={campaigns} bucketList={bucketList} sectors={sectors} />
       </div>
     </div>
   )
@@ -568,12 +642,12 @@ function DetailFieldsCard({
 }) {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+      <div className="px-6 pt-4 pb-2">
+        <h3 className="text-base font-semibold text-light-text dark:text-dark-text flex items-center gap-2">
           <FileText className="h-5 w-5" />
           Details
-        </CardTitle>
-      </CardHeader>
+        </h3>
+      </div>
       <CardContent>
         <dl className="grid grid-cols-2 gap-4">
           {fields

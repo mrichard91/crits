@@ -86,6 +86,15 @@ async def health_check() -> dict[str, str]:
     }
 
 
+# Worker health endpoint
+@app.get("/api/worker/health")
+async def worker_health() -> dict:
+    """Check Celery worker health."""
+    from crits_api.worker.health import check_worker_health
+
+    return check_worker_health()
+
+
 # Mount download REST endpoint
 app.include_router(download_router)
 

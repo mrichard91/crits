@@ -1,6 +1,7 @@
 """GraphQL mutation resolvers."""
 
 from crits_api.graphql.mutations.actors import ActorMutations
+from crits_api.graphql.mutations.admin import AdminMutations
 from crits_api.graphql.mutations.auth import AuthMutations
 from crits_api.graphql.mutations.backdoors import BackdoorMutations
 from crits_api.graphql.mutations.bulk import BulkMutations
@@ -23,6 +24,7 @@ from crits_api.graphql.mutations.signatures import SignatureMutations
 from crits_api.graphql.mutations.targets import TargetMutations
 
 __all__ = [
+    "AdminMutations",
     "AuthMutations",
     "ActorMutations",
     "BackdoorMutations",

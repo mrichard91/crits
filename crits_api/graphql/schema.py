@@ -14,6 +14,7 @@ from crits_api.config import settings
 from crits_api.graphql.extensions import QueryComplexityLimiter
 from crits_api.graphql.mutations import (
     ActorMutations,
+    AdminMutations,
     AuthMutations,
     BackdoorMutations,
     BulkMutations,
@@ -36,6 +37,8 @@ from crits_api.graphql.mutations import (
     TargetMutations,
 )
 from crits_api.graphql.queries.actors import ActorQueries
+from crits_api.graphql.queries.admin import AdminQueries
+from crits_api.graphql.queries.analysis_results import AnalysisResultQueries
 from crits_api.graphql.queries.backdoors import BackdoorQueries
 from crits_api.graphql.queries.campaigns import CampaignQueries
 from crits_api.graphql.queries.certificates import CertificateQueries
@@ -63,8 +66,10 @@ from crits_api.graphql.types.user import UserType
 
 @strawberry.type
 class Query(
+    AdminQueries,
     IndicatorQueries,
     ActorQueries,
+    AnalysisResultQueries,
     BackdoorQueries,
     CampaignQueries,
     CertificateQueries,
@@ -133,6 +138,7 @@ class Query(
 
 @strawberry.type
 class Mutation(
+    AdminMutations,
     AuthMutations,
     IndicatorMutations,
     ActorMutations,

@@ -1,0 +1,1 @@
+"""CRITs Celery task definitions."""
