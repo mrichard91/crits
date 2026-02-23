@@ -158,10 +158,14 @@ services:
       - DEBUG=${DEBUG:-true}
       # Security
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      # External service directories (colon-separated)
+      - SERVICE_DIRS=/opt/crits_services
     volumes:
       # Share uploaded files volume so workers can read GridFS-backed data
       - crits_files:/app/files
       - crits_logs:/app/logs
+      # External analysis service repos
+      - ./services:/opt/crits_services
     depends_on:
       mongodb:
         condition: service_healthy
