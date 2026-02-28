@@ -16,6 +16,7 @@ from crits_api.graphql.queries.raw_data import RawDataQueries
 from crits_api.graphql.queries.relationships import RelationshipQueries
 from crits_api.graphql.queries.samples import SampleQueries
 from crits_api.graphql.queries.screenshots import ScreenshotQueries
+from crits_api.graphql.queries.services import ServiceQueries
 from crits_api.graphql.queries.signatures import SignatureQueries
 from crits_api.graphql.queries.tags import TagQueries
 from crits_api.graphql.queries.targets import TargetQueries
@@ -37,6 +38,7 @@ __all__ = [
     "RelationshipQueries",
     "SampleQueries",
     "ScreenshotQueries",
+    "ServiceQueries",
     "SignatureQueries",
     "TagQueries",
     "TargetQueries",

@@ -59,6 +59,7 @@ from crits_api.graphql.queries.relationships import RelationshipQueries
 from crits_api.graphql.queries.samples import SampleQueries
 from crits_api.graphql.queries.screenshots import ScreenshotQueries
 from crits_api.graphql.queries.search import SearchQueries
+from crits_api.graphql.queries.services import ServiceQueries
 from crits_api.graphql.queries.signatures import SignatureQueries
 from crits_api.graphql.queries.tags import TagQueries
 from crits_api.graphql.queries.targets import TargetQueries
@@ -88,6 +89,7 @@ class Query(
     SampleQueries,
     ScreenshotQueries,
     SearchQueries,
+    ServiceQueries,
     SignatureQueries,
     TagQueries,
     TargetQueries,

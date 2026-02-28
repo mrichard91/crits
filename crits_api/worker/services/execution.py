@@ -90,7 +90,7 @@ def _execute_modern_service(
         analysis_id=analysis_id,
     )
 
-    config = _build_config(service.config_class, custom_config)
+    config = _build_config(service.config_class, custom_config, service.name)
 
     # Validate target
     if not service.validate_target(context):
@@ -173,13 +173,42 @@ def _load_tlo(obj_type: str, obj_id: str) -> Any:
 def _build_config(
     config_class: type[ServiceConfig],
     custom_config: dict[str, Any] | None,
+    service_name: str | None = None,
 ) -> ServiceConfig:
-    """Build a ServiceConfig from custom config dict."""
-    if custom_config and config_class is not ServiceConfig:
+    """Build a ServiceConfig, merging DB-persisted values then runtime overrides.
+
+    Priority (highest wins): custom_config > DB config > dataclass defaults.
+    """
+    merged: dict[str, Any] = {}
+
+    # 1. Load persisted config from CRITsService DB record
+    if service_name and config_class is not ServiceConfig:
         try:
-            return config_class(**custom_config)
+            from crits.services.service import CRITsService
+
+            svc = CRITsService.objects(name=service_name).first()
+            if svc and svc.config:
+                db_vals = svc.config.to_dict()
+                # Only keep keys that are actual fields on the config class
+                import dataclasses as _dc
+
+                if _dc.is_dataclass(config_class):
+                    valid_keys = {f.name for f in _dc.fields(config_class)}
+                    merged.update({k: v for k, v in db_vals.items() if k in valid_keys})
         except Exception:
-            logger.debug("Could not init config class with custom config, using defaults")
+            logger.debug("Could not load DB config for %s", service_name)
+
+    # 2. Runtime overrides win
+    if custom_config:
+        merged.update(custom_config)
+
+    # 3. Instantiate
+    if merged and config_class is not ServiceConfig:
+        try:
+            return config_class(**merged)
+        except Exception:
+            logger.debug("Could not init config class with merged config, using defaults")
+
     return config_class()
 
 

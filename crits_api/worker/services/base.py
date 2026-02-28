@@ -2,18 +2,70 @@
 
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
+# -- Configuration field helper ------------------------------------------------
+
+
+def config_field(
+    default: Any = dataclass,  # sentinel — replaced below
+    *,
+    type: str = "str",
+    description: str = "",
+    required: bool = False,
+    private: bool = False,
+    default_factory: Any = dataclass,  # sentinel
+) -> Any:
+    """Create a dataclass field with service-config metadata.
+
+    Mirrors the legacy ``ServiceConfigOption`` constructor arguments:
+
+    * *type*: ``"str"``, ``"int"``, ``"bool"`` — drives UI widget selection.
+    * *description*: human-readable help text shown in the admin UI.
+    * *required*: whether the field must be set before the service is usable.
+    * *private*: if ``True`` the value is masked in the UI (API keys, etc.).
+
+    Usage::
+
+        @dataclass
+        class MyConfig(ServiceConfig):
+            api_key: str = config_field(default="", type="str",
+                                        description="API key for ...",
+                                        required=True, private=True)
+            timeout: int = config_field(default=30, type="int",
+                                        description="Request timeout in seconds")
+    """
+    metadata = {
+        "config_type": type,
+        "description": description,
+        "required": required,
+        "private": private,
+    }
+
+    _sentinel = dataclass  # reuse the class object as an "unset" marker
+
+    if default is not _sentinel and default_factory is not _sentinel:
+        raise ValueError("Cannot specify both default and default_factory")
+
+    if default_factory is not _sentinel:
+        return field(default_factory=default_factory, metadata=metadata)
+    if default is not _sentinel:
+        return field(default=default, metadata=metadata)
+    # No default — the caller must provide a value
+    return field(metadata=metadata)
+
+
 @dataclass
 class ServiceConfig:
     """Base configuration for analysis services.
 
-    Subclass to add service-specific config fields.
+    Subclass and add fields (optionally using ``config_field``) to declare
+    service-specific configuration.
     """
 
     def to_dict(self) -> dict[str, Any]:
