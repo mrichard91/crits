@@ -137,12 +137,14 @@ class EventQueries:
     @strawberry.field(description="Get distinct event types")
     @require_permission("Event.read")
     def event_types(self, info: Info) -> list[str]:
-        """Get list of distinct event types."""
-        from crits.events.event import Event
+        """Get list of distinct event types (vocabulary + any custom DB values)."""
+        from crits.vocabulary.events import EventTypes
 
+        values = set(EventTypes.values())
         try:
-            types = Event.objects.distinct("event_type")
-            return sorted([t for t in types if t])
-        except Exception as e:
-            logger.error(f"Error getting event types: {e}")
-            return []
+            from crits.events.event import Event
+
+            values.update(t for t in Event.objects.distinct("event_type") if t)
+        except Exception:
+            pass
+        return sorted(values)

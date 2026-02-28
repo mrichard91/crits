@@ -990,10 +990,10 @@ def alter_bucket_list(obj, buckets, val):
     ###TODO: SetOnInsert is supported since mongoengine 0.8.0 (see commits #308/#309)
     buckets_col = mongo_connector(settings.COL_BUCKET_LISTS)
     for name in buckets:
-        buckets_col.update({'name': name},
-                           {'$inc': {obj._meta['crits_type']: val},
-                            '$setOnInsert': soi},
-                           upsert=True)
+        buckets_col.update_one({'name': name},
+                               {'$inc': {obj._meta['crits_type']: val},
+                                '$setOnInsert': soi},
+                               upsert=True)
 
         # Find and remove this bucket if, and only if, all counts are zero.
         if val == -1:

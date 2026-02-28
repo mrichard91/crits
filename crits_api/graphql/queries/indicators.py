@@ -181,17 +181,14 @@ class IndicatorQueries:
     @strawberry.field(description="Get distinct indicator types")
     @require_permission("Indicator.read")
     def indicator_types(self, info: Info) -> list[str]:
-        """
-        Get list of distinct indicator types in the database.
+        """Get list of distinct indicator types (vocabulary + any custom DB values)."""
+        from crits.vocabulary.indicators import IndicatorTypes
 
-        Returns:
-            List of indicator type strings
-        """
-        from crits.indicators.indicator import Indicator
-
+        values = set(IndicatorTypes.values())
         try:
-            types = Indicator.objects.distinct("ind_type")
-            return sorted([t for t in types if t])
-        except Exception as e:
-            logger.error(f"Error getting indicator types: {e}")
-            return []
+            from crits.indicators.indicator import Indicator
+
+            values.update(t for t in Indicator.objects.distinct("ind_type") if t)
+        except Exception:
+            pass
+        return sorted(values)

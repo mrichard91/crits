@@ -1,8 +1,10 @@
 import { useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, Upload } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { X, Upload, Plus } from 'lucide-react'
 import { useTLOCreate } from '@/hooks/useTLOCreate'
 import { useTLOFilterOptions } from '@/hooks/useTLOList'
+import { gqlQuery } from '@/lib/graphql'
 import type { TLOConfig, TLOCreateFieldDef } from '@/lib/tloConfig'
 import { Button, Input, Spinner } from '@/components/ui'
 
@@ -117,6 +119,8 @@ function CreateFieldInput({
   )
 }
 
+const ADD_NEW_SENTINEL = '__add_new__'
+
 function SelectFieldInput({
   field,
   value,
@@ -126,7 +130,69 @@ function SelectFieldInput({
   value: string
   onChange: (val: string) => void
 }) {
+  const queryClient = useQueryClient()
   const { data: options } = useTLOFilterOptions(field.optionsQuery)
+  const [showCreate, setShowCreate] = useState(false)
+  const [newValue, setNewValue] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+
+  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value
+    if (val === ADD_NEW_SENTINEL) {
+      setShowCreate(true)
+      setCreateError(null)
+    } else {
+      onChange(val)
+      setShowCreate(false)
+    }
+  }
+
+  const handleCreate = async () => {
+    const trimmed = newValue.trim()
+    if (!trimmed || !field.createMutation) return
+
+    setCreating(true)
+    setCreateError(null)
+
+    // Build mutation - determine parameter signature from the mutation name
+    let mutation: string
+    let variables: Record<string, string>
+    if (field.createMutation === 'createConfigItem') {
+      mutation = `mutation($configType: ConfigTypeEnum!, $name: String!) {
+        ${field.createMutation}(configType: $configType, name: $name) { success message }
+      }`
+      variables = { ...field.createVariables, name: trimmed }
+    } else {
+      mutation = `mutation($name: String!) {
+        ${field.createMutation}(name: $name) { success message }
+      }`
+      variables = { name: trimmed }
+    }
+
+    try {
+      const data = await gqlQuery<Record<string, { success: boolean; message: string }>>(
+        mutation,
+        variables,
+      )
+      const result = data[field.createMutation]
+      if (!result.success) {
+        setCreateError(result.message)
+        setCreating(false)
+        return
+      }
+      // Invalidate filter-options cache so the new value appears
+      await queryClient.invalidateQueries({ queryKey: ['filter-options', field.optionsQuery] })
+      onChange(trimmed)
+      setShowCreate(false)
+      setNewValue('')
+      setCreateError(null)
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : 'Failed to create')
+    } finally {
+      setCreating(false)
+    }
+  }
 
   return (
     <div>
@@ -135,8 +201,8 @@ function SelectFieldInput({
         {field.required && <span className="text-status-error ml-1">*</span>}
       </label>
       <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={showCreate ? ADD_NEW_SENTINEL : value}
+        onChange={handleSelectChange}
         className="crits-input w-full"
       >
         <option value="">Select {field.label}...</option>
@@ -145,7 +211,52 @@ function SelectFieldInput({
             {opt}
           </option>
         ))}
+        {field.allowCreate && <option value={ADD_NEW_SENTINEL}>+ Add new...</option>}
       </select>
+      {showCreate && field.allowCreate && (
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            type="text"
+            value={newValue}
+            onChange={(e) => {
+              setNewValue(e.target.value)
+              setCreateError(null)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                handleCreate()
+              }
+            }}
+            placeholder={`New ${field.label.toLowerCase()} name`}
+            className="crits-input flex-1"
+            autoFocus
+          />
+          <button
+            type="button"
+            onClick={handleCreate}
+            disabled={creating || !newValue.trim()}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded
+              bg-accent-blue text-white hover:bg-accent-blue/90
+              disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {creating ? <Spinner size="sm" /> : <Plus className="h-4 w-4" />}
+            Add
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowCreate(false)
+              setNewValue('')
+              setCreateError(null)
+            }}
+            className="text-light-text-muted dark:text-dark-text-muted hover:text-light-text dark:hover:text-dark-text"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+      {createError && <p className="mt-1 text-xs text-status-error">{createError}</p>}
     </div>
   )
 }

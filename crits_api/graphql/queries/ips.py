@@ -137,12 +137,14 @@ class IPQueries:
     @strawberry.field(description="Get distinct IP types")
     @require_permission("IP.read")
     def ip_types(self, info: Info) -> list[str]:
-        """Get list of distinct IP types."""
-        from crits.ips.ip import IP
+        """Get list of distinct IP types (vocabulary + any custom DB values)."""
+        from crits.vocabulary.ips import IPTypes
 
+        values = set(IPTypes.values())
         try:
-            types = IP.objects.distinct("ip_type")
-            return sorted([t for t in types if t])
-        except Exception as e:
-            logger.error(f"Error getting IP types: {e}")
-            return []
+            from crits.ips.ip import IP
+
+            values.update(t for t in IP.objects.distinct("ip_type") if t)
+        except Exception:
+            pass
+        return sorted(values)

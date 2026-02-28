@@ -137,12 +137,12 @@ class DomainQueries:
     @strawberry.field(description="Get distinct domain record types")
     @require_permission("Domain.read")
     def domain_record_types(self, info: Info) -> list[str]:
-        """Get list of distinct domain record types."""
-        from crits.domains.domain import Domain
-
+        """Get list of distinct domain record types (common DNS types + any custom DB values)."""
+        values = {"A", "AAAA", "CNAME", "MX", "NS", "PTR", "SOA", "SRV", "TXT"}
         try:
-            types = Domain.objects.distinct("record_type")
-            return sorted([t for t in types if t])
-        except Exception as e:
-            logger.error(f"Error getting domain record types: {e}")
-            return []
+            from crits.domains.domain import Domain
+
+            values.update(t for t in Domain.objects.distinct("record_type") if t)
+        except Exception:
+            pass
+        return sorted(values)
