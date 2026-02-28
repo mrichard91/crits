@@ -21,6 +21,7 @@ from crits_api.graphql.mutations.samples import SampleMutations
 from crits_api.graphql.mutations.screenshots import ScreenshotMutations
 from crits_api.graphql.mutations.services import ServiceMutations
 from crits_api.graphql.mutations.signatures import SignatureMutations
+from crits_api.graphql.mutations.tags import TagMutations
 from crits_api.graphql.mutations.targets import TargetMutations
 
 __all__ = [
@@ -45,5 +46,6 @@ __all__ = [
     "ScreenshotMutations",
     "ServiceMutations",
     "SignatureMutations",
+    "TagMutations",
     "TargetMutations",
 ]
