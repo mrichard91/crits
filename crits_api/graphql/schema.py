@@ -34,6 +34,7 @@ from crits_api.graphql.mutations import (
     ScreenshotMutations,
     ServiceMutations,
     SignatureMutations,
+    TagMutations,
     TargetMutations,
 )
 from crits_api.graphql.queries.actors import ActorQueries
@@ -59,6 +60,7 @@ from crits_api.graphql.queries.samples import SampleQueries
 from crits_api.graphql.queries.screenshots import ScreenshotQueries
 from crits_api.graphql.queries.search import SearchQueries
 from crits_api.graphql.queries.signatures import SignatureQueries
+from crits_api.graphql.queries.tags import TagQueries
 from crits_api.graphql.queries.targets import TargetQueries
 from crits_api.graphql.types.common import TLOType
 from crits_api.graphql.types.user import UserType
@@ -87,6 +89,7 @@ class Query(
     ScreenshotQueries,
     SearchQueries,
     SignatureQueries,
+    TagQueries,
     TargetQueries,
 ):
     """Root query type for CRITs GraphQL API."""
@@ -130,6 +133,14 @@ class Query(
             return sorted(s.name for s in ctx.sources)
         return sorted(s.name for s in ctx.sources if s.write)
 
+    @strawberry.field(description="Get all tag (bucket list) names")
+    @require_authenticated
+    def tag_names(self, info: Info) -> list[str]:
+        """Get list of all tag names from the Bucket collection."""
+        from crits.core.bucket import Bucket
+
+        return sorted(n for n in Bucket.objects.distinct("name") if n)
+
     @strawberry.field(description="List available TLO types")
     def tlo_types(self) -> list[TLOType]:
         """Get list of all Top-Level Object types."""
@@ -159,6 +170,7 @@ class Mutation(
     ScreenshotMutations,
     ServiceMutations,
     SignatureMutations,
+    TagMutations,
     TargetMutations,
 ):
     """Root mutation type for CRITs GraphQL API."""

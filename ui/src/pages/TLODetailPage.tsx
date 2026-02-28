@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query'
 import {
   ArrowLeft,
   Calendar,
@@ -15,11 +15,13 @@ import {
   FileCode,
   Info,
   Wrench,
+  X,
 } from 'lucide-react'
 import { useTLODetail } from '@/hooks/useTLODetail'
 import type { TLOConfig, TLODetailFieldDef } from '@/lib/tloConfig'
 import { Card, CardContent, Badge, Spinner, Button } from '@/components/ui'
 import { formatDate } from '@/lib/utils'
+import { gqlQuery } from '@/lib/graphql'
 import { RelationshipsCard } from '@/components/RelationshipsCard'
 import { SampleHashCard } from '@/components/SampleHashCard'
 import { SampleToolsCard } from '@/components/SampleToolsCard'
@@ -191,12 +193,178 @@ function SidebarSection({
   )
 }
 
+/* ── Tag management ──────────────────────────────────────────────── */
+
+const UPDATE_TAGS_MUTATION = `
+  mutation UpdateBucketList($tloType: String!, $tloId: String!, $tags: [String!]!) {
+    updateBucketList(tloType: $tloType, tloId: $tloId, tags: $tags) {
+      success
+      message
+    }
+  }
+`
+
+const TAG_NAMES_QUERY = `query { tagNames }`
+
+function TagsSection({
+  tags,
+  tloType,
+  tloId,
+  onTagsChange,
+}: {
+  tags: string[]
+  tloType: string
+  tloId: string
+  onTagsChange: () => void
+}) {
+  const [inputValue, setInputValue] = useState('')
+  const [highlightIndex, setHighlightIndex] = useState(-1)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const { data: tagNamesData } = useQuery({
+    queryKey: ['tagNames'],
+    queryFn: () => gqlQuery<{ tagNames: string[] }>(TAG_NAMES_QUERY),
+    staleTime: 60_000,
+  })
+  const allTagNames = tagNamesData?.tagNames ?? []
+
+  const mutation = useMutation({
+    mutationFn: (newTags: string[]) =>
+      gqlQuery<{ updateBucketList: { success: boolean; message: string } }>(UPDATE_TAGS_MUTATION, {
+        tloType,
+        tloId,
+        tags: newTags,
+      }),
+    onSuccess: () => onTagsChange(),
+    onError: (err) => console.error('Failed to update tags:', err),
+  })
+
+  // Filter suggestions: match input, exclude already-applied tags
+  const suggestions =
+    inputValue.trim().length > 0
+      ? allTagNames.filter(
+          (name) => name.toLowerCase().includes(inputValue.toLowerCase()) && !tags.includes(name),
+        )
+      : []
+
+  const addTag = (tag: string) => {
+    const trimmed = tag.trim()
+    if (!trimmed || tags.includes(trimmed)) return
+    mutation.mutate([...tags, trimmed])
+    setInputValue('')
+    setHighlightIndex(-1)
+    setDropdownOpen(false)
+  }
+
+  const removeTag = (tag: string) => {
+    mutation.mutate(tags.filter((t) => t !== tag))
+  }
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!dropdownOpen) return
+    function handleClickOutside(event: globalThis.MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as globalThis.Node)) {
+        setDropdownOpen(false)
+        setHighlightIndex(-1)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [dropdownOpen])
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setHighlightIndex((prev) => Math.min(prev + 1, suggestions.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setHighlightIndex((prev) => Math.max(prev - 1, -1))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (highlightIndex >= 0 && highlightIndex < suggestions.length) {
+        addTag(suggestions[highlightIndex])
+      } else {
+        addTag(inputValue)
+      }
+    } else if (e.key === 'Escape') {
+      setDropdownOpen(false)
+      setHighlightIndex(-1)
+    }
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div
+        className="flex flex-wrap items-center gap-1.5 rounded-md border border-light-border dark:border-dark-border bg-light-surface dark:bg-dark-surface px-2 py-1.5 focus-within:ring-1 focus-within:ring-crits-blue focus-within:border-crits-blue transition-colors cursor-text"
+        onClick={() => inputRef.current?.focus()}
+      >
+        <Tag className="h-3.5 w-3.5 shrink-0 text-light-text-muted dark:text-dark-text-muted" />
+        {tags.map((tag) => (
+          <Link
+            key={tag}
+            to={`/tags/${encodeURIComponent(tag)}`}
+            className="inline-flex items-center gap-1 rounded-full bg-crits-blue/10 text-crits-blue px-2 py-0.5 text-xs font-medium hover:bg-crits-blue/20 transition-colors"
+          >
+            {tag}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                removeTag(tag)
+              }}
+              className="inline-flex items-center justify-center h-3.5 w-3.5 rounded-full hover:bg-crits-blue/30 transition-colors"
+              title={`Remove tag "${tag}"`}
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          </Link>
+        ))}
+        <input
+          ref={inputRef}
+          type="text"
+          value={inputValue}
+          onChange={(e) => {
+            setInputValue(e.target.value)
+            setHighlightIndex(-1)
+            setDropdownOpen(true)
+          }}
+          onFocus={() => setDropdownOpen(true)}
+          onKeyDown={handleKeyDown}
+          placeholder={tags.length === 0 ? 'Add tags…' : ''}
+          className="flex-1 min-w-[60px] bg-transparent text-xs text-light-text dark:text-dark-text placeholder:text-light-text-muted dark:placeholder:text-dark-text-muted outline-none py-0.5"
+        />
+      </div>
+      {dropdownOpen && suggestions.length > 0 && (
+        <div className="absolute z-10 left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-md border border-light-border dark:border-dark-border bg-light-surface dark:bg-dark-surface shadow-lg">
+          {suggestions.map((name, idx) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => addTag(name)}
+              className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                idx === highlightIndex
+                  ? 'bg-crits-blue/10 text-crits-blue'
+                  : 'text-light-text dark:text-dark-text hover:bg-light-hover dark:hover:bg-dark-hover'
+              }`}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ── Metadata Sidebar ────────────────────────────────────────────── */
 
 function MetadataSidebar({
   sources,
   campaigns,
-  bucketList,
   sectors,
   relationships,
   tloType,
@@ -205,7 +373,6 @@ function MetadataSidebar({
 }: {
   sources: Source[]
   campaigns: string[]
-  bucketList: string[]
   sectors: string[]
   relationships: Relationship[]
   tloType: string
@@ -255,21 +422,6 @@ function MetadataSidebar({
               {campaigns.map((c) => (
                 <Badge key={c} className="text-xs">
                   {c}
-                </Badge>
-              ))}
-            </div>
-          )}
-        </SidebarSection>
-
-        {/* Tags */}
-        <SidebarSection icon={Tag} label="Tags" count={bucketList.length}>
-          {bucketList.length === 0 ? (
-            <p className="text-xs text-light-text-muted dark:text-dark-text-muted">No tags</p>
-          ) : (
-            <div className="flex flex-wrap gap-1.5">
-              {bucketList.map((tag) => (
-                <Badge key={tag} variant="info" className="text-xs">
-                  {tag}
                 </Badge>
               ))}
             </div>
@@ -361,12 +513,7 @@ export function TLODetailPage({ config }: TLODetailPageProps) {
 
   const createdStr = formatCompactDate(created)
   const modifiedStr = formatCompactDate(modified)
-  const dateSubtitle = [
-    createdStr && `Created ${createdStr}`,
-    modifiedStr && `Modified ${modifiedStr}`,
-  ]
-    .filter(Boolean)
-    .join(' | ')
+  const invalidateDetail = () => queryClient.invalidateQueries({ queryKey: [config.gqlSingle, id] })
 
   return (
     <div className="space-y-6">
@@ -403,16 +550,37 @@ export function TLODetailPage({ config }: TLODetailPageProps) {
                 ))}
               </div>
             )}
-            {dateSubtitle && (
-              <p className="text-xs text-light-text-muted dark:text-dark-text-muted mt-1">
-                {dateSubtitle}
-              </p>
-            )}
           </div>
           <div className="flex items-center gap-2">
             {status && <Badge variant={statusVariant(status)}>{status}</Badge>}
           </div>
         </div>
+      </div>
+
+      {/* Dates + Tags */}
+      <div className="space-y-3">
+        {(createdStr || modifiedStr) && (
+          <div className="flex items-center gap-4 text-xs text-light-text-muted dark:text-dark-text-muted">
+            {createdStr && (
+              <span className="flex items-center gap-1">
+                <Calendar className="h-3.5 w-3.5" />
+                Created {createdStr}
+              </span>
+            )}
+            {modifiedStr && (
+              <span className="flex items-center gap-1">
+                <Calendar className="h-3.5 w-3.5" />
+                Modified {modifiedStr}
+              </span>
+            )}
+          </div>
+        )}
+        <TagsSection
+          tags={bucketList}
+          tloType={config.type}
+          tloId={id ?? ''}
+          onTagsChange={invalidateDetail}
+        />
       </div>
 
       {/* Main content grid */}
@@ -424,13 +592,10 @@ export function TLODetailPage({ config }: TLODetailPageProps) {
           sources={sources}
           relationships={relationships}
           campaigns={campaigns}
-          bucketList={bucketList}
           sectors={sectors}
           tloType={config.type}
           tloId={id ?? ''}
-          onRelationshipChange={() =>
-            queryClient.invalidateQueries({ queryKey: [config.gqlSingle, id] })
-          }
+          onRelationshipChange={invalidateDetail}
         />
       ) : (
         <DefaultLayout
@@ -440,13 +605,10 @@ export function TLODetailPage({ config }: TLODetailPageProps) {
           sources={sources}
           relationships={relationships}
           campaigns={campaigns}
-          bucketList={bucketList}
           sectors={sectors}
           tloType={config.type}
           tloId={id ?? ''}
-          onRelationshipChange={() =>
-            queryClient.invalidateQueries({ queryKey: [config.gqlSingle, id] })
-          }
+          onRelationshipChange={invalidateDetail}
         />
       )}
     </div>
@@ -460,7 +622,6 @@ interface LayoutProps {
   sources: Source[]
   relationships: Relationship[]
   campaigns: string[]
-  bucketList: string[]
   sectors: string[]
   tloType: string
   tloId: string
@@ -473,7 +634,6 @@ function DefaultLayout({
   sources,
   relationships,
   campaigns,
-  bucketList,
   sectors,
   tloType,
   tloId,
@@ -491,7 +651,6 @@ function DefaultLayout({
         <MetadataSidebar
           sources={sources}
           campaigns={campaigns}
-          bucketList={bucketList}
           sectors={sectors}
           relationships={relationships}
           tloType={tloType}
@@ -509,7 +668,6 @@ function SampleLayout({
   sources,
   relationships,
   campaigns,
-  bucketList,
   sectors,
   tloType,
   tloId,
@@ -621,7 +779,6 @@ function SampleLayout({
         <MetadataSidebar
           sources={sources}
           campaigns={campaigns}
-          bucketList={bucketList}
           sectors={sectors}
           relationships={relationships}
           tloType={tloType}

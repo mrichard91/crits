@@ -33,7 +33,7 @@ interface TLOListPageProps {
   config: TLOConfig
 }
 
-function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+export function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
   const parts = path.split('.')
   let current: unknown = obj
   for (const part of parts) {
@@ -56,7 +56,7 @@ function statusVariant(status: string): 'success' | 'warning' | 'error' | 'defau
   }
 }
 
-function CellValue({
+export function CellValue({
   col,
   item,
   config,
