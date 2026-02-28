@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Tag, X } from 'lucide-react'
+import { LayoutDashboard, Tag, Wrench, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TLO_CONFIGS, TLO_NAV_ORDER } from '@/lib/tloConfig'
 
@@ -67,6 +67,23 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           >
             <Tag className="h-4 w-4 flex-shrink-0" />
             <span>Tags</span>
+          </NavLink>
+
+          {/* Services link */}
+          <NavLink
+            to="/services"
+            onClick={onClose}
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 px-3 py-2 rounded text-sm transition-colors',
+                isActive
+                  ? 'bg-crits-blue/10 text-crits-blue font-medium'
+                  : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-light-bg-secondary dark:hover:bg-dark-bg-secondary hover:text-light-text dark:hover:text-dark-text',
+              )
+            }
+          >
+            <Wrench className="h-4 w-4 flex-shrink-0" />
+            <span>Services</span>
           </NavLink>
 
           {/* TLO type links */}
