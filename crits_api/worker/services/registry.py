@@ -43,12 +43,41 @@ def get_all_services() -> dict[str, type[AnalysisService]]:
     return dict(_registry)
 
 
+def _is_triage_enabled(cls: type[AnalysisService]) -> bool:
+    """Check if a modern service should run on triage, respecting DB overrides."""
+    try:
+        from crits.services.service import CRITsService
+
+        db_record = CRITsService.objects(name=cls.name).first()
+        if db_record and db_record.run_on_triage is not None:
+            return bool(db_record.run_on_triage)
+    except Exception:
+        pass
+    return cls.run_on_triage
+
+
+def _is_service_enabled(cls: type[AnalysisService]) -> bool:
+    """Check if a modern service is enabled, respecting DB overrides."""
+    try:
+        from crits.services.service import CRITsService
+
+        db_record = CRITsService.objects(name=cls.name).first()
+        if db_record and db_record.enabled is not None:
+            return bool(db_record.enabled)
+    except Exception:
+        pass
+    return True
+
+
 def get_triage_services() -> list[type[AnalysisService]]:
     """Return modern services marked run_on_triage=True, merged with legacy triage services.
 
+    Respects DB overrides for both the triage flag and the enabled flag.
     Modern services are returned first, then legacy services not already covered.
     """
-    modern_triage = [cls for cls in _registry.values() if cls.run_on_triage]
+    modern_triage = [
+        cls for cls in _registry.values() if _is_triage_enabled(cls) and _is_service_enabled(cls)
+    ]
 
     # Merge with legacy triage services from the DB
     legacy_names: list[str] = []
@@ -69,8 +98,15 @@ def get_triage_services() -> list[type[AnalysisService]]:
 
 
 def get_triage_service_names() -> list[str]:
-    """Return names of all triage services (modern + legacy)."""
-    modern = [cls.name for cls in _registry.values() if cls.run_on_triage]
+    """Return names of all triage services (modern + legacy).
+
+    Respects DB overrides for both the triage flag and the enabled flag.
+    """
+    modern = [
+        cls.name
+        for cls in _registry.values()
+        if _is_triage_enabled(cls) and _is_service_enabled(cls)
+    ]
 
     try:
         from crits.services.handlers import triage_services as legacy_triage_services

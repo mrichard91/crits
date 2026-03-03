@@ -29,6 +29,7 @@ DATABASES = {
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
+ROOT_URLCONF = "crits.urls"
 
 # Redis cache — needed if any code touches Django's cache framework
 CACHES = {

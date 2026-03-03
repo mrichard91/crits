@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Wrench, Search, ChevronDown, ChevronRight, Save, RotateCcw } from 'lucide-react'
+import { Wrench, Search, ChevronDown, ChevronRight, Save, RotateCcw, Play, X } from 'lucide-react'
 import { gqlQuery } from '@/lib/graphql'
 import { Card, CardContent, Input, Spinner, Badge, Button } from '@/components/ui'
 
@@ -53,6 +53,35 @@ const UPDATE_CONFIG_MUTATION = `
     }
   }
 `
+
+const RUN_SERVICE_MUTATION = `
+  mutation RunService($serviceName: String!, $objType: String!, $objId: String!) {
+    runService(serviceName: $serviceName, objType: $objType, objId: $objId) {
+      success
+      message
+      analysisId
+    }
+  }
+`
+
+const ALL_TLO_TYPES = [
+  'Actor',
+  'Backdoor',
+  'Campaign',
+  'Certificate',
+  'Domain',
+  'Email',
+  'Event',
+  'Exploit',
+  'Indicator',
+  'IP',
+  'PCAP',
+  'RawData',
+  'Sample',
+  'Screenshot',
+  'Signature',
+  'Target',
+]
 
 interface ConfigOption {
   key: string
@@ -107,14 +136,37 @@ function Toggle({
 function ConfigEditor({ serviceName, options }: { serviceName: string; options: ConfigOption[] }) {
   const queryClient = useQueryClient()
   const [edits, setEdits] = useState<Record<string, string>>({})
+  const [saveMessage, setSaveMessage] = useState<{
+    type: 'success' | 'error'
+    text: string
+  } | null>(null)
   const hasEdits = Object.keys(edits).length > 0
+
+  useEffect(() => {
+    if (saveMessage?.type === 'success') {
+      const timer = setTimeout(() => setSaveMessage(null), 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [saveMessage])
 
   const updateConfig = useMutation({
     mutationFn: (vars: { serviceName: string; configJson: string }) =>
-      gqlQuery(UPDATE_CONFIG_MUTATION, vars),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services'] })
-      setEdits({})
+      gqlQuery<{ updateServiceConfig: { success: boolean; message: string } }>(
+        UPDATE_CONFIG_MUTATION,
+        vars,
+      ),
+    onSuccess: (result) => {
+      const res = result.updateServiceConfig
+      if (res.success) {
+        queryClient.invalidateQueries({ queryKey: ['services'] })
+        setEdits({})
+        setSaveMessage({ type: 'success', text: res.message || 'Configuration saved' })
+      } else {
+        setSaveMessage({ type: 'error', text: res.message || 'Validation failed' })
+      }
+    },
+    onError: () => {
+      setSaveMessage({ type: 'error', text: 'Failed to save configuration' })
     },
   })
 
@@ -130,6 +182,23 @@ function ConfigEditor({ serviceName, options }: { serviceName: string; options: 
   }
 
   const handleSave = () => {
+    // Client-side validation
+    const errors: string[] = []
+    for (const [key, val] of Object.entries(edits)) {
+      const opt = options.find((o) => o.key === key)
+      if (!opt) continue
+      if (opt.required && val.trim() === '') {
+        errors.push(`'${key}' is required`)
+      }
+      if (opt.configType === 'int' && val.trim() !== '' && !/^-?\d+$/.test(val.trim())) {
+        errors.push(`'${key}' must be an integer`)
+      }
+    }
+    if (errors.length > 0) {
+      setSaveMessage({ type: 'error', text: errors.join('; ') })
+      return
+    }
+
     // Build the config object with proper types
     const configObj: Record<string, unknown> = {}
     for (const [key, val] of Object.entries(edits)) {
@@ -148,7 +217,10 @@ function ConfigEditor({ serviceName, options }: { serviceName: string; options: 
     })
   }
 
-  const handleReset = () => setEdits({})
+  const handleReset = () => {
+    setEdits({})
+    setSaveMessage(null)
+  }
 
   return (
     <div className="px-4 py-3 bg-light-bg-secondary dark:bg-dark-bg-secondary border-t border-light-border dark:border-dark-border">
@@ -227,9 +299,127 @@ function ConfigEditor({ serviceName, options }: { serviceName: string; options: 
           )
         })}
       </div>
-      {updateConfig.isError && (
-        <p className="text-xs text-status-error mt-2">Failed to save configuration</p>
+      {saveMessage && (
+        <p
+          className={`text-xs mt-2 ${saveMessage.type === 'success' ? 'text-status-success' : 'text-status-error'}`}
+        >
+          {saveMessage.text}
+        </p>
       )}
+    </div>
+  )
+}
+
+function TestRunDialog({
+  service,
+  open,
+  onClose,
+}: {
+  service: ServiceInfo
+  open: boolean
+  onClose: () => void
+}) {
+  const typeOptions =
+    service.supportedTypes.includes('all') || service.supportedTypes.length === 0
+      ? ALL_TLO_TYPES
+      : service.supportedTypes
+  const [objType, setObjType] = useState(typeOptions[0] || 'Sample')
+  const [objId, setObjId] = useState('')
+  const [result, setResult] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const runService = useMutation({
+    mutationFn: (vars: { serviceName: string; objType: string; objId: string }) =>
+      gqlQuery<{
+        runService: { success: boolean; message: string; analysisId: string }
+      }>(RUN_SERVICE_MUTATION, vars),
+    onSuccess: (data) => {
+      const res = data.runService
+      if (res.success) {
+        setResult({ type: 'success', text: res.message || 'Service dispatched' })
+      } else {
+        setResult({ type: 'error', text: res.message || 'Failed to dispatch service' })
+      }
+    },
+    onError: () => {
+      setResult({ type: 'error', text: 'Failed to dispatch service' })
+    },
+  })
+
+  const handleSubmit = () => {
+    if (!objId.trim()) {
+      setResult({ type: 'error', text: 'Object ID is required' })
+      return
+    }
+    setResult(null)
+    runService.mutate({ serviceName: service.name, objType, objId: objId.trim() })
+  }
+
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-light-bg dark:bg-dark-bg rounded-lg shadow-xl w-full max-w-md mx-4">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-light-border dark:border-dark-border">
+          <h3 className="text-sm font-medium text-light-text dark:text-dark-text">
+            Test Run: {service.name}
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-light-text-muted dark:text-dark-text-muted hover:text-light-text dark:hover:text-dark-text"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="px-4 py-4 space-y-4">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-light-text-secondary dark:text-dark-text-secondary">
+              TLO Type
+            </label>
+            <select
+              value={objType}
+              onChange={(e) => setObjType(e.target.value)}
+              className="w-full rounded-md border border-light-border dark:border-dark-border bg-light-bg dark:bg-dark-bg text-sm text-light-text dark:text-dark-text px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-crits-blue"
+            >
+              {typeOptions.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-light-text-secondary dark:text-dark-text-secondary">
+              Object ID
+            </label>
+            <Input
+              placeholder="Enter ObjectId..."
+              value={objId}
+              onChange={(e) => setObjId(e.target.value)}
+              className="text-sm font-mono"
+            />
+          </div>
+
+          {result && (
+            <p
+              className={`text-xs ${result.type === 'success' ? 'text-status-success' : 'text-status-error'}`}
+            >
+              {result.text}
+            </p>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 px-4 py-3 border-t border-light-border dark:border-dark-border">
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button size="sm" onClick={handleSubmit} disabled={runService.isPending}>
+            <Play className="h-3 w-3 mr-1" />
+            Run
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -237,6 +427,7 @@ function ConfigEditor({ serviceName, options }: { serviceName: string; options: 
 export function ServicesPage() {
   const [filter, setFilter] = useState('')
   const [expandedService, setExpandedService] = useState<string | null>(null)
+  const [testRunService, setTestRunService] = useState<ServiceInfo | null>(null)
   const queryClient = useQueryClient()
 
   const { data, isLoading, error } = useQuery({
@@ -355,6 +546,15 @@ export function ServicesPage() {
                         )}
                       </div>
 
+                      {/* Test run button */}
+                      <button
+                        onClick={() => setTestRunService(svc)}
+                        className="shrink-0 p-1.5 rounded-md text-light-text-secondary dark:text-dark-text-secondary hover:text-crits-blue hover:bg-light-bg-tertiary dark:hover:bg-dark-bg-tertiary transition-colors"
+                        title={`Test run ${svc.name}`}
+                      >
+                        <Play className="h-4 w-4" />
+                      </button>
+
                       {/* Toggles */}
                       <div className="flex items-center gap-6 shrink-0">
                         <label className="flex items-center gap-2 text-xs text-light-text-secondary dark:text-dark-text-secondary">
@@ -391,6 +591,14 @@ export function ServicesPage() {
           )}
         </CardContent>
       </Card>
+
+      {testRunService && (
+        <TestRunDialog
+          service={testRunService}
+          open={true}
+          onClose={() => setTestRunService(null)}
+        />
+      )}
     </div>
   )
 }

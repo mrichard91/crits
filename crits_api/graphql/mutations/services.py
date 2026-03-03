@@ -33,6 +33,73 @@ _TYPE_CACHE_KEY = {
 logger = logging.getLogger(__name__)
 
 
+def _validate_service_config(service_name: str, values: dict[str, Any]) -> list[str]:
+    """Validate config values against the service's config_class field metadata.
+
+    Returns a list of error messages (empty if valid).
+    """
+    import dataclasses
+
+    from crits_api.worker.services.registry import ensure_services_registered, get_service
+
+    ensure_services_registered()
+    svc_cls = get_service(service_name)
+    if not svc_cls:
+        return []  # unknown service — skip validation
+
+    config_class = svc_cls.config_class
+    if not dataclasses.is_dataclass(config_class):
+        return []
+
+    field_map = {f.name: f for f in dataclasses.fields(config_class)}
+    errors: list[str] = []
+
+    for key, val in values.items():
+        f = field_map.get(key)
+        if not f:
+            continue
+
+        meta = dict(f.metadata) if f.metadata else {}
+        config_type = meta.get("config_type", "str")
+        required = meta.get("required", False)
+
+        # Required check
+        if required and (val is None or str(val).strip() == ""):
+            errors.append(f"'{key}' is required")
+            continue
+
+        # Type checks
+        if config_type == "int" and val is not None and str(val).strip() != "":
+            try:
+                int(val)
+            except (ValueError, TypeError):
+                errors.append(f"'{key}' must be an integer")
+
+        if (
+            config_type == "bool"
+            and val is not None
+            and not isinstance(val, bool)
+            and str(val).lower() not in ("true", "false", "0", "1")
+        ):
+            errors.append(f"'{key}' must be a boolean")
+
+    # Check required fields that were not provided but exist on the config
+    for fname, f in field_map.items():
+        if fname in values:
+            continue
+        meta = dict(f.metadata) if f.metadata else {}
+        # Only flag required fields that have no default
+        if (
+            meta.get("required")
+            and f.default is dataclasses.MISSING
+            and f.default_factory is dataclasses.MISSING
+        ):
+            # Only matters if the DB doesn't already have a value — skip here
+            pass
+
+    return errors
+
+
 @strawberry.type
 class ServiceInfo:
     """Information about an available service."""
@@ -203,22 +270,26 @@ class ServiceMutations:
     ) -> MutationResult:
         """Toggle the enabled flag for a service.
 
-        Creates a CRITsService DB record if one doesn't exist yet.
+        Uses upsert to create a CRITsService DB record if one doesn't exist yet.
         """
         try:
-            from crits.services.service import CRITsService
+            from django.conf import settings
 
-            svc = CRITsService.objects(name=service_name).first()
-            if not svc:
-                svc = CRITsService(name=service_name)
-            svc.enabled = enabled
-            svc.save()
+            col = settings.PY_DB[settings.COL_SERVICES]
+            col.update_one(
+                {"name": service_name},
+                {"$set": {"enabled": enabled}},
+                upsert=True,
+            )
+            logger.info("Toggled %s enabled=%s", service_name, enabled)
             return MutationResult(
                 success=True,
                 message=f"Service '{service_name}' {'enabled' if enabled else 'disabled'}",
             )
         except Exception as e:
-            logger.error(f"Error toggling service enabled: {e}")
+            logger.error(
+                "Error toggling service enabled: %s: %s", type(e).__name__, e, exc_info=True
+            )
             return MutationResult(success=False, message=str(e))
 
     @strawberry.mutation(description="Update service configuration values")
@@ -242,21 +313,21 @@ class ServiceMutations:
         if not isinstance(values, dict):
             return MutationResult(success=False, message="config_json must be a JSON object")
 
+        # Validate config values against service config_class metadata
+        validation_errors = _validate_service_config(service_name, values)
+        if validation_errors:
+            return MutationResult(success=False, message="; ".join(validation_errors))
+
         try:
-            from crits.services.analysis_result import AnalysisConfig
-            from crits.services.service import CRITsService
+            from django.conf import settings
 
-            svc = CRITsService.objects(name=service_name).first()
-            if not svc:
-                svc = CRITsService(name=service_name)
-
-            if not svc.config:
-                svc.config = AnalysisConfig()
-
-            for key, val in values.items():
-                setattr(svc.config, key, val)
-
-            svc.save()
+            col = settings.PY_DB[settings.COL_SERVICES]
+            config_set = {f"config.{key}": val for key, val in values.items()}
+            col.update_one(
+                {"name": service_name},
+                {"$set": config_set},
+                upsert=True,
+            )
             return MutationResult(
                 success=True,
                 message=f"Configuration updated for '{service_name}'",
@@ -272,22 +343,26 @@ class ServiceMutations:
     ) -> MutationResult:
         """Toggle the run_on_triage flag for a service.
 
-        Creates a CRITsService DB record if one doesn't exist yet.
+        Uses upsert to create a CRITsService DB record if one doesn't exist yet.
         """
         try:
-            from crits.services.service import CRITsService
+            from django.conf import settings
 
-            svc = CRITsService.objects(name=service_name).first()
-            if not svc:
-                svc = CRITsService(name=service_name)
-            svc.run_on_triage = run_on_triage
-            svc.save()
+            col = settings.PY_DB[settings.COL_SERVICES]
+            col.update_one(
+                {"name": service_name},
+                {"$set": {"run_on_triage": run_on_triage}},
+                upsert=True,
+            )
+            logger.info("Toggled %s run_on_triage=%s", service_name, run_on_triage)
             return MutationResult(
                 success=True,
                 message=f"Service '{service_name}' triage {'enabled' if run_on_triage else 'disabled'}",
             )
         except Exception as e:
-            logger.error(f"Error toggling service triage: {e}")
+            logger.error(
+                "Error toggling service triage: %s: %s", type(e).__name__, e, exc_info=True
+            )
             return MutationResult(success=False, message=str(e))
 
     @strawberry.field(description="List available services")
