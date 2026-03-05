@@ -9,6 +9,7 @@ interface User {
   organization: string
   roles: string[]
   isActive: boolean
+  isSuperuser: boolean
 }
 
 interface AuthContextType {
@@ -32,6 +33,7 @@ const ME_QUERY = `
       organization
       roles
       isActive
+      isSuperuser
     }
   }
 `

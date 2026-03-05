@@ -15,6 +15,7 @@ from crits_api.graphql.types.admin import (
     RoleType,
     SourceAccessType,
 )
+from crits_api.graphql.types.user import UserType
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,36 @@ class AdminQueries:
             return None
         except Exception as e:
             logger.error(f"Error fetching role {id}: {e}")
+            return None
+
+    @strawberry.field(description="List all users")
+    @require_admin
+    def users(self, info: Info) -> list[UserType]:
+        from crits.core.user import CRITsUser
+
+        try:
+            return [
+                UserType.from_model(u)
+                for u in CRITsUser.objects().order_by("username").exclude("subscriptions")
+            ]
+        except Exception as e:
+            logger.error(f"Error fetching users: {e}")
+            return []
+
+    @strawberry.field(description="Get a single user by ID")
+    @require_admin
+    def user(self, info: Info, id: str) -> UserType | None:
+        from bson import ObjectId
+
+        from crits.core.user import CRITsUser
+
+        try:
+            user = CRITsUser.objects(id=ObjectId(id)).exclude("subscriptions").first()
+            if user:
+                return UserType.from_model(user)
+            return None
+        except Exception as e:
+            logger.error(f"Error fetching user {id}: {e}")
             return None
 
     @strawberry.field(description="List raw data types")

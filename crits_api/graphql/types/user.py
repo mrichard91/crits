@@ -30,6 +30,7 @@ class UserType:
     date_joined: datetime | None = None
     organization: str = ""
     roles: list[str] = strawberry.field(default_factory=list)
+    totp: bool = False
 
     @classmethod
     def from_model(cls, user: Any) -> "UserType":
@@ -55,6 +56,7 @@ class UserType:
             date_joined=getattr(user, "date_joined", None),
             organization=getattr(user, "organization", "") or "",
             roles=list(getattr(user, "roles", []) or []),
+            totp=bool(getattr(user, "totp", False)),
         )
 
 
