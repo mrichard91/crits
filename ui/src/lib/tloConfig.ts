@@ -986,7 +986,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
   },
 }
 
-// Ordered list for sidebar navigation
+// Ordered list for iterating all TLO types (used by dashboard, tag detail, etc.)
 export const TLO_NAV_ORDER: TLOType[] = [
   'Indicator',
   'Domain',
