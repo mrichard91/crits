@@ -49,6 +49,8 @@ class CampaignQueries:
         name_contains: str | None = None,
         active: str | None = None,
         status: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
     ) -> list[CampaignType]:
         """List campaigns with optional filtering."""
         from crits.campaigns.campaign import Campaign
@@ -67,7 +69,20 @@ class CampaignQueries:
             if status:
                 queryset = queryset.filter(status=status)
 
-            queryset = queryset.order_by("-modified")
+            from crits_api.graphql.queries.sorting import apply_sorting
+
+            queryset = apply_sorting(
+                queryset,
+                sort_by,
+                sort_dir,
+                {
+                    "name": "name",
+                    "active": "active",
+                    "status": "status",
+                    "modified": "modified",
+                    "created": "created",
+                },
+            )
             campaigns = queryset.skip(offset).limit(limit)
 
             return [CampaignType.from_model(c) for c in campaigns]

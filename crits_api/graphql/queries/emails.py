@@ -57,6 +57,8 @@ class EmailQueries:
         from_address: str | None = None,
         status: str | None = None,
         campaign: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
     ) -> list[EmailType]:
         """List emails with optional filtering."""
         from crits.emails.email import Email
@@ -84,7 +86,20 @@ class EmailQueries:
             if campaign:
                 queryset = queryset.filter(campaign__name=campaign)
 
-            queryset = queryset.order_by("-modified")
+            from crits_api.graphql.queries.sorting import apply_sorting
+
+            queryset = apply_sorting(
+                queryset,
+                sort_by,
+                sort_dir,
+                {
+                    "subject": "subject",
+                    "fromAddress": "from_address",
+                    "status": "status",
+                    "modified": "modified",
+                    "created": "created",
+                },
+            )
             emails = queryset.skip(offset).limit(limit)
 
             return [EmailType.from_model(e) for e in emails]

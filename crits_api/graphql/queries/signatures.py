@@ -57,6 +57,8 @@ class SignatureQueries:
         data_type: str | None = None,
         status: str | None = None,
         campaign: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
     ) -> list[SignatureType]:
         """List signatures with optional filtering."""
         from crits.signatures.signature import Signature
@@ -84,7 +86,21 @@ class SignatureQueries:
             if campaign:
                 queryset = queryset.filter(campaign__name=campaign)
 
-            queryset = queryset.order_by("-modified")
+            from crits_api.graphql.queries.sorting import apply_sorting
+
+            queryset = apply_sorting(
+                queryset,
+                sort_by,
+                sort_dir,
+                {
+                    "title": "title",
+                    "dataType": "data_type",
+                    "version": "version",
+                    "status": "status",
+                    "modified": "modified",
+                    "created": "created",
+                },
+            )
             signatures = queryset.skip(offset).limit(limit)
 
             return [SignatureType.from_model(s) for s in signatures]

@@ -55,6 +55,8 @@ class ScreenshotQueries:
         offset: int = 0,
         filename_contains: str | None = None,
         tag: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
     ) -> list[ScreenshotType]:
         """List screenshots with optional filtering."""
         from crits.screenshots.screenshot import Screenshot
@@ -76,7 +78,19 @@ class ScreenshotQueries:
             if tag:
                 queryset = queryset.filter(tags=tag)
 
-            queryset = queryset.order_by("-modified")
+            from crits_api.graphql.queries.sorting import apply_sorting
+
+            queryset = apply_sorting(
+                queryset,
+                sort_by,
+                sort_dir,
+                {
+                    "filename": "filename",
+                    "status": "status",
+                    "modified": "modified",
+                    "created": "created",
+                },
+            )
             screenshots = queryset.skip(offset).limit(limit)
 
             return [ScreenshotType.from_model(s) for s in screenshots]

@@ -2,11 +2,17 @@ import { useQuery } from '@tanstack/react-query'
 import { gqlQuery } from '@/lib/graphql'
 import type { TLOConfig } from '@/lib/tloConfig'
 
-export const PAGE_SIZE = 25
+export const DEFAULT_PAGE_SIZE = 25
+export const PAGE_SIZE_OPTIONS = [25, 50, 100] as const
 
-function buildListQuery(config: TLOConfig, filterKeys: string[]): string {
+function buildListQuery(config: TLOConfig, filterKeys: string[], hasSorting: boolean): string {
   const params = ['$limit: Int!', '$offset: Int!']
   const args = ['limit: $limit', 'offset: $offset']
+
+  if (hasSorting) {
+    params.push('$sortBy: String', '$sortDir: String')
+    args.push('sortBy: $sortBy', 'sortDir: $sortDir')
+  }
 
   for (const f of config.filters) {
     if (filterKeys.includes(f.key)) {
@@ -40,6 +46,9 @@ function countCall(config: TLOConfig, filterKeys: string[]): string {
 
 export interface UseTLOListParams {
   page: number
+  pageSize?: number
+  sortBy?: string
+  sortDir?: string
   filters: Record<string, string>
 }
 
@@ -51,6 +60,8 @@ export interface UseTLOListResult {
 }
 
 export function useTLOList(config: TLOConfig, params: UseTLOListParams): UseTLOListResult {
+  const pageSize = params.pageSize ?? DEFAULT_PAGE_SIZE
+
   // Only include filters that have values
   const activeFilters: Record<string, string> = {}
   for (const [key, value] of Object.entries(params.filters)) {
@@ -58,16 +69,22 @@ export function useTLOList(config: TLOConfig, params: UseTLOListParams): UseTLOL
   }
 
   const activeFilterKeys = Object.keys(activeFilters)
-  const query = buildListQuery(config, activeFilterKeys)
+  const hasSorting = !!(params.sortBy && params.sortDir)
+  const query = buildListQuery(config, activeFilterKeys, hasSorting)
 
   const variables: Record<string, unknown> = {
-    limit: PAGE_SIZE,
-    offset: (params.page - 1) * PAGE_SIZE,
+    limit: pageSize,
+    offset: (params.page - 1) * pageSize,
     ...activeFilters,
   }
 
+  if (hasSorting) {
+    variables.sortBy = params.sortBy
+    variables.sortDir = params.sortDir
+  }
+
   const { data, isLoading, error } = useQuery({
-    queryKey: [config.gqlList, params.page, activeFilters],
+    queryKey: [config.gqlList, params.page, pageSize, params.sortBy, params.sortDir, activeFilters],
     queryFn: () => gqlQuery<Record<string, unknown>>(query, variables),
   })
 

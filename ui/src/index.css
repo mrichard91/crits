@@ -42,6 +42,10 @@
     @apply w-full border-collapse text-sm;
   }
 
+  .crits-table thead {
+    @apply sticky top-0 z-10;
+  }
+
   .crits-table th {
     @apply bg-light-bg-secondary dark:bg-dark-bg-secondary;
     @apply border border-light-border dark:border-dark-border;

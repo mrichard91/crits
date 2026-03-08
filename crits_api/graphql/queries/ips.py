@@ -57,6 +57,8 @@ class IPQueries:
         ip_type: str | None = None,
         status: str | None = None,
         campaign: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
     ) -> list[IPType]:
         """List IPs with optional filtering."""
         from crits.ips.ip import IP
@@ -84,7 +86,20 @@ class IPQueries:
             if campaign:
                 queryset = queryset.filter(campaign__name=campaign)
 
-            queryset = queryset.order_by("-modified")
+            from crits_api.graphql.queries.sorting import apply_sorting
+
+            queryset = apply_sorting(
+                queryset,
+                sort_by,
+                sort_dir,
+                {
+                    "ip": "ip",
+                    "ipType": "ip_type",
+                    "status": "status",
+                    "modified": "modified",
+                    "created": "created",
+                },
+            )
             ips = queryset.skip(offset).limit(limit)
 
             return [IPType.from_model(ip) for ip in ips]

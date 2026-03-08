@@ -24,6 +24,8 @@ export interface TLOColumnDef {
   type: 'text' | 'badge' | 'date' | 'mono' | 'list'
   linkToDetail?: boolean
   truncate?: number
+  sortable?: boolean // default true — set false for list/nested fields
+  sortKey?: string // override sort field name if different from key
 }
 
 export interface TLOFilterDef {
@@ -163,9 +165,9 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'value', label: 'Value', type: 'mono', linkToDetail: true, truncate: 50 },
       { key: 'indType', label: 'Type', type: 'badge' },
       { key: 'status', label: 'Status', type: 'badge' },
-      { key: 'confidence.rating', label: 'Confidence', type: 'text' },
-      { key: 'impact.rating', label: 'Impact', type: 'text' },
-      { key: 'campaigns', label: 'Campaigns', type: 'list' },
+      { key: 'confidence.rating', label: 'Confidence', type: 'text', sortable: false },
+      { key: 'impact.rating', label: 'Impact', type: 'text', sortable: false },
+      { key: 'campaigns', label: 'Campaigns', type: 'list', sortable: false },
       { key: 'modified', label: 'Modified', type: 'date' },
     ],
     filters: [
@@ -237,9 +239,9 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
     ],
     columns: [
       { key: 'name', label: 'Name', type: 'text', linkToDetail: true },
-      { key: 'aliases', label: 'Aliases', type: 'list' },
+      { key: 'aliases', label: 'Aliases', type: 'list', sortable: false },
       { key: 'status', label: 'Status', type: 'badge' },
-      { key: 'campaigns', label: 'Campaigns', type: 'list' },
+      { key: 'campaigns', label: 'Campaigns', type: 'list', sortable: false },
       { key: 'modified', label: 'Modified', type: 'date' },
     ],
     filters: [
@@ -288,7 +290,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
     columns: [
       { key: 'name', label: 'Name', type: 'text', linkToDetail: true },
       { key: 'status', label: 'Status', type: 'badge' },
-      { key: 'campaigns', label: 'Campaigns', type: 'list' },
+      { key: 'campaigns', label: 'Campaigns', type: 'list', sortable: false },
       { key: 'modified', label: 'Modified', type: 'date' },
     ],
     filters: [
@@ -329,7 +331,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
     detailQueryFields: [...commonDetailFields, 'name', 'aliases', 'active'],
     columns: [
       { key: 'name', label: 'Name', type: 'text', linkToDetail: true },
-      { key: 'aliases', label: 'Aliases', type: 'list' },
+      { key: 'aliases', label: 'Aliases', type: 'list', sortable: false },
       { key: 'active', label: 'Active', type: 'badge' },
       { key: 'status', label: 'Status', type: 'badge' },
       { key: 'modified', label: 'Modified', type: 'date' },
@@ -368,7 +370,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'filename', label: 'Filename', type: 'text', linkToDetail: true, truncate: 40 },
       { key: 'md5', label: 'MD5', type: 'mono', truncate: 16 },
       { key: 'status', label: 'Status', type: 'badge' },
-      { key: 'campaigns', label: 'Campaigns', type: 'list' },
+      { key: 'campaigns', label: 'Campaigns', type: 'list', sortable: false },
       { key: 'modified', label: 'Modified', type: 'date' },
     ],
     filters: [
@@ -413,7 +415,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'domain', label: 'Domain', type: 'mono', linkToDetail: true, truncate: 50 },
       { key: 'recordType', label: 'Record Type', type: 'badge' },
       { key: 'status', label: 'Status', type: 'badge' },
-      { key: 'campaigns', label: 'Campaigns', type: 'list' },
+      { key: 'campaigns', label: 'Campaigns', type: 'list', sortable: false },
       { key: 'modified', label: 'Modified', type: 'date' },
     ],
     filters: [
@@ -471,7 +473,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'subject', label: 'Subject', type: 'text', linkToDetail: true, truncate: 50 },
       { key: 'fromAddress', label: 'From', type: 'mono', truncate: 30 },
       { key: 'status', label: 'Status', type: 'badge' },
-      { key: 'campaigns', label: 'Campaigns', type: 'list' },
+      { key: 'campaigns', label: 'Campaigns', type: 'list', sortable: false },
       { key: 'modified', label: 'Modified', type: 'date' },
     ],
     filters: [
@@ -531,7 +533,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'title', label: 'Title', type: 'text', linkToDetail: true, truncate: 50 },
       { key: 'eventType', label: 'Event Type', type: 'badge' },
       { key: 'status', label: 'Status', type: 'badge' },
-      { key: 'campaigns', label: 'Campaigns', type: 'list' },
+      { key: 'campaigns', label: 'Campaigns', type: 'list', sortable: false },
       { key: 'modified', label: 'Modified', type: 'date' },
     ],
     filters: [
@@ -587,7 +589,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'name', label: 'Name', type: 'text', linkToDetail: true },
       { key: 'cve', label: 'CVE', type: 'mono' },
       { key: 'status', label: 'Status', type: 'badge' },
-      { key: 'campaigns', label: 'Campaigns', type: 'list' },
+      { key: 'campaigns', label: 'Campaigns', type: 'list', sortable: false },
       { key: 'modified', label: 'Modified', type: 'date' },
     ],
     filters: [
@@ -632,7 +634,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'ip', label: 'IP Address', type: 'mono', linkToDetail: true },
       { key: 'ipType', label: 'Type', type: 'badge' },
       { key: 'status', label: 'Status', type: 'badge' },
-      { key: 'campaigns', label: 'Campaigns', type: 'list' },
+      { key: 'campaigns', label: 'Campaigns', type: 'list', sortable: false },
       { key: 'modified', label: 'Modified', type: 'date' },
     ],
     filters: [
@@ -683,7 +685,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'filename', label: 'Filename', type: 'text', linkToDetail: true, truncate: 40 },
       { key: 'md5', label: 'MD5', type: 'mono', truncate: 16 },
       { key: 'status', label: 'Status', type: 'badge' },
-      { key: 'campaigns', label: 'Campaigns', type: 'list' },
+      { key: 'campaigns', label: 'Campaigns', type: 'list', sortable: false },
       { key: 'modified', label: 'Modified', type: 'date' },
     ],
     filters: [
@@ -735,7 +737,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'dataType', label: 'Data Type', type: 'badge' },
       { key: 'version', label: 'Version', type: 'text' },
       { key: 'status', label: 'Status', type: 'badge' },
-      { key: 'campaigns', label: 'Campaigns', type: 'list' },
+      { key: 'campaigns', label: 'Campaigns', type: 'list', sortable: false },
       { key: 'modified', label: 'Modified', type: 'date' },
     ],
     filters: [
@@ -890,7 +892,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'dataType', label: 'Data Type', type: 'badge' },
       { key: 'version', label: 'Version', type: 'text' },
       { key: 'status', label: 'Status', type: 'badge' },
-      { key: 'campaigns', label: 'Campaigns', type: 'list' },
+      { key: 'campaigns', label: 'Campaigns', type: 'list', sortable: false },
       { key: 'modified', label: 'Modified', type: 'date' },
     ],
     filters: [
@@ -956,7 +958,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'department', label: 'Department', type: 'text' },
       { key: 'division', label: 'Division', type: 'text' },
       { key: 'status', label: 'Status', type: 'badge' },
-      { key: 'campaigns', label: 'Campaigns', type: 'list' },
+      { key: 'campaigns', label: 'Campaigns', type: 'list', sortable: false },
       { key: 'modified', label: 'Modified', type: 'date' },
     ],
     filters: [

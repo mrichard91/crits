@@ -7,14 +7,14 @@ export interface TableProps {
 
 export function Table({ children, className }: TableProps) {
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
       <table className={cn('crits-table', className)}>{children}</table>
     </div>
   )
 }
 
 export function TableHeader({ children, className }: TableProps) {
-  return <thead className={cn('', className)}>{children}</thead>
+  return <thead className={cn('sticky top-0 z-10', className)}>{children}</thead>
 }
 
 export function TableBody({ children, className }: TableProps) {

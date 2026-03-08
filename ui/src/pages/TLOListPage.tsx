@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   Search,
@@ -9,8 +9,14 @@ import {
   ChevronUp,
   ChevronDown,
   ArrowUpDown,
+  Loader2,
 } from 'lucide-react'
-import { useTLOList, useTLOFilterOptions, PAGE_SIZE } from '@/hooks/useTLOList'
+import {
+  useTLOList,
+  useTLOFilterOptions,
+  DEFAULT_PAGE_SIZE,
+  PAGE_SIZE_OPTIONS,
+} from '@/hooks/useTLOList'
 import { AddTLODialog } from '@/components/AddTLODialog'
 import type { TLOConfig, TLOColumnDef, TLOFilterDef } from '@/lib/tloConfig'
 import {
@@ -114,14 +120,40 @@ export function CellValue({
   return <>{display}</>
 }
 
+function useDebouncedValue(
+  value: string,
+  delay: number,
+): { debouncedValue: string; isPending: boolean } {
+  const [debouncedValue, setDebouncedValue] = useState(value)
+  const [isPending, setIsPending] = useState(false)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>()
+
+  useEffect(() => {
+    if (value === debouncedValue) {
+      setIsPending(false)
+      return
+    }
+    setIsPending(true)
+    timeoutRef.current = setTimeout(() => {
+      setDebouncedValue(value)
+      setIsPending(false)
+    }, delay)
+    return () => clearTimeout(timeoutRef.current)
+  }, [value, delay, debouncedValue])
+
+  return { debouncedValue, isPending }
+}
+
 function FilterBar({
   config,
   filters,
   onFilterChange,
+  onTextFilterChange,
 }: {
   config: TLOConfig
   filters: Record<string, string>
   onFilterChange: (key: string, value: string) => void
+  onTextFilterChange: (key: string, value: string) => void
 }) {
   return (
     <Card>
@@ -132,7 +164,11 @@ function FilterBar({
               key={filterDef.key}
               filterDef={filterDef}
               value={filters[filterDef.key] || ''}
-              onChange={(val) => onFilterChange(filterDef.key, val)}
+              onChange={
+                filterDef.type === 'text'
+                  ? (val) => onTextFilterChange(filterDef.key, val)
+                  : (val) => onFilterChange(filterDef.key, val)
+              }
             />
           ))}
         </div>
@@ -151,25 +187,56 @@ function FilterInput({
   onChange: (val: string) => void
 }) {
   if (filterDef.type === 'text') {
-    return (
-      <div className="flex-1 min-w-[200px]">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-light-text-muted dark:text-dark-text-muted" />
-          <Input
-            placeholder={filterDef.label + '...'}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-      </div>
-    )
+    return <DebouncedTextFilter filterDef={filterDef} value={value} onChange={onChange} />
   }
 
   // Select filter
   return (
     <div className="w-44">
       <SelectFilter filterDef={filterDef} value={value} onChange={onChange} />
+    </div>
+  )
+}
+
+function DebouncedTextFilter({
+  filterDef,
+  value,
+  onChange,
+}: {
+  filterDef: TLOFilterDef
+  value: string
+  onChange: (val: string) => void
+}) {
+  const [localValue, setLocalValue] = useState(value)
+  const { debouncedValue, isPending } = useDebouncedValue(localValue, 300)
+
+  // Sync debounced value to parent
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+  useEffect(() => {
+    onChangeRef.current(debouncedValue)
+  }, [debouncedValue])
+
+  // Reset local value when external value changes (e.g. URL navigation)
+  useEffect(() => {
+    setLocalValue(value)
+  }, [value])
+
+  return (
+    <div className="flex-1 min-w-[200px]">
+      <div className="relative">
+        {isPending ? (
+          <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-light-text-muted dark:text-dark-text-muted animate-spin" />
+        ) : (
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-light-text-muted dark:text-dark-text-muted" />
+        )}
+        <Input
+          placeholder={filterDef.label + '...'}
+          value={localValue}
+          onChange={(e) => setLocalValue(e.target.value)}
+          className="pl-10"
+        />
+      </div>
     </div>
   )
 }
@@ -208,25 +275,12 @@ function SelectFilter({
   )
 }
 
-function compareValues(a: unknown, b: unknown, colType: string): number {
-  if (a == null && b == null) return 0
-  if (a == null) return 1
-  if (b == null) return -1
-
-  if (colType === 'date') {
-    return new Date(a as string).getTime() - new Date(b as string).getTime()
-  }
-
-  const strA = String(a).toLowerCase()
-  const strB = String(b).toLowerCase()
-  return strA.localeCompare(strB)
-}
-
 export function TLOListPage({ config }: TLOListPageProps) {
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
 
   const page = parseInt(searchParams.get('page') || '1', 10)
+  const pageSize = parseInt(searchParams.get('pageSize') || String(DEFAULT_PAGE_SIZE), 10)
   const sortBy = searchParams.get('sortBy') || ''
   const sortDir = (searchParams.get('sortDir') || '') as '' | 'asc' | 'desc'
 
@@ -237,56 +291,87 @@ export function TLOListPage({ config }: TLOListPageProps) {
     if (val) filters[f.key] = val
   }
 
-  const { items, totalCount, isLoading, error } = useTLOList(config, { page, filters })
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+  const { items, totalCount, isLoading, error } = useTLOList(config, {
+    page,
+    pageSize,
+    sortBy: sortBy || undefined,
+    sortDir: sortDir || undefined,
+    filters,
+  })
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
 
-  // Client-side sorting of the current page
-  const sortedItems = useMemo(() => {
-    if (!sortBy || !sortDir) return items
+  const toggleSort = useCallback(
+    (col: TLOColumnDef) => {
+      if (col.sortable === false) return
+      const colKey = col.sortKey ?? col.key
+      const params = new URLSearchParams(searchParams)
+      if (sortBy !== colKey) {
+        params.set('sortBy', colKey)
+        params.set('sortDir', 'asc')
+      } else if (sortDir === 'asc') {
+        params.set('sortDir', 'desc')
+      } else {
+        params.delete('sortBy')
+        params.delete('sortDir')
+      }
+      params.set('page', '1')
+      setSearchParams(params)
+    },
+    [searchParams, sortBy, sortDir, setSearchParams],
+  )
 
-    const col = config.columns.find((c) => c.key === sortBy)
-    if (!col) return items
+  const updateFilter = useCallback(
+    (key: string, value: string) => {
+      const params = new URLSearchParams(searchParams)
+      if (value) {
+        params.set(key, value)
+      } else {
+        params.delete(key)
+      }
+      params.set('page', '1')
+      setSearchParams(params)
+    },
+    [searchParams, setSearchParams],
+  )
 
-    return [...items].sort((a, b) => {
-      const aVal = getNestedValue(a, col.key)
-      const bVal = getNestedValue(b, col.key)
-      const cmp = compareValues(aVal, bVal, col.type)
-      return sortDir === 'desc' ? -cmp : cmp
-    })
-  }, [items, sortBy, sortDir, config.columns])
+  // Text filter changes come from the debounced component — same logic as updateFilter
+  // but kept separate so select filters fire immediately
+  const updateTextFilter = useCallback(
+    (key: string, value: string) => {
+      // Only update if the value actually changed from what's in the URL
+      const current = searchParams.get(key) || ''
+      if (value === current) return
+      updateFilter(key, value)
+    },
+    [searchParams, updateFilter],
+  )
 
-  const toggleSort = (colKey: string) => {
-    const params = new URLSearchParams(searchParams)
-    if (sortBy !== colKey) {
-      params.set('sortBy', colKey)
-      params.set('sortDir', 'asc')
-    } else if (sortDir === 'asc') {
-      params.set('sortDir', 'desc')
-    } else {
-      params.delete('sortBy')
-      params.delete('sortDir')
-    }
-    setSearchParams(params)
-  }
+  const goToPage = useCallback(
+    (newPage: number) => {
+      const params = new URLSearchParams(searchParams)
+      params.set('page', String(newPage))
+      setSearchParams(params)
+    },
+    [searchParams, setSearchParams],
+  )
 
-  const updateFilter = (key: string, value: string) => {
-    const params = new URLSearchParams(searchParams)
-    if (value) {
-      params.set(key, value)
-    } else {
-      params.delete(key)
-    }
-    params.set('page', '1')
-    setSearchParams(params)
-  }
-
-  const goToPage = (newPage: number) => {
-    const params = new URLSearchParams(searchParams)
-    params.set('page', String(newPage))
-    setSearchParams(params)
-  }
+  const changePageSize = useCallback(
+    (newSize: number) => {
+      const params = new URLSearchParams(searchParams)
+      if (newSize === DEFAULT_PAGE_SIZE) {
+        params.delete('pageSize')
+      } else {
+        params.set('pageSize', String(newSize))
+      }
+      params.set('page', '1')
+      setSearchParams(params)
+    },
+    [searchParams, setSearchParams],
+  )
 
   const Icon = config.icon
+
+  const getSortKey = (col: TLOColumnDef) => col.sortKey ?? col.key
 
   return (
     <div className="space-y-4">
@@ -319,7 +404,12 @@ export function TLOListPage({ config }: TLOListPageProps) {
       )}
 
       {/* Filters */}
-      <FilterBar config={config} filters={filters} onFilterChange={updateFilter} />
+      <FilterBar
+        config={config}
+        filters={filters}
+        onFilterChange={updateFilter}
+        onTextFilterChange={updateTextFilter}
+      />
 
       {/* Table */}
       <Card>
@@ -343,26 +433,32 @@ export function TLOListPage({ config }: TLOListPageProps) {
                   <TableRow>
                     {config.columns.map((col) => (
                       <TableHead key={col.key}>
-                        <button
-                          onClick={() => toggleSort(col.key)}
-                          className="inline-flex items-center gap-1 hover:text-light-text dark:hover:text-dark-text transition-colors"
-                        >
-                          {col.label}
-                          {sortBy === col.key && sortDir === 'asc' ? (
-                            <ChevronUp className="h-3.5 w-3.5" />
-                          ) : sortBy === col.key && sortDir === 'desc' ? (
-                            <ChevronDown className="h-3.5 w-3.5" />
-                          ) : (
-                            <ArrowUpDown className="h-3.5 w-3.5 opacity-30" />
-                          )}
-                        </button>
+                        {col.sortable === false ? (
+                          <span className="text-light-text-muted dark:text-dark-text-muted">
+                            {col.label}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => toggleSort(col)}
+                            className="inline-flex items-center gap-1 hover:text-light-text dark:hover:text-dark-text transition-colors"
+                          >
+                            {col.label}
+                            {sortBy === getSortKey(col) && sortDir === 'asc' ? (
+                              <ChevronUp className="h-3.5 w-3.5" />
+                            ) : sortBy === getSortKey(col) && sortDir === 'desc' ? (
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            ) : (
+                              <ArrowUpDown className="h-3.5 w-3.5 opacity-30" />
+                            )}
+                          </button>
+                        )}
                       </TableHead>
                     ))}
                     <TableHead className="w-16">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedItems.map((item) => (
+                  {items.map((item) => (
                     <TableRow key={item.id as string}>
                       {config.columns.map((col) => (
                         <TableCell key={col.key}>
@@ -383,8 +479,21 @@ export function TLOListPage({ config }: TLOListPageProps) {
 
               {/* Pagination */}
               <div className="flex items-center justify-between px-4 py-3 border-t border-light-border dark:border-dark-border">
-                <div className="text-sm text-light-text-secondary dark:text-dark-text-secondary">
-                  Page {page} of {totalPages} ({totalCount} total)
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-light-text-secondary dark:text-dark-text-secondary">
+                    Page {page} of {totalPages} ({totalCount} total)
+                  </span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => changePageSize(Number(e.target.value))}
+                    className="crits-input w-auto py-1 px-2 text-sm"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size}>
+                        {size} / page
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button

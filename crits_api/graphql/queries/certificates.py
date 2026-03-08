@@ -57,6 +57,8 @@ class CertificateQueries:
         md5: str | None = None,
         status: str | None = None,
         campaign: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
     ) -> list[CertificateType]:
         """List certificates with optional filtering."""
         from crits.certificates.certificate import Certificate
@@ -84,7 +86,20 @@ class CertificateQueries:
             if campaign:
                 queryset = queryset.filter(campaign__name=campaign)
 
-            queryset = queryset.order_by("-modified")
+            from crits_api.graphql.queries.sorting import apply_sorting
+
+            queryset = apply_sorting(
+                queryset,
+                sort_by,
+                sort_dir,
+                {
+                    "filename": "filename",
+                    "md5": "md5",
+                    "status": "status",
+                    "modified": "modified",
+                    "created": "created",
+                },
+            )
             certs = queryset.skip(offset).limit(limit)
 
             return [CertificateType.from_model(c) for c in certs]

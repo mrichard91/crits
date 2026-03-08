@@ -67,6 +67,8 @@ class IndicatorQueries:
         value_contains: str | None = None,
         status: str | None = None,
         campaign: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
     ) -> list[IndicatorType]:
         """
         List indicators with optional filtering.
@@ -113,8 +115,20 @@ class IndicatorQueries:
             if campaign:
                 queryset = queryset.filter(campaign__name=campaign)
 
-            # Order by modified date descending (most recent first)
-            queryset = queryset.order_by("-modified")
+            from crits_api.graphql.queries.sorting import apply_sorting
+
+            queryset = apply_sorting(
+                queryset,
+                sort_by,
+                sort_dir,
+                {
+                    "value": "value",
+                    "indType": "ind_type",
+                    "status": "status",
+                    "modified": "modified",
+                    "created": "created",
+                },
+            )
 
             # Apply pagination
             indicators = queryset.skip(offset).limit(limit)

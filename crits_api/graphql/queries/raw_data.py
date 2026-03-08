@@ -57,6 +57,8 @@ class RawDataQueries:
         data_type: str | None = None,
         status: str | None = None,
         campaign: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
     ) -> list[RawDataType]:
         """List raw data objects with optional filtering."""
         from crits.raw_data.raw_data import RawData
@@ -84,7 +86,21 @@ class RawDataQueries:
             if campaign:
                 queryset = queryset.filter(campaign__name=campaign)
 
-            queryset = queryset.order_by("-modified")
+            from crits_api.graphql.queries.sorting import apply_sorting
+
+            queryset = apply_sorting(
+                queryset,
+                sort_by,
+                sort_dir,
+                {
+                    "title": "title",
+                    "dataType": "data_type",
+                    "version": "version",
+                    "status": "status",
+                    "modified": "modified",
+                    "created": "created",
+                },
+            )
             raw_data_list = queryset.skip(offset).limit(limit)
 
             return [RawDataType.from_model(rd) for rd in raw_data_list]
