@@ -6,6 +6,8 @@ import {
   Calendar,
   ChevronDown,
   ChevronRight,
+  Clock,
+  MessageSquare,
   Plus,
   User,
   Shield,
@@ -26,6 +28,9 @@ import { RelationshipsCard } from '@/components/RelationshipsCard'
 import { SampleHashCard } from '@/components/SampleHashCard'
 import { SampleToolsCard } from '@/components/SampleToolsCard'
 import { SampleServicesCard } from '@/components/SampleServicesCard'
+import { EditableField } from '@/components/EditableField'
+import { CommentsSection } from '@/components/CommentsSection'
+import { ActivityTimeline } from '@/components/ActivityTimeline'
 
 interface TLODetailPageProps {
   config: TLOConfig
@@ -460,6 +465,13 @@ export function TLODetailPage({ config }: TLODetailPageProps) {
   const queryClient = useQueryClient()
   const { item, isLoading, error } = useTLODetail(config, id ?? '')
 
+  const { data: meData } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => gqlQuery<{ me: { username: string } }>('query { me { username } }'),
+    staleTime: 300_000,
+  })
+  const currentUser = meData?.me?.username ?? ''
+
   const Icon = config.icon
   const isSampleLayout = config.customLayout === 'sample'
 
@@ -552,7 +564,27 @@ export function TLODetailPage({ config }: TLODetailPageProps) {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {status && <Badge variant={statusVariant(status)}>{status}</Badge>}
+            {status && config.gqlUpdate ? (
+              <EditableField
+                field={{
+                  key: 'status',
+                  label: 'Status',
+                  type: 'badge',
+                  editable: true,
+                  editType: 'select',
+                }}
+                value={status}
+                gqlUpdate={config.gqlUpdate}
+                tloId={id ?? ''}
+                queryKey={[config.gqlSingle, id]}
+              >
+                <Badge variant={statusVariant(status)} className="cursor-pointer">
+                  {status}
+                </Badge>
+              </EditableField>
+            ) : (
+              status && <Badge variant={statusVariant(status)}>{status}</Badge>
+            )}
           </div>
         </div>
       </div>
@@ -595,6 +627,7 @@ export function TLODetailPage({ config }: TLODetailPageProps) {
           sectors={sectors}
           tloType={config.type}
           tloId={id ?? ''}
+          currentUser={currentUser}
           onRelationshipChange={invalidateDetail}
         />
       ) : (
@@ -608,6 +641,7 @@ export function TLODetailPage({ config }: TLODetailPageProps) {
           sectors={sectors}
           tloType={config.type}
           tloId={id ?? ''}
+          currentUser={currentUser}
           onRelationshipChange={invalidateDetail}
         />
       )}
@@ -625,11 +659,13 @@ interface LayoutProps {
   sectors: string[]
   tloType: string
   tloId: string
+  currentUser: string
   onRelationshipChange: () => void
 }
 
 function DefaultLayout({
   item,
+  config,
   detailFieldsFiltered,
   sources,
   relationships,
@@ -637,13 +673,52 @@ function DefaultLayout({
   sectors,
   tloType,
   tloId,
+  currentUser,
   onRelationshipChange,
 }: LayoutProps) {
+  const [bottomTab, setBottomTab] = useState<'comments' | 'timeline'>('comments')
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
       {/* Left column - Detail content */}
       <div className="lg:col-span-3 space-y-6">
-        <DetailFieldsCard fields={detailFieldsFiltered} item={item} />
+        <DetailFieldsCard fields={detailFieldsFiltered} item={item} config={config} tloId={tloId} />
+
+        {/* Comments / Timeline tabs */}
+        <Card className="p-0">
+          <div className="flex items-center gap-1 px-4 pt-3 pb-0 border-b border-light-border dark:border-dark-border">
+            <button
+              onClick={() => setBottomTab('comments')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                bottomTab === 'comments'
+                  ? 'border-crits-blue text-crits-blue'
+                  : 'border-transparent text-light-text-muted dark:text-dark-text-muted hover:text-light-text dark:hover:text-dark-text'
+              }`}
+            >
+              <MessageSquare className="h-4 w-4" />
+              Comments
+            </button>
+            <button
+              onClick={() => setBottomTab('timeline')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                bottomTab === 'timeline'
+                  ? 'border-crits-blue text-crits-blue'
+                  : 'border-transparent text-light-text-muted dark:text-dark-text-muted hover:text-light-text dark:hover:text-dark-text'
+              }`}
+            >
+              <Clock className="h-4 w-4" />
+              Timeline
+            </button>
+          </div>
+          <CardContent className="p-4">
+            {bottomTab === 'comments' && (
+              <CommentsSection objType={tloType} objId={tloId} currentUser={currentUser} />
+            )}
+            {bottomTab === 'timeline' && (
+              <ActivityTimeline item={item} objType={tloType} objId={tloId} />
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Right column - Metadata sidebar */}
@@ -664,6 +739,7 @@ function DefaultLayout({
 
 function SampleLayout({
   item,
+  config,
   detailFieldsFiltered,
   sources,
   relationships,
@@ -671,10 +747,30 @@ function SampleLayout({
   sectors,
   tloType,
   tloId,
+  currentUser,
   onRelationshipChange,
 }: LayoutProps) {
   const md5 = (item.md5 as string) ?? ''
   const [sampleTab, setSampleTab] = useState<'details' | 'tools' | 'services'>('details')
+  const [bottomTab, setBottomTab] = useState<'comments' | 'timeline'>('comments')
+
+  const renderFieldWithEdit = (field: TLODetailFieldDef) => {
+    const content = <FieldValue field={field} item={item} />
+    if (field.editable && config.gqlUpdate) {
+      return (
+        <EditableField
+          field={field}
+          value={getNestedValue(item, field.key)}
+          gqlUpdate={config.gqlUpdate}
+          tloId={tloId}
+          queryKey={[config.gqlSingle, tloId]}
+        >
+          {content}
+        </EditableField>
+      )
+    }
+    return content
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -731,7 +827,7 @@ function SampleLayout({
                           {field.label}
                         </dt>
                         <dd className="text-light-text dark:text-dark-text mt-1">
-                          <FieldValue field={field} item={item} />
+                          {renderFieldWithEdit(field)}
                         </dd>
                       </div>
                     ))}
@@ -740,7 +836,7 @@ function SampleLayout({
                   .filter((f) => f.type === 'pre')
                   .map((field) => {
                     const val = getNestedValue(item, field.key)
-                    if (!val) return null
+                    if (!val && !field.editable) return null
                     return (
                       <div
                         key={field.key}
@@ -749,8 +845,8 @@ function SampleLayout({
                         <dt className="text-sm font-medium text-light-text-muted dark:text-dark-text-muted mb-2">
                           {field.label}
                         </dt>
-                        <dd className="text-light-text dark:text-dark-text whitespace-pre-wrap">
-                          {String(val)}
+                        <dd className="text-light-text dark:text-dark-text">
+                          {renderFieldWithEdit(field)}
                         </dd>
                       </div>
                     )
@@ -769,6 +865,42 @@ function SampleLayout({
             {sampleTab === 'tools' && md5 && <SampleToolsCard md5={md5} bare />}
             {sampleTab === 'services' && (
               <SampleServicesCard objType={tloType} objId={tloId} bare />
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Comments / Timeline tabs */}
+        <Card className="p-0">
+          <div className="flex items-center gap-1 px-4 pt-3 pb-0 border-b border-light-border dark:border-dark-border">
+            <button
+              onClick={() => setBottomTab('comments')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                bottomTab === 'comments'
+                  ? 'border-crits-blue text-crits-blue'
+                  : 'border-transparent text-light-text-muted dark:text-dark-text-muted hover:text-light-text dark:hover:text-dark-text'
+              }`}
+            >
+              <MessageSquare className="h-4 w-4" />
+              Comments
+            </button>
+            <button
+              onClick={() => setBottomTab('timeline')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                bottomTab === 'timeline'
+                  ? 'border-crits-blue text-crits-blue'
+                  : 'border-transparent text-light-text-muted dark:text-dark-text-muted hover:text-light-text dark:hover:text-dark-text'
+              }`}
+            >
+              <Clock className="h-4 w-4" />
+              Timeline
+            </button>
+          </div>
+          <CardContent className="p-4">
+            {bottomTab === 'comments' && (
+              <CommentsSection objType={tloType} objId={tloId} currentUser={currentUser} />
+            )}
+            {bottomTab === 'timeline' && (
+              <ActivityTimeline item={item} objType={tloType} objId={tloId} />
             )}
           </CardContent>
         </Card>
@@ -793,10 +925,32 @@ function SampleLayout({
 function DetailFieldsCard({
   fields,
   item,
+  config,
+  tloId,
 }: {
   fields: TLODetailFieldDef[]
   item: Record<string, unknown>
+  config?: TLOConfig
+  tloId?: string
 }) {
+  const renderFieldWithEdit = (field: TLODetailFieldDef) => {
+    const content = <FieldValue field={field} item={item} />
+    if (field.editable && config?.gqlUpdate && tloId) {
+      return (
+        <EditableField
+          field={field}
+          value={getNestedValue(item, field.key)}
+          gqlUpdate={config.gqlUpdate}
+          tloId={tloId}
+          queryKey={[config.gqlSingle, tloId]}
+        >
+          {content}
+        </EditableField>
+      )
+    }
+    return content
+  }
+
   return (
     <Card>
       <div className="px-6 pt-4 pb-2">
@@ -815,7 +969,7 @@ function DetailFieldsCard({
                   {field.label}
                 </dt>
                 <dd className="text-light-text dark:text-dark-text mt-1">
-                  <FieldValue field={field} item={item} />
+                  {renderFieldWithEdit(field)}
                 </dd>
               </div>
             ))}
@@ -825,7 +979,7 @@ function DetailFieldsCard({
           .filter((f) => f.type === 'pre')
           .map((field) => {
             const val = getNestedValue(item, field.key)
-            if (!val) return null
+            if (!val && !field.editable) return null
             return (
               <div
                 key={field.key}
@@ -834,8 +988,8 @@ function DetailFieldsCard({
                 <dt className="text-sm font-medium text-light-text-muted dark:text-dark-text-muted mb-2">
                   {field.label}
                 </dt>
-                <dd className="text-light-text dark:text-dark-text whitespace-pre-wrap">
-                  {String(val)}
+                <dd className="text-light-text dark:text-dark-text">
+                  {renderFieldWithEdit(field)}
                 </dd>
               </div>
             )

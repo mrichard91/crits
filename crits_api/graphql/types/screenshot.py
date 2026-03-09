@@ -8,8 +8,10 @@ from typing import Any
 import strawberry
 
 from crits_api.graphql.types.common import (
+    EmbeddedActionType,
     EmbeddedRelationshipType,
     SourceInfo,
+    extract_actions,
     extract_campaigns,
     extract_relationships,
     extract_sources,
@@ -42,7 +44,8 @@ class ScreenshotType:
     bucket_list: list[str] = strawberry.field(default_factory=list)
     sectors: list[str] = strawberry.field(default_factory=list)
 
-    # Relationships and metadata
+    # Relationships, actions, and metadata
+    actions: list[EmbeddedActionType] = strawberry.field(default_factory=list)
     sources: list[SourceInfo] = strawberry.field(default_factory=list)
     relationships: list[EmbeddedRelationshipType] = strawberry.field(default_factory=list)
 
@@ -65,6 +68,7 @@ class ScreenshotType:
             campaigns=extract_campaigns(screenshot),
             bucket_list=list(getattr(screenshot, "bucket_list", []) or []),
             sectors=list(getattr(screenshot, "sectors", []) or []),
+            actions=extract_actions(screenshot),
             sources=extract_sources(screenshot),
             relationships=extract_relationships(screenshot),
         )

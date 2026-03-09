@@ -40,6 +40,10 @@ export interface TLODetailFieldDef {
   key: string
   label: string
   type: 'text' | 'badge' | 'date' | 'mono' | 'list' | 'pre'
+  editable?: boolean
+  editKey?: string // GQL mutation param name (defaults to key)
+  editType?: 'text' | 'textarea' | 'select'
+  editOptionsQuery?: string // GQL query returning string[] for select
 }
 
 export interface TLOCreateFieldDef {
@@ -90,6 +94,9 @@ export interface TLOConfig {
   // Custom detail page layout
   customLayout?: 'sample'
 
+  // Update mutation (for inline editing)
+  gqlUpdate?: string // "updateIndicator", etc.
+
   // Create mutation (if supported)
   gqlCreate?: string // "createIndicator", etc.
   createFields?: TLOCreateFieldDef[]
@@ -110,13 +117,14 @@ const commonDetailFields = [
   'sectors',
   'sources { name instances { method reference date analyst } }',
   'relationships { objectId relType relationship relConfidence analyst displayValue }',
+  'actions { actionType analyst performedDate active reason date }',
 ]
 
 const commonDetailDisplay: TLODetailFieldDef[] = [
-  { key: 'status', label: 'Status', type: 'badge' },
+  { key: 'status', label: 'Status', type: 'badge', editable: true, editType: 'select' },
   { key: 'analyst', label: 'Analyst', type: 'text' },
   { key: 'tlp', label: 'TLP', type: 'badge' },
-  { key: 'description', label: 'Description', type: 'pre' },
+  { key: 'description', label: 'Description', type: 'pre', editable: true, editType: 'textarea' },
 ]
 
 const statusFilter: TLOFilterDef = {
@@ -176,9 +184,17 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       statusFilter,
       campaignFilter,
     ],
+    gqlUpdate: 'updateIndicator',
     detailFields: [
       ...commonDetailDisplay,
-      { key: 'indType', label: 'Indicator Type', type: 'badge' },
+      {
+        key: 'indType',
+        label: 'Indicator Type',
+        type: 'badge',
+        editable: true,
+        editType: 'select',
+        editOptionsQuery: 'indicatorTypes',
+      },
       { key: 'confidence.rating', label: 'Confidence', type: 'text' },
       { key: 'impact.rating', label: 'Impact', type: 'text' },
       { key: 'threatTypes', label: 'Threat Types', type: 'list' },
@@ -249,6 +265,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       statusFilter,
       campaignFilter,
     ],
+    gqlUpdate: 'updateActor',
     detailFields: [
       ...commonDetailDisplay,
       { key: 'aliases', label: 'Aliases', type: 'list' },
@@ -298,6 +315,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       statusFilter,
       campaignFilter,
     ],
+    gqlUpdate: 'updateBackdoor',
     detailFields: [...commonDetailDisplay],
     gqlCreate: 'createBackdoor',
     createFields: [
@@ -341,6 +359,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'active', label: 'Active', type: 'select' },
       statusFilter,
     ],
+    gqlUpdate: 'updateCampaign',
     detailFields: [
       ...commonDetailDisplay,
       { key: 'active', label: 'Active', type: 'badge' },
@@ -379,6 +398,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       statusFilter,
       campaignFilter,
     ],
+    gqlUpdate: 'updateCertificate',
     detailFields: [...commonDetailDisplay, { key: 'md5', label: 'MD5', type: 'mono' }],
     gqlCreate: 'createCertificate',
     requiresFileUpload: true,
@@ -429,6 +449,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       statusFilter,
       campaignFilter,
     ],
+    gqlUpdate: 'updateDomain',
     detailFields: [
       ...commonDetailDisplay,
       { key: 'recordType', label: 'Record Type', type: 'badge' },
@@ -482,6 +503,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       statusFilter,
       campaignFilter,
     ],
+    gqlUpdate: 'updateEmail',
     detailFields: [
       ...commonDetailDisplay,
       { key: 'fromAddress', label: 'From Address', type: 'mono' },
@@ -542,6 +564,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       statusFilter,
       campaignFilter,
     ],
+    gqlUpdate: 'updateEvent',
     detailFields: [
       ...commonDetailDisplay,
       { key: 'eventType', label: 'Event Type', type: 'badge' },
@@ -598,6 +621,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       statusFilter,
       campaignFilter,
     ],
+    gqlUpdate: 'updateExploit',
     detailFields: [...commonDetailDisplay, { key: 'cve', label: 'CVE', type: 'mono' }],
     gqlCreate: 'createExploit',
     createFields: [
@@ -643,6 +667,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       statusFilter,
       campaignFilter,
     ],
+    gqlUpdate: 'updateIp',
     detailFields: [...commonDetailDisplay, { key: 'ipType', label: 'IP Type', type: 'badge' }],
     gqlCreate: 'createIp',
     createFields: [
@@ -694,6 +719,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       statusFilter,
       campaignFilter,
     ],
+    gqlUpdate: 'updatePcap',
     detailFields: [...commonDetailDisplay, { key: 'md5', label: 'MD5', type: 'mono' }],
     gqlCreate: 'createPcap',
     requiresFileUpload: true,
@@ -746,6 +772,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       statusFilter,
       campaignFilter,
     ],
+    gqlUpdate: 'updateRawData',
     detailFields: [
       ...commonDetailDisplay,
       { key: 'dataType', label: 'Data Type', type: 'badge' },
@@ -833,6 +860,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'filenames', label: 'Filenames', type: 'list' },
     ],
     customLayout: 'sample',
+    gqlUpdate: 'updateSample',
     gqlCreate: 'createSample',
     requiresFileUpload: true,
     createFields: [
@@ -871,6 +899,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       { key: 'modified', label: 'Modified', type: 'date' },
     ],
     filters: [{ key: 'filenameContains', label: 'Search filenames', type: 'text' }],
+    gqlUpdate: 'updateScreenshot',
     detailFields: [...commonDetailDisplay],
   },
 
@@ -901,9 +930,17 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       statusFilter,
       campaignFilter,
     ],
+    gqlUpdate: 'updateSignature',
     detailFields: [
       ...commonDetailDisplay,
-      { key: 'dataType', label: 'Data Type', type: 'badge' },
+      {
+        key: 'dataType',
+        label: 'Data Type',
+        type: 'badge',
+        editable: true,
+        editType: 'select',
+        editOptionsQuery: 'signatureDataTypes',
+      },
       { key: 'version', label: 'Version', type: 'text' },
       { key: 'md5', label: 'MD5', type: 'mono' },
     ],
@@ -968,6 +1005,7 @@ export const TLO_CONFIGS: Record<TLOType, TLOConfig> = {
       statusFilter,
       campaignFilter,
     ],
+    gqlUpdate: 'updateTarget',
     detailFields: [
       ...commonDetailDisplay,
       { key: 'department', label: 'Department', type: 'text' },
