@@ -18,6 +18,7 @@ import {
   PAGE_SIZE_OPTIONS,
 } from '@/hooks/useTLOList'
 import { AddTLODialog } from '@/components/AddTLODialog'
+import { BulkActionBar } from '@/components/BulkActionBar'
 import type { TLOConfig, TLOColumnDef, TLOFilterDef } from '@/lib/tloConfig'
 import {
   Card,
@@ -291,6 +292,13 @@ export function TLOListPage({ config }: TLOListPageProps) {
     if (val) filters[f.key] = val
   }
 
+  // Selection state for bulk actions
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const resetKey = `${page}-${pageSize}-${sortBy}-${sortDir}-${JSON.stringify(filters)}`
+  useEffect(() => {
+    setSelectedIds(new Set())
+  }, [resetKey])
+
   const { items, totalCount, isLoading, error } = useTLOList(config, {
     page,
     pageSize,
@@ -299,6 +307,26 @@ export function TLOListPage({ config }: TLOListPageProps) {
     filters,
   })
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+
+  const allVisibleSelected =
+    items.length > 0 && items.every((item) => selectedIds.has(item.id as string))
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      if (allVisibleSelected) return new Set()
+      const next = new Set(prev)
+      for (const item of items) next.add(item.id as string)
+      return next
+    })
+  }, [items, allVisibleSelected])
+  const toggleSelectItem = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
 
   const toggleSort = useCallback(
     (col: TLOColumnDef) => {
@@ -411,6 +439,9 @@ export function TLOListPage({ config }: TLOListPageProps) {
         onTextFilterChange={updateTextFilter}
       />
 
+      {/* Bulk actions */}
+      <BulkActionBar config={config} selectedIds={selectedIds} onClearSelection={clearSelection} />
+
       {/* Table */}
       <Card>
         <CardContent className="p-0">
@@ -431,6 +462,14 @@ export function TLOListPage({ config }: TLOListPageProps) {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        onChange={toggleSelectAll}
+                        className="rounded border-light-border dark:border-dark-border"
+                      />
+                    </TableHead>
                     {config.columns.map((col) => (
                       <TableHead key={col.key}>
                         {col.sortable === false ? (
@@ -459,7 +498,18 @@ export function TLOListPage({ config }: TLOListPageProps) {
                 </TableHeader>
                 <TableBody>
                   {items.map((item) => (
-                    <TableRow key={item.id as string}>
+                    <TableRow
+                      key={item.id as string}
+                      className={selectedIds.has(item.id as string) ? 'bg-crits-blue/5' : ''}
+                    >
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(item.id as string)}
+                          onChange={() => toggleSelectItem(item.id as string)}
+                          className="rounded border-light-border dark:border-dark-border"
+                        />
+                      </TableCell>
                       {config.columns.map((col) => (
                         <TableCell key={col.key}>
                           <CellValue col={col} item={item} config={config} />
