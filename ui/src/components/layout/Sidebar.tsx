@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Users, ChevronRight, Tag, Wrench, X } from 'lucide-react'
+import { LayoutDashboard, Users, ChevronRight, Tag, Wrench, X, MessageSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TLO_CONFIGS } from '@/lib/tloConfig'
 import type { TLOType } from '@/types'
@@ -218,6 +218,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             onNavigate={onClose}
           />
           <SidebarLink to="/users" icon={Users} label="Users" onNavigate={onClose} />
+          <SidebarLink to="/chat" icon={MessageSquare} label="AI Chat" onNavigate={onClose} />
 
           {/* Divider */}
           <div className="pt-2" />

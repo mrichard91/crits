@@ -8,6 +8,7 @@ from crits_api.graphql.mutations.bulk import BulkMutations
 from crits_api.graphql.mutations.campaigns import CampaignMutations
 from crits_api.graphql.mutations.certificates import CertificateMutations
 from crits_api.graphql.mutations.comments import CommentMutations
+from crits_api.graphql.mutations.conversations import ConversationMutations
 from crits_api.graphql.mutations.domains import DomainMutations
 from crits_api.graphql.mutations.emails import EmailMutations
 from crits_api.graphql.mutations.events import EventMutations
@@ -33,6 +34,7 @@ __all__ = [
     "CampaignMutations",
     "CertificateMutations",
     "CommentMutations",
+    "ConversationMutations",
     "DomainMutations",
     "EmailMutations",
     "EventMutations",

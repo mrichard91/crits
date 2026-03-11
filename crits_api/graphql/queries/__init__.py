@@ -5,6 +5,7 @@ from crits_api.graphql.queries.admin import AdminQueries
 from crits_api.graphql.queries.backdoors import BackdoorQueries
 from crits_api.graphql.queries.campaigns import CampaignQueries
 from crits_api.graphql.queries.certificates import CertificateQueries
+from crits_api.graphql.queries.conversations import ConversationQueries
 from crits_api.graphql.queries.domains import DomainQueries
 from crits_api.graphql.queries.emails import EmailQueries
 from crits_api.graphql.queries.events import EventQueries
@@ -22,6 +23,7 @@ from crits_api.graphql.queries.tags import TagQueries
 from crits_api.graphql.queries.targets import TargetQueries
 
 __all__ = [
+    "ConversationQueries",
     "AdminQueries",
     "IndicatorQueries",
     "ActorQueries",

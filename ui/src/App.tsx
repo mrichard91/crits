@@ -9,6 +9,7 @@ import { TagsPage } from '@/pages/TagsPage'
 import { TagDetailPage } from '@/pages/TagDetailPage'
 import { ServicesPage } from '@/pages/ServicesPage'
 import { UsersPage } from '@/pages/UsersPage'
+import { ChatPage } from '@/pages/ChatPage'
 import { TLO_CONFIGS } from '@/lib/tloConfig'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -46,6 +47,8 @@ function App() {
         <Route path="tags/:tagName" element={<TagDetailPage />} />
         <Route path="services" element={<ServicesPage />} />
         <Route path="users" element={<UsersPage />} />
+        <Route path="chat" element={<ChatPage />} />
+        <Route path="chat/:id" element={<ChatPage />} />
         {Object.values(TLO_CONFIGS).map((config) => (
           <Route key={config.type} path={config.route.slice(1)}>
             <Route index element={<TLOListPage config={config} />} />

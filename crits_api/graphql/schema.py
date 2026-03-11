@@ -21,6 +21,7 @@ from crits_api.graphql.mutations import (
     CampaignMutations,
     CertificateMutations,
     CommentMutations,
+    ConversationMutations,
     DomainMutations,
     EmailMutations,
     EventMutations,
@@ -44,6 +45,7 @@ from crits_api.graphql.queries.backdoors import BackdoorQueries
 from crits_api.graphql.queries.campaigns import CampaignQueries
 from crits_api.graphql.queries.certificates import CertificateQueries
 from crits_api.graphql.queries.comments import CommentQueries
+from crits_api.graphql.queries.conversations import ConversationQueries
 from crits_api.graphql.queries.dashboard import DashboardQueries
 from crits_api.graphql.queries.domains import DomainQueries
 from crits_api.graphql.queries.emails import EmailQueries
@@ -78,6 +80,7 @@ class Query(
     CampaignQueries,
     CertificateQueries,
     CommentQueries,
+    ConversationQueries,
     DashboardQueries,
     DomainQueries,
     EmailQueries,
@@ -162,6 +165,7 @@ class Mutation(
     CampaignMutations,
     CertificateMutations,
     CommentMutations,
+    ConversationMutations,
     DomainMutations,
     EmailMutations,
     EventMutations,
