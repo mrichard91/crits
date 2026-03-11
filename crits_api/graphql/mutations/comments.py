@@ -66,46 +66,38 @@ class CommentMutations:
         Returns:
             MutationResult indicating success or failure
         """
-        from crits.comments.handlers import comment_add
+        from crits.comments.comment import Comment
+        from crits.core.crits_mongoengine import create_embedded_source
+        from crits.core.user_tools import get_user_organization
 
         ctx: GraphQLContext = info.context
         username = ctx.user.username if ctx.user else "unknown"
 
         try:
-            # Build the cleaned_data dict expected by the handler
-            cleaned_data = {
-                "comment": comment,
-            }
+            new_comment = Comment()
+            new_comment.comment = comment
+            new_comment.parse_comment()
+            new_comment.set_parent_object(obj_type, obj_id)
 
-            # Determine if this is a reply
-            method = ""
             if parent_date and parent_analyst:
-                method = "reply"
-                cleaned_data["parent_date"] = parent_date
-                cleaned_data["parent_analyst"] = parent_analyst
+                new_comment.set_parent_comment(parent_date, parent_analyst)
 
-            # Empty subscription dict - comments don't use subscriptions via API
-            subscr: dict[str, str] = {}
+            new_comment.analyst = username
+            new_comment.set_url_key(obj_id)
 
-            result = comment_add(
-                cleaned_data,
-                obj_type,
-                obj_id,
-                method,
-                subscr,
-                username,
+            source = create_embedded_source(
+                name=get_user_organization(username),
+                analyst=username,
+                needs_tlp=False,
             )
+            new_comment.source = [source]
+            new_comment.save(username=username)
 
-            if result.get("success"):
-                _invalidate_comment_target(obj_type)
-                return MutationResult(
-                    success=True,
-                    message=result.get("message", "Comment added"),
-                    id=obj_id,
-                )
+            _invalidate_comment_target(obj_type)
             return MutationResult(
-                success=False,
-                message=result.get("message", "Failed to add comment"),
+                success=True,
+                message="Comment added successfully",
+                id=obj_id,
             )
 
         except Exception as e:
@@ -143,7 +135,7 @@ class CommentMutations:
             # Build the cleaned_data dict expected by the handler
             cleaned_data = {
                 "comment": comment,
-                "date": comment_date,
+                "parent_date": comment_date,
             }
 
             # Empty subscription dict

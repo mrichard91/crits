@@ -192,18 +192,27 @@ class AdminMutations:
             if not role:
                 return MutationResult(success=False, message="Role not found")
 
-            role.add_source(
-                source_name,
-                read=read,
-                write=write,
-                tlp_red=tlp_red,
-                tlp_amber=tlp_amber,
-                tlp_green=tlp_green,
-            )
+            # Upsert: update flags if source already exists, otherwise add
+            existing = next((s for s in role.sources if s.name == source_name), None)
+            if existing:
+                existing.read = read
+                existing.write = write
+                existing.tlp_red = tlp_red
+                existing.tlp_amber = tlp_amber
+                existing.tlp_green = tlp_green
+            else:
+                role.add_source(
+                    source_name,
+                    read=read,
+                    write=write,
+                    tlp_red=tlp_red,
+                    tlp_amber=tlp_amber,
+                    tlp_green=tlp_green,
+                )
             role.save()
             return MutationResult(
                 success=True,
-                message=f"Source '{source_name}' added to role",
+                message=f"Source '{source_name}' updated on role",
                 id=id,
             )
         except Exception as e:

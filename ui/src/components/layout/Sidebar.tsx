@@ -1,6 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Users, ChevronRight, Tag, Wrench, X, MessageSquare } from 'lucide-react'
+import {
+  LayoutDashboard,
+  Users,
+  ChevronRight,
+  Tag,
+  Wrench,
+  X,
+  MessageSquare,
+  Database,
+  Shield,
+  Settings2,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TLO_CONFIGS } from '@/lib/tloConfig'
 import type { TLOType } from '@/types'
@@ -37,6 +48,9 @@ interface SystemItem {
 const SYSTEM_ITEMS: SystemItem[] = [
   { label: 'Tags', route: '/tags', icon: Tag },
   { label: 'Services', route: '/services', icon: Wrench },
+  { label: 'Sources', route: '/sources', icon: Database },
+  { label: 'Roles', route: '/roles', icon: Shield },
+  { label: 'Config', route: '/config-items', icon: Settings2 },
 ]
 
 // --- localStorage helpers ---

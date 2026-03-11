@@ -175,6 +175,11 @@ no_implicit_optional = true
 # Allow Any returns from MongoEngine querysets
 warn_return_any = false
 
+# Tests: keep type annotations but allow indexing Optional data (ExecutionResult.data)
+[[tool.mypy.overrides]]
+module = "crits_api.tests.*"
+disable_error_code = ["index"]
+
 # Ignore legacy crits module (too many issues to fix)
 [[tool.mypy.overrides]]
 module = "crits.*"
