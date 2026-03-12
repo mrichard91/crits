@@ -107,7 +107,7 @@ interface RoleInfo {
   id: string
   name: string
   active: boolean
-  description: string
+  description: string | null
   sources: SourceACL[]
   apiInterface: boolean
   scriptInterface: boolean
@@ -587,7 +587,7 @@ export function RolesPage() {
     ? roles.filter(
         (r) =>
           r.name.toLowerCase().includes(filter.toLowerCase()) ||
-          r.description.toLowerCase().includes(filter.toLowerCase()),
+          (r.description ?? '').toLowerCase().includes(filter.toLowerCase()),
       )
     : roles
 

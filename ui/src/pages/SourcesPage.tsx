@@ -53,7 +53,7 @@ const TOGGLE_SOURCE_MUTATION = `
 interface SourceInfo {
   name: string
   active: boolean
-  sampleCount: number
+  sampleCount: number | null
 }
 
 // ── Toggle Component ─────────────────────────────────────────────────
@@ -271,7 +271,7 @@ export function SourcesPage() {
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-light-text-secondary dark:text-dark-text-secondary">
-                          {source.sampleCount.toLocaleString()}
+                          {(source.sampleCount ?? 0).toLocaleString()}
                         </span>
                       </TableCell>
                       <TableCell>
