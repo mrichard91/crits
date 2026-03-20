@@ -98,13 +98,13 @@ const RESET_PASSWORD_MUTATION = `
 interface UserInfo {
   id: string
   username: string
-  email: string
-  firstName: string
-  lastName: string
+  email: string | null
+  firstName: string | null
+  lastName: string | null
   isActive: boolean
   isSuperuser: boolean
-  organization: string
-  roles: string[]
+  organization: string | null
+  roles: string[] | null
   totp: boolean
   lastLogin: string | null
 }
@@ -347,11 +347,11 @@ function EditUserDialog({
 }) {
   const queryClient = useQueryClient()
   const [form, setForm] = useState({
-    email: user.email,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    organization: user.organization,
-    roles: [...user.roles],
+    email: user.email ?? '',
+    firstName: user.firstName ?? '',
+    lastName: user.lastName ?? '',
+    organization: user.organization ?? '',
+    roles: [...(user.roles ?? [])],
   })
   const [newPassword, setNewPassword] = useState('')
   const [result, setResult] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -424,8 +424,9 @@ function EditUserDialog({
       organization: form.organization,
     })
     // Check if roles changed
+    const userRoles = user.roles ?? []
     const rolesChanged =
-      form.roles.length !== user.roles.length || form.roles.some((r) => !user.roles.includes(r))
+      form.roles.length !== userRoles.length || form.roles.some((r) => !userRoles.includes(r))
     if (rolesChanged) {
       setUserRoles.mutate({ id: user.id, roles: form.roles })
     }
@@ -621,7 +622,7 @@ export function UsersPage() {
     ? users.filter(
         (u) =>
           u.username.toLowerCase().includes(filter.toLowerCase()) ||
-          u.email.toLowerCase().includes(filter.toLowerCase()),
+          (u.email ?? '').toLowerCase().includes(filter.toLowerCase()),
       )
     : users
 
@@ -716,9 +717,9 @@ export function UsersPage() {
                             </Badge>
                           )}
                         </div>
-                        {(user.firstName || user.lastName) && (
+                        {(user.firstName ?? user.lastName) && (
                           <span className="text-xs text-light-text-muted dark:text-dark-text-muted">
-                            {user.firstName} {user.lastName}
+                            {user.firstName ?? ''} {user.lastName ?? ''}
                           </span>
                         )}
                       </TableCell>
@@ -729,8 +730,8 @@ export function UsersPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {user.roles.length > 0 ? (
-                            user.roles.map((role) => (
+                          {(user.roles ?? []).length > 0 ? (
+                            (user.roles ?? []).map((role) => (
                               <Badge key={role} variant="default">
                                 {role}
                               </Badge>

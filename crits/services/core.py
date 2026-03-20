@@ -135,14 +135,12 @@ class ServiceManager(object):
                     else:
                         svc_obj.status = "available"
                 else:
-                    existing_config = svc_obj.config.to_dict()
+                    existing_config = svc_obj.config.to_dict() if svc_obj.config else {}
                     try:
                         new_config = service.get_config(existing_config)
                         svc_obj.config = AnalysisConfig(**new_config)
                     except ServiceConfigError:
                         svc_obj.status = "misconfigured"
-                        svc_obj.enabled = False
-                        svc_obj.run_on_triage = False
                         msg = ("Service %s is misconfigured." % service_name)
                         logger.warning(msg)
                     else:
@@ -153,8 +151,6 @@ class ServiceManager(object):
                     service.parse_config(svc_obj.config.to_dict())
                 except ServiceConfigError as e:
                     svc_obj.status = "misconfigured"
-                    svc_obj.enabled = False
-                    svc_obj.run_on_triage = False
 
                 svc_obj.description = service_description
                 svc_obj.version = service_version
@@ -169,8 +165,6 @@ class ServiceManager(object):
         for svc in svcs:
             if svc.name not in self._services:
                 svc.status = 'unavailable'
-                svc.enabled = False
-                svc.run_on_triage = False
                 svc.save()
 
     def get_service_class(self, service_name):

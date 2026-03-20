@@ -31,7 +31,7 @@ export function DashboardPage() {
           Overview of your threat intelligence data
           {stats && (
             <span className="ml-2 font-medium">
-              — {stats.totalCount.toLocaleString()} total objects
+              — {(stats.totalCount ?? 0).toLocaleString()} total objects
             </span>
           )}
         </p>

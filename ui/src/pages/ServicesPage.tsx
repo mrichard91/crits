@@ -96,12 +96,12 @@ interface ConfigOption {
 interface ServiceInfo {
   name: string
   version: string
-  description: string
+  description: string | null
   enabled: boolean
   runOnTriage: boolean
-  supportedTypes: string[]
+  supportedTypes: string[] | null
   isModern: boolean
-  configOptions: ConfigOption[]
+  configOptions: ConfigOption[] | null
 }
 
 function Toggle({
@@ -319,10 +319,8 @@ function TestRunDialog({
   open: boolean
   onClose: () => void
 }) {
-  const typeOptions =
-    service.supportedTypes.includes('all') || service.supportedTypes.length === 0
-      ? ALL_TLO_TYPES
-      : service.supportedTypes
+  const types = service.supportedTypes ?? []
+  const typeOptions = types.includes('all') || types.length === 0 ? ALL_TLO_TYPES : types
   const [objType, setObjType] = useState(typeOptions[0] || 'Sample')
   const [objId, setObjId] = useState('')
   const [result, setResult] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -452,7 +450,7 @@ export function ServicesPage() {
     ? services.filter(
         (s) =>
           s.name.toLowerCase().includes(filter.toLowerCase()) ||
-          s.description.toLowerCase().includes(filter.toLowerCase()),
+          (s.description ?? '').toLowerCase().includes(filter.toLowerCase()),
       )
     : services
 
@@ -498,7 +496,8 @@ export function ServicesPage() {
             <div className="divide-y divide-light-border dark:divide-dark-border">
               {filtered.map((svc) => {
                 const isExpanded = expandedService === svc.name
-                const hasConfig = svc.configOptions.length > 0
+                const configOpts = svc.configOptions ?? []
+                const hasConfig = configOpts.length > 0
 
                 return (
                   <div key={svc.name}>
@@ -536,13 +535,13 @@ export function ServicesPage() {
 
                       {/* Supported types */}
                       <div className="hidden md:flex items-center gap-1 shrink-0">
-                        {svc.supportedTypes.slice(0, 3).map((t) => (
+                        {(svc.supportedTypes ?? []).slice(0, 3).map((t) => (
                           <Badge key={t} variant="default">
                             {t}
                           </Badge>
                         ))}
-                        {svc.supportedTypes.length > 3 && (
-                          <Badge variant="default">+{svc.supportedTypes.length - 3}</Badge>
+                        {(svc.supportedTypes ?? []).length > 3 && (
+                          <Badge variant="default">+{(svc.supportedTypes ?? []).length - 3}</Badge>
                         )}
                       </div>
 
@@ -582,7 +581,7 @@ export function ServicesPage() {
 
                     {/* Expanded config editor */}
                     {isExpanded && hasConfig && (
-                      <ConfigEditor serviceName={svc.name} options={svc.configOptions} />
+                      <ConfigEditor serviceName={svc.name} options={configOpts} />
                     )}
                   </div>
                 )

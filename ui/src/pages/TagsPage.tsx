@@ -29,7 +29,7 @@ export function TagsPage() {
 
   const tags = data?.tagSummary ?? []
   const filtered = filter
-    ? tags.filter((t) => t.name.toLowerCase().includes(filter.toLowerCase()))
+    ? tags.filter((t) => (t.name ?? '').toLowerCase().includes(filter.toLowerCase()))
     : tags
 
   return (

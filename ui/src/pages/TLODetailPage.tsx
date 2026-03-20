@@ -116,7 +116,7 @@ interface SourceInstance {
 
 interface Source {
   name: string
-  instances: SourceInstance[]
+  instances: SourceInstance[] | null
 }
 
 interface Relationship {
@@ -402,7 +402,7 @@ function MetadataSidebar({
                   <span className="text-sm font-medium text-light-text dark:text-dark-text">
                     {source.name}
                   </span>
-                  {source.instances.map((inst, iidx) => (
+                  {(source.instances ?? []).map((inst, iidx) => (
                     <div
                       key={iidx}
                       className="text-xs text-light-text-secondary dark:text-dark-text-secondary mt-0.5 ml-2"

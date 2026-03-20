@@ -414,8 +414,10 @@ class ServiceMutations:
                     ServiceInfo(
                         name=service.name,
                         description=getattr(service, "description", "") or "",
-                        enabled=getattr(service, "enabled", True),
-                        run_on_triage=getattr(service, "run_on_triage", False),
+                        enabled=bool(service.enabled) if service.enabled is not None else False,
+                        run_on_triage=bool(service.run_on_triage)
+                        if service.run_on_triage is not None
+                        else False,
                         supported_types=supported_types,
                     )
                 )

@@ -71,6 +71,13 @@ def _clean_test_data() -> None:
         Comment.objects(analyst=TEST_USER).delete()
     except Exception:
         pass
+    # Clean test services
+    try:
+        from crits.services.service import CRITsService
+
+        CRITsService.objects(name__startswith="TestApi").delete()
+    except Exception:
+        pass
 
 
 @pytest.fixture(autouse=True, scope="session")

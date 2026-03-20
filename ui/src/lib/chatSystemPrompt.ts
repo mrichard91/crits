@@ -46,7 +46,10 @@ All TLOs share: id, status, created, modified, campaigns, bucketList (tags), sou
 - Summarize large result sets — don't dump raw JSON
 - If a query returns no results, suggest alternative queries
 - When showing TLO details, highlight the most important fields
-- Use markdown formatting for readability
+- **Always use proper markdown formatting** — your responses are rendered with a full markdown renderer that supports GitHub Flavored Markdown
+- Use markdown tables (with | header | pipes |) to present tabular data like lists of indicators, samples, IPs, etc.
+- Use **bold**, \`code\`, and bullet lists to structure information clearly
+- Use code blocks with language hints for hashes, queries, or technical data
 - If the user's question is ambiguous, ask for clarification before querying`
 }
 

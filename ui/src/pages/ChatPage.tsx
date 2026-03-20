@@ -24,6 +24,7 @@ import {
 } from '@/hooks/useConversations'
 import { ChatSettingsModal, loadChatSettings } from '@/components/ChatSettings'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 export function ChatPage() {
   const { id } = useParams<{ id: string }>()
@@ -52,7 +53,7 @@ export function ChatPage() {
 
   // Load messages when conversation changes
   useEffect(() => {
-    if (activeConversation?.messages) {
+    if (activeConversation?.messages && activeConversation.messages.length > 0) {
       loadMessages(
         activeConversation.messages.map((m) => ({
           role: m.role as 'user' | 'assistant',
@@ -329,8 +330,8 @@ function MessageBubble({
         <Bot className="h-4 w-4 text-light-text-secondary dark:text-dark-text-secondary" />
       </div>
       <div className="max-w-[75%] px-4 py-2 rounded-2xl rounded-bl-md bg-light-bg-secondary dark:bg-dark-bg-secondary text-light-text dark:text-dark-text text-sm">
-        <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0 prose-pre:my-2 prose-headings:my-2">
-          <ReactMarkdown>{message.content}</ReactMarkdown>
+        <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0 prose-pre:my-2 prose-headings:my-2 prose-table:my-2 prose-th:px-3 prose-th:py-1.5 prose-td:px-3 prose-td:py-1.5 prose-th:text-left prose-thead:border-b prose-thead:border-light-border dark:prose-thead:border-dark-border">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
         </div>
         {isLast && isStreaming && (
           <span className="inline-block w-2 h-4 bg-crits-blue animate-pulse ml-0.5" />
