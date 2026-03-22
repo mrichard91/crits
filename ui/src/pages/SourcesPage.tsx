@@ -103,7 +103,7 @@ function CreateSourceDialog({ open, onClose }: { open: boolean; onClose: () => v
     onSuccess: (data) => {
       const res = data.createSource
       if (res.success) {
-        queryClient.invalidateQueries({ queryKey: ['sources'] })
+        queryClient.invalidateQueries({ queryKey: ['sources'] }) // SourcesPage + RolesPage
         setName('')
         setResult({ type: 'success', text: res.message })
         setTimeout(() => onClose(), 1000)
