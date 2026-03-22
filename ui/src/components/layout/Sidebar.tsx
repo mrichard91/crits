@@ -46,10 +46,11 @@ interface SystemItem {
 }
 
 const SYSTEM_ITEMS: SystemItem[] = [
-  { label: 'Tags', route: '/tags', icon: Tag },
-  { label: 'Services', route: '/services', icon: Wrench },
-  { label: 'Sources', route: '/sources', icon: Database },
+  { label: 'Users', route: '/users', icon: Users },
   { label: 'Roles', route: '/roles', icon: Shield },
+  { label: 'Sources', route: '/sources', icon: Database },
+  { label: 'Services', route: '/services', icon: Wrench },
+  { label: 'Tags', route: '/tags', icon: Tag },
   { label: 'Config', route: '/config-items', icon: Settings2 },
 ]
 
@@ -231,7 +232,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             label={TLO_CONFIGS.Indicator.label}
             onNavigate={onClose}
           />
-          <SidebarLink to="/users" icon={Users} label="Users" onNavigate={onClose} />
           <SidebarLink to="/chat" icon={MessageSquare} label="AI Chat" onNavigate={onClose} />
 
           {/* Divider */}

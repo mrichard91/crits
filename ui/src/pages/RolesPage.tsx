@@ -572,8 +572,9 @@ export function RolesPage() {
   })
 
   const { data: sourcesData } = useQuery({
-    queryKey: ['sources'],
+    queryKey: ['sources', 'names'],
     queryFn: () => gqlQuery<{ sources: SourceBasic[] }>(SOURCES_QUERY),
+    staleTime: 0, // Always refetch — sources may have been created on another page
   })
 
   const toggleRole = useMutation({
