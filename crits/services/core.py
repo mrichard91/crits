@@ -9,13 +9,12 @@ import shutil
 import tempfile
 import uuid
 
-from django.conf import settings
-
 from crits.services.service_records import (
     find_service_records,
     get_service_record,
     update_service_record,
 )
+from crits.services.runtime_settings import get_company_name, get_service_dirs
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +45,7 @@ class ServiceManager(object):
         self._services = {}
 
         if services_packages is None:
-            services_packages = settings.SERVICE_DIRS
+            services_packages = get_service_dirs()
         self._import_services(services_packages)
         self._discover_services(Service)
 
@@ -351,7 +350,7 @@ class Service(object):
     - call `_debug`, `_info`, `_warning`, `_error`, `_critical` as appropriate.
     """
 
-    source = settings.COMPANY_NAME
+    source = get_company_name()
 
     # Set default for is_triage_run
     is_triage_run = False

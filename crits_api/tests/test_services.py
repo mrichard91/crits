@@ -702,6 +702,34 @@ class TestLegacyServiceRuntime:
                 sys.modules["crits.services.handlers"] = original_handlers
 
 
+class TestLegacyServiceRuntimeSettings:
+    """Test raw runtime setting helpers used by the service subsystem."""
+
+    def test_get_service_dirs_merges_env_and_config(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from crits.services import runtime_settings
+
+        monkeypatch.setattr(
+            runtime_settings,
+            "_get_runtime_config",
+            lambda: {
+                "service_dirs": [
+                    "/db/services",
+                    "/shared/services",
+                ]
+            },
+        )
+        monkeypatch.setenv("SERVICE_DIRS", "/env/services:/shared/services")
+
+        assert runtime_settings.get_service_dirs() == (
+            "/env/services",
+            "/shared/services",
+            "/db/services",
+        )
+
+
 class TestAnalysisRecordReads:
     """Test GraphQL analysis-result reads against raw Mongo documents."""
 

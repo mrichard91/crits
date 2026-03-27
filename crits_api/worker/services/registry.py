@@ -6,6 +6,7 @@ import os
 import sys
 from typing import Any
 
+from crits.services.runtime_settings import get_service_dirs
 from crits_api.db.service_records import get_service_record, list_service_names
 from crits_api.worker.services.base import AnalysisService
 
@@ -134,28 +135,12 @@ def get_triage_service_names() -> list[str]:
 def _discover_external_services() -> None:
     """Scan SERVICE_DIRS for external AnalysisService packages.
 
-    Reads directories from both Django settings (MongoDB config) and the
-    SERVICE_DIRS environment variable (colon-separated). For each directory,
-    walks subdirectories looking for packages with ``__init__.py`` and imports
-    them — the ``@register_service`` decorator fires on import.
+    Reads directories from raw CRITs config or the SERVICE_DIRS environment
+    variable. For each directory, walks subdirectories looking for packages
+    with ``__init__.py`` and imports them; the ``@register_service``
+    decorator fires on import.
     """
-    service_dirs: list[str] = []
-
-    # Source 1: Django settings (loaded from MongoDB config)
-    try:
-        from django.conf import settings
-
-        service_dirs.extend(getattr(settings, "SERVICE_DIRS", ()))
-    except Exception:
-        pass
-
-    # Source 2: SERVICE_DIRS env var (colon-separated paths)
-    env_dirs = os.environ.get("SERVICE_DIRS", "")
-    if env_dirs:
-        for d in env_dirs.split(":"):
-            d = d.strip()
-            if d and d not in service_dirs:
-                service_dirs.append(d)
+    service_dirs = list(get_service_dirs())
 
     if not service_dirs:
         return

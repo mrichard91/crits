@@ -1,11 +1,9 @@
 import copy
 from threading import local
 
-from django.conf import settings
-
 import crits.services
 
-from crits.core.class_mapper import class_from_id
+from crits.core.class_mapper import class_from_id, class_from_type
 from crits.services.core import AnalysisTask, ServiceConfigError
 from crits.services.results import finish_task, insert_analysis_results, update_analysis_results
 from crits.services.service_records import get_service_record
@@ -37,7 +35,7 @@ def execute_service_local(
     result = {"success": False, "analysis_id": "", "message": ""}
     custom_config = custom_config or {}
 
-    if type_ not in settings.CRITS_TYPES:
+    if class_from_type(type_) is None:
         result["message"] = "Unknown CRITs type."
         return result
 
