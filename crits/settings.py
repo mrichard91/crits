@@ -285,7 +285,6 @@ if crits_config.get('email_host', None):
     EMAIL_HOST =            crits_config.get('email_host', None)
 if crits_config.get('email_port', None):
     EMAIL_PORT =        int(crits_config.get('email_port', None))
-ENABLE_API =                crits_config.get('enable_api', False)
 ENABLE_TOASTS =             crits_config.get('enable_toasts', False)
 GIT_REPO_URL =              crits_config.get('git_repo_url', '')
 HTTP_PROXY =                crits_config.get('http_proxy', None)
@@ -570,12 +569,6 @@ if old_mongoengine:
         'crits.targets',
         'mongoengine.django.mongo_auth',
     )
-    # Only add tastypie if API is enabled (requires tastypie packages installed)
-    if ENABLE_API:
-        INSTALLED_APPS += (
-            'tastypie',
-            'tastypie_mongoengine',
-        )
     if ENABLE_DT:
         INSTALLED_APPS += (
             'template_timings_panel',
@@ -654,12 +647,6 @@ else:
         'django_mongoengine',
         'django_mongoengine.mongo_auth',
     )
-    # Only add tastypie if API is enabled (requires tastypie packages installed)
-    if ENABLE_API:
-        INSTALLED_APPS += (
-            'tastypie',
-            'tastypie_mongoengine',
-        )
     if ENABLE_DT:
         INSTALLED_APPS += ( 
             'template_timings_panel',

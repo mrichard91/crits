@@ -44,7 +44,6 @@ class CRITsConfig(CritsDocument, Document):
     depth_max = IntField(default=10)
     email_host = StringField(default='')
     email_port = StringField(default='')
-    enable_api = BooleanField(default=False)
     enable_toasts = BooleanField(default=False)
     git_repo_url = StringField(default='https://github.com/crits/crits')
     http_proxy = StringField(default='')

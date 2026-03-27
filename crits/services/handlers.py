@@ -32,6 +32,7 @@ from crits.core.user_tools import user_sources
 from crits.services.analysis_result import AnalysisResult, AnalysisConfig
 from crits.services.analysis_result import EmbeddedAnalysisResultLog
 from crits.services.core import ServiceConfigError, AnalysisTask
+from crits.services.results import finish_task, insert_analysis_results, update_analysis_results
 from crits.services.service import CRITsService
 
 logger = logging.getLogger(__name__)
@@ -443,52 +444,6 @@ def add_log(object_type, object_id, analysis_id, log_message, level, user):
     return results
 
 
-def finish_task(object_type, object_id, analysis_id, status, user):
-    """
-    Finish a task by setting its status to "completed" and setting the finish
-    date.
-
-    :param object_type: The top-level object type.
-    :type object_type: str
-    :param object_id: The ObjectId to search for.
-    :type object_id: str
-    :param analysis_id: The ID of the task to update.
-    :type analysis_id: str
-    :param status: The status of the task.
-    :type status: str ("error", "completed")
-    :param user: The user updating the log.
-    :type user: :class:`crits.core.user.CRITsUser`
-    :returns: dict with keys "success" (boolean) and "message" (str) if failed.
-    """
-
-    results = {'success': False}
-    if not status:
-        status = "completed"
-    if status not in ('error', 'completed'):
-        status = "completed"
-    if not object_type or not object_id or not analysis_id:
-        results['message'] = "Must supply object id/type and analysis id."
-        return results
-
-    # Validate user can add service results to this TLO.
-    klass = class_from_type(object_type)
-    params = {'id': object_id}
-    if hasattr(klass, 'source'):
-        params['source__name__in'] = user_sources(user)
-    obj = klass.objects(**params).first()
-    if not obj:
-        results['message'] = "Could not find object to add results to."
-        return results
-
-    # Update analysis log
-    date = str(datetime.datetime.now())
-    ar = AnalysisResult.objects(analysis_id=analysis_id).first()
-    if ar:
-        AnalysisResult.objects(id=ar.id).update_one(set__status=status,
-                                                    set__finish_date=date)
-    results['success'] = True
-    return results
-
 
 def update_config(service_name, config, user):
     """
@@ -691,59 +646,6 @@ def delete_analysis(task_id, user):
     ar = AnalysisResult.objects(id=task_id).first()
     if ar:
         ar.delete(username=user.username)
-
-def insert_analysis_results(task):
-    """
-    Insert analysis results for this task.
-    """
-
-    ar = AnalysisResult()
-    tdict = task.to_dict()
-    tdict['analysis_id'] = tdict['id']
-    del tdict['id']
-    ar.merge(arg_dict=tdict)
-    ar.save()
-
-def update_analysis_results(task):
-    """
-    Update analysis results for this task.
-    """
-
-    # If the task does not currently exist for the given sample in the
-    # database, add it.
-
-    found = False
-    ar = AnalysisResult.objects(analysis_id=task.task_id).first()
-    if ar:
-        found = True
-
-    if not found:
-        logger.warning("Tried to update a task that didn't exist.")
-        insert_analysis_results(task)
-    else:
-        # Otherwise, update it.
-        tdict = task.to_dict()
-        tdict['analysis_id'] = tdict['id']
-        del tdict['id']
-
-        #TODO: find a better way to do this.
-        new_dict = {}
-        for k in tdict.keys():
-            new_dict['set__%s' % k] = tdict[k]
-        try:
-            AnalysisResult.objects(id=ar.id).update_one(**new_dict)
-        except Exception as e: # assume bad data in 'results'
-            task.status = 'error'
-            new_dict['set__results'] = []
-            le = EmbeddedAnalysisResultLog()
-            le.message = 'DB Update Failed: %s' % e
-            le.level = 'error'
-            le.datetime = str(datetime.datetime.now())
-            new_dict['set__log'].append(le)
-            try:
-                AnalysisResult.objects(id=ar.id).update_one(**new_dict)
-            except: # don't know what's wrong, try writing basic log only
-                AnalysisResult.objects(id=ar.id).update_one(set__log=[le])
 
 # The service pools need to be defined down here because the functions
 # that are used by the services must already be defined.

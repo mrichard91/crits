@@ -1,12 +1,13 @@
 """Analysis result queries for CRITs GraphQL API."""
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 import strawberry
 from strawberry.types import Info
 
 from crits_api.auth.permissions import require_authenticated
+from crits_api.db.analysis_records import AnalysisRecord, find_analysis_records, get_analysis_record
 
 logger = logging.getLogger(__name__)
 
@@ -38,33 +39,11 @@ class AnalysisResultType:
     log: list[AnalysisResultLogType] = strawberry.field(default_factory=list)
 
     @classmethod
-    def from_model(cls, ar: Any) -> "AnalysisResultType":
-        """Create AnalysisResultType from AnalysisResult model."""
-        log_entries = []
-        if ar.log:
-            for entry in ar.log:
-                log_entries.append(
-                    AnalysisResultLogType(
-                        message=getattr(entry, "message", "") or "",
-                        level=getattr(entry, "level", "") or "",
-                        datetime=getattr(entry, "datetime", "") or "",
-                    )
-                )
-
-        # Convert results to JSON-serializable list
-        results_list: list[Any] = []
-        if ar.results:
-            for r in ar.results:
-                if isinstance(r, dict):
-                    results_list.append(r)
-                elif hasattr(r, "to_dict"):
-                    results_list.append(r.to_dict())
-                else:
-                    results_list.append({"result": str(r)})
-
+    def from_record(cls, ar: AnalysisRecord) -> "AnalysisResultType":
+        """Create AnalysisResultType from a normalized analysis record."""
         return cls(
-            id=str(ar.id),
-            analysis_id=str(ar.analysis_id) if ar.analysis_id else "",
+            id=ar.id,
+            analysis_id=ar.analysis_id,
             service_name=ar.service_name or "",
             version=ar.version or "",
             object_type=ar.object_type or "",
@@ -73,8 +52,15 @@ class AnalysisResultType:
             status=ar.status or "",
             start_date=ar.start_date or "",
             finish_date=ar.finish_date or "",
-            results=results_list,
-            log=log_entries,
+            results=cast(list[strawberry.scalars.JSON], list(ar.results)),
+            log=[
+                AnalysisResultLogType(
+                    message=entry.message,
+                    level=entry.level,
+                    datetime=entry.datetime,
+                )
+                for entry in ar.log
+            ],
         )
 
 
@@ -108,26 +94,22 @@ class AnalysisResultQueries:
         Returns:
             List of analysis results
         """
-        from crits.services.analysis_result import AnalysisResult
-
         limit = min(limit, 200)
 
         try:
-            queryset = AnalysisResult.objects(
-                object_type=obj_type,
-                object_id=str(obj_id),
-            )
+            query: dict[str, Any] = {
+                "object_type": obj_type,
+                "object_id": str(obj_id),
+            }
 
             if service_name:
-                queryset = queryset.filter(service_name=service_name)
+                query["service_name"] = service_name
 
             if status:
-                queryset = queryset.filter(status=status)
+                query["status"] = status
 
-            queryset = queryset.order_by("-start_date")
-            results = queryset.skip(offset).limit(limit)
-
-            return [AnalysisResultType.from_model(ar) for ar in results]
+            results = find_analysis_records(query, limit=limit, offset=offset)
+            return [AnalysisResultType.from_record(ar) for ar in results]
 
         except Exception as e:
             logger.error(f"Error fetching analysis results: {e}")
@@ -149,12 +131,10 @@ class AnalysisResultQueries:
         Returns:
             The analysis result if found, None otherwise
         """
-        from crits.services.analysis_result import AnalysisResult
-
         try:
-            ar = AnalysisResult.objects(analysis_id=analysis_id).first()
+            ar = get_analysis_record(analysis_id)
             if ar:
-                return AnalysisResultType.from_model(ar)
+                return AnalysisResultType.from_record(ar)
             return None
 
         except Exception as e:

@@ -1,12 +1,15 @@
 """Service execution pipeline.
 
-Pipeline: lookup service -> load TLO -> validate -> create record -> run -> update record -> invalidate cache.
+Pipeline:
+lookup service -> load TLO -> validate -> create record -> run -> update record
+-> invalidate cache.
 Falls back to _execute_legacy_service() for external plugins not in the modern registry.
 """
 
 import logging
 from typing import Any
 
+from crits_api.db.service_records import get_service_record
 from crits_api.worker.services.base import AnalysisContext, ServiceConfig
 from crits_api.worker.services.registry import ensure_services_registered, get_service
 from crits_api.worker.services.results import (
@@ -135,22 +138,22 @@ def _execute_legacy_service(
 ) -> dict[str, Any]:
     """Fall back to the legacy service execution path.
 
-    Calls crits.services.handlers.run_service(execute='local') inside the worker.
+    Calls the extracted legacy runtime without importing Django handlers.
     """
     result: dict[str, Any] = {"success": False, "analysis_id": "", "message": ""}
 
     try:
-        from crits.services.handlers import run_service as django_run_service
+        from crits.services.runtime import execute_service_local
 
-        legacy_result = django_run_service(
+        legacy_result = execute_service_local(
             name=service_name,
             type_=obj_type,
             id_=obj_id,
             user=username,
-            execute="local",
             custom_config=custom_config or {},
         )
         result["success"] = legacy_result.get("success", False)
+        result["analysis_id"] = legacy_result.get("analysis_id", "")
         result["message"] = legacy_result.get("html", "") or legacy_result.get("message", "")
     except Exception as e:
         logger.exception("Legacy service '%s' failed on %s/%s", service_name, obj_type, obj_id)
@@ -181,14 +184,12 @@ def _build_config(
     """
     merged: dict[str, Any] = {}
 
-    # 1. Load persisted config from CRITsService DB record
+    # 1. Load persisted config from the service metadata record
     if service_name and config_class is not ServiceConfig:
         try:
-            from crits.services.service import CRITsService
-
-            svc = CRITsService.objects(name=service_name).first()
+            svc = get_service_record(service_name)
             if svc and svc.config:
-                db_vals = svc.config.to_dict()
+                db_vals = svc.config
                 # Only keep keys that are actual fields on the config class
                 import dataclasses as _dc
 

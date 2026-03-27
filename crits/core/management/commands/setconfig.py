@@ -65,7 +65,6 @@ class Command(BaseCommand):
                depth_max:\t\t\t<integer>
                email_host:\t\t\t<string>
                email_port:\t\t\t<string>
-               enable_api:\t\t\t<boolean> (ex: True, true, yes, or 1)
                enable_toasts:\t\t\t<boolean> (ex: True, true, yes, or 1)
                git_repo_url:\t\t<string>
                http_proxy:\t\t\t<string>
@@ -210,7 +209,7 @@ def set_config_attribute(crits_config, attr, value):
     is_successful = False;
 
     if hasattr(crits_config, attr):
-        if attr in ("enable_api", "create_unknown_user", "debug", "ldap_auth",
+        if attr in ("create_unknown_user", "debug", "ldap_auth",
                     "ldap_tls", "remote_user", "secure_cookie", "enable_toasts",
                     "ldap_update_on_login", "query_caching",
                     "crits_email_end_tag"):

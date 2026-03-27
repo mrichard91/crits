@@ -28,7 +28,7 @@ class ServiceAnalysisError(Exception):
 
 class ServiceManager(object):
     """
-    Discover, register, and configure Services.
+    Discover and configure Services.
     """
 
     def __init__(self, services_packages=None):
@@ -37,15 +37,15 @@ class ServiceManager(object):
 
         - `services_packages` should be a Python package containing a single
           directory for each available service. If not provided, it will use
-          the package in which the ServiceManager class is defined.
+          the directories configured in ``settings.SERVICE_DIRS``.
         """
 
         self._services = {}
 
-        if not services_packages:
+        if services_packages is None:
             services_packages = settings.SERVICE_DIRS
         self._import_services(services_packages)
-        self._register_services(Service)
+        self._discover_services(Service)
 
     def _import_services(self, services_packages):
         """
@@ -70,16 +70,16 @@ class ServiceManager(object):
                             logger.warning("Failed to import service (%s): %s" %
                                             (services_pkg, e))
 
-    def _register_services(self, klass):
+    def _discover_services(self, klass):
         """
-        Create a dict with names of available services and classes that
-        implement them.
+        Create an in-memory dict with names of available services and classes
+        that implement them.
 
         This is a recursive function since __subclasses__() only returns direct
         subclasses. If class A(object):, class B(A):, and class C(B):, then
         A.__subclasses__() doesn't contain C.
 
-        All subclasses of the Service class are saved in the `services`
+        All subclasses of the Service class are saved in the ``_services``
         dictionary. It is intended that each of these was imported by the
         _import_services function, but this is not enforced. The key in the
         dictionary is the `name` class-level field, and the value is the class
@@ -95,16 +95,11 @@ class ServiceManager(object):
                     hasattr(service_class, "version")):
                 # If this is a subclass of Service but not an actual service
                 # call this function recursively.
-                self._register_services(service_class)
+                self._discover_services(service_class)
                 continue
 
             service_name = service_class.name
             service_version = service_class.version
-            service_description = service_class.description
-            supported_types = service_class.supported_types
-            compatability_mode = service_class.compatability_mode
-            is_triage_run = service_class.is_triage_run
-
             #logger.debug("Found service subclass: %s version %s" %
             #                (service_name, service_version))
 
@@ -117,55 +112,97 @@ class ServiceManager(object):
                 logger.warning(msg)
                 logger.warning(e)
                 continue
-            else:
-                # Only register the service if it is valid.
-                #logger.debug("Registering Service %s" % service_name)
-                svc_obj = CRITsService.objects(name=service_class.name).first()
-                service = service_class()
-                if not svc_obj:
-                    svc_obj = CRITsService()
-                    svc_obj.name = service_name
-                    try:
-                        new_config = service.get_config({})
-                        svc_obj.config = AnalysisConfig(**new_config)
-                    except ServiceConfigError:
-                        svc_obj.status = "misconfigured"
-                        msg = ("Service %s is misconfigured." % service_name)
-                        logger.warning(msg)
-                    else:
-                        svc_obj.status = "available"
-                else:
-                    existing_config = svc_obj.config.to_dict() if svc_obj.config else {}
-                    try:
-                        new_config = service.get_config(existing_config)
-                        svc_obj.config = AnalysisConfig(**new_config)
-                    except ServiceConfigError:
-                        svc_obj.status = "misconfigured"
-                        msg = ("Service %s is misconfigured." % service_name)
-                        logger.warning(msg)
-                    else:
-                        svc_obj.status = "available"
-                # Give the service a chance to tell us what is wrong with the
-                # config.
-                try:
-                    service.parse_config(svc_obj.config.to_dict())
-                except ServiceConfigError as e:
-                    svc_obj.status = "misconfigured"
 
-                svc_obj.description = service_description
-                svc_obj.version = service_version
-                svc_obj.supported_types = supported_types
-                svc_obj.compatability_mode = compatability_mode
-                svc_obj.is_triage_run = is_triage_run
-                svc_obj.save()
-                self._services[service_class.name] = service_class
-        # For anything in the database that did not import properly, mark the
-        # status to unavailable.
-        svcs = CRITsService.objects()
-        for svc in svcs:
-            if svc.name not in self._services:
+            self._services[service_class.name] = service_class
+
+    def _sync_service_record(self, service_class):
+        """
+        Create or update the database record for a discovered service.
+
+        :returns: ``True`` if a new record was created, ``False`` if an
+            existing record was updated.
+        """
+
+        service_name = service_class.name
+        service_version = service_class.version
+        service_description = service_class.description
+        supported_types = service_class.supported_types
+        compatability_mode = service_class.compatability_mode
+        is_triage_run = service_class.is_triage_run
+
+        svc_obj = CRITsService.objects(name=service_name).first()
+        created = svc_obj is None
+        service = service_class()
+
+        if not svc_obj:
+            svc_obj = CRITsService()
+            svc_obj.name = service_name
+            existing_config = {}
+        else:
+            existing_config = svc_obj.config.to_dict() if svc_obj.config else {}
+
+        try:
+            new_config = service.get_config(existing_config)
+            svc_obj.config = AnalysisConfig(**new_config)
+        except ServiceConfigError:
+            svc_obj.status = "misconfigured"
+            msg = ("Service %s is misconfigured." % service_name)
+            logger.warning(msg)
+        else:
+            svc_obj.status = "available"
+
+        # Give the service a chance to tell us what is wrong with the config.
+        try:
+            config_dict = svc_obj.config.to_dict() if svc_obj.config else {}
+            service.parse_config(config_dict)
+        except ServiceConfigError:
+            svc_obj.status = "misconfigured"
+
+        svc_obj.description = service_description
+        svc_obj.version = service_version
+        svc_obj.supported_types = supported_types
+        svc_obj.compatability_mode = compatability_mode
+        svc_obj.is_triage_run = is_triage_run
+        svc_obj.save()
+
+        return created
+
+    def sync_service_records(self, mark_unavailable=True):
+        """
+        Persist discovered service metadata to the database.
+
+        :param mark_unavailable: Mark DB service records that are no longer
+            discovered as unavailable.
+        :type mark_unavailable: bool
+        :returns: Summary counts for the sync operation.
+        :rtype: dict
+        """
+
+        created = 0
+        updated = 0
+
+        for service_class in self._services.values():
+            if self._sync_service_record(service_class):
+                created += 1
+            else:
+                updated += 1
+
+        unavailable = 0
+        if mark_unavailable:
+            available_service_names = set(self._services)
+            for svc in CRITsService.objects():
+                if svc.name in available_service_names:
+                    continue
                 svc.status = 'unavailable'
                 svc.save()
+                unavailable += 1
+
+        return {
+            'created': created,
+            'updated': updated,
+            'unavailable': unavailable,
+            'total': len(self._services),
+        }
 
     def get_service_class(self, service_name):
         """
@@ -177,6 +214,23 @@ class ServiceManager(object):
         """
 
         return self._services.get(service_name, None)
+
+
+def sync_legacy_service_records(services_packages=None, mark_unavailable=True):
+    """
+    Discover legacy services and explicitly sync their DB records.
+
+    :param services_packages: Optional service package directories to scan.
+    :type services_packages: list
+    :param mark_unavailable: Mark DB records for undiscovered services as
+        unavailable.
+    :type mark_unavailable: bool
+    :returns: Summary counts for the sync operation.
+    :rtype: dict
+    """
+
+    manager = ServiceManager(services_packages=services_packages)
+    return manager.sync_service_records(mark_unavailable=mark_unavailable)
 
 
 class AnalysisTask(object):
@@ -452,10 +506,15 @@ class Service(object):
             error = "Error running service: %s" % e
             self._error(error)
         finally:
-            if self.complete:
+            if self.complete or self.notify:
                 self._info("Analysis complete")
-                from crits.services.handlers import update_analysis_results
-                update_analysis_results(self.current_task)
+                if self.notify:
+                    self.notify(self.current_task)
+                else:
+                    from crits.services.results import update_analysis_results
+
+                    update_analysis_results(self.current_task)
+            if self.complete:
                 # Check status, if it is ERROR, don't change it.
                 if self.current_task.status == self.current_task.STATUS_ERROR:
                     status = self.current_task.STATUS_ERROR

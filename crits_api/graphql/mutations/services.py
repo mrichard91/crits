@@ -7,8 +7,14 @@ import strawberry
 from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
-from crits_api.auth.permissions import require_authenticated
+from crits_api.auth.permissions import require_admin, require_authenticated
 from crits_api.cache.decorators import _fire_invalidation
+from crits_api.db.analysis_records import get_analysis_record
+from crits_api.db.service_records import (
+    find_service_records,
+    get_service_record,
+    update_service_record,
+)
 from crits_api.graphql.types.common import MutationResult
 
 _TYPE_CACHE_KEY = {
@@ -243,9 +249,7 @@ class ServiceMutations:
             AnalysisStatusType with current status
         """
         try:
-            from crits.services.analysis_result import AnalysisResult
-
-            ar = AnalysisResult.objects(analysis_id=analysis_id).first()
+            ar = get_analysis_record(analysis_id)
             if not ar:
                 return AnalysisStatusType(
                     success=False,
@@ -273,14 +277,7 @@ class ServiceMutations:
         Uses upsert to create a CRITsService DB record if one doesn't exist yet.
         """
         try:
-            from django.conf import settings
-
-            col = settings.PY_DB[settings.COL_SERVICES]
-            col.update_one(
-                {"name": service_name},
-                {"$set": {"enabled": enabled}},
-                upsert=True,
-            )
+            update_service_record(service_name, {"enabled": enabled})
             logger.info("Toggled %s enabled=%s", service_name, enabled)
             return MutationResult(
                 success=True,
@@ -319,15 +316,8 @@ class ServiceMutations:
             return MutationResult(success=False, message="; ".join(validation_errors))
 
         try:
-            from django.conf import settings
-
-            col = settings.PY_DB[settings.COL_SERVICES]
             config_set = {f"config.{key}": val for key, val in values.items()}
-            col.update_one(
-                {"name": service_name},
-                {"$set": config_set},
-                upsert=True,
-            )
+            update_service_record(service_name, config_set)
             return MutationResult(
                 success=True,
                 message=f"Configuration updated for '{service_name}'",
@@ -346,23 +336,44 @@ class ServiceMutations:
         Uses upsert to create a CRITsService DB record if one doesn't exist yet.
         """
         try:
-            from django.conf import settings
-
-            col = settings.PY_DB[settings.COL_SERVICES]
-            col.update_one(
-                {"name": service_name},
-                {"$set": {"run_on_triage": run_on_triage}},
-                upsert=True,
-            )
+            update_service_record(service_name, {"run_on_triage": run_on_triage})
             logger.info("Toggled %s run_on_triage=%s", service_name, run_on_triage)
             return MutationResult(
                 success=True,
-                message=f"Service '{service_name}' triage {'enabled' if run_on_triage else 'disabled'}",
+                message=(
+                    f"Service '{service_name}' triage {'enabled' if run_on_triage else 'disabled'}"
+                ),
             )
         except Exception as e:
             logger.error(
                 "Error toggling service triage: %s: %s", type(e).__name__, e, exc_info=True
             )
+            return MutationResult(success=False, message=str(e))
+
+    @strawberry.mutation(
+        description="Explicitly sync legacy service records from discovered classes"
+    )
+    @require_admin
+    def sync_legacy_services(self, info: Info) -> MutationResult:
+        """Synchronize legacy service metadata into MongoDB on demand."""
+        try:
+            from crits.services import reset_service_manager
+            from crits.services.core import sync_legacy_service_records
+
+            summary = sync_legacy_service_records()
+            reset_service_manager()
+
+            return MutationResult(
+                success=True,
+                message=(
+                    "Legacy service sync complete: "
+                    f"{summary['created']} created, "
+                    f"{summary['updated']} updated, "
+                    f"{summary['unavailable']} unavailable"
+                ),
+            )
+        except Exception as e:
+            logger.error("Error syncing legacy services: %s", e, exc_info=True)
             return MutationResult(success=False, message=str(e))
 
     @strawberry.field(description="List available services")
@@ -374,8 +385,6 @@ class ServiceMutations:
         Returns:
             List of ServiceInfo objects describing available services
         """
-        from crits.services.service import CRITsService
-
         services: list[ServiceInfo] = []
         seen_names: set[str] = set()
 
@@ -388,12 +397,21 @@ class ServiceMutations:
 
             ensure_services_registered()
             for name, cls in get_all_services().items():
+                db_record = get_service_record(name)
                 services.append(
                     ServiceInfo(
                         name=cls.name,
                         description=cls.description,
-                        enabled=True,
-                        run_on_triage=cls.run_on_triage,
+                        enabled=(
+                            bool(db_record.enabled)
+                            if db_record and db_record.enabled is not None
+                            else True
+                        ),
+                        run_on_triage=(
+                            bool(db_record.run_on_triage)
+                            if db_record and db_record.run_on_triage is not None
+                            else cls.run_on_triage
+                        ),
                         supported_types=list(cls.supported_types),
                     )
                 )
@@ -403,22 +421,19 @@ class ServiceMutations:
 
         # Legacy DB services (not already covered by modern)
         try:
-            for service in CRITsService.objects():
+            for service in find_service_records():
                 if service.name in seen_names:
                     continue
-                supported_types: list[str] = []
-                if hasattr(service, "supported_types"):
-                    supported_types = list(service.supported_types or [])
 
                 services.append(
                     ServiceInfo(
                         name=service.name,
-                        description=getattr(service, "description", "") or "",
+                        description=service.description,
                         enabled=bool(service.enabled) if service.enabled is not None else False,
                         run_on_triage=bool(service.run_on_triage)
                         if service.run_on_triage is not None
                         else False,
-                        supported_types=supported_types,
+                        supported_types=list(service.supported_types or []),
                     )
                 )
         except Exception as e:

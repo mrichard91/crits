@@ -1,6 +1,3 @@
-import os
-import importlib.util
-
 from django.conf import settings
 from django.urls import include, re_path as url
 
@@ -37,68 +34,6 @@ handler500 = 'crits.core.errors.custom_500'
 handler404 = 'crits.core.errors.custom_404'
 handler403 = 'crits.core.errors.custom_403'
 handler400 = 'crits.core.errors.custom_400'
-
-# Enable the API if configured
-# django_tastypie_mongoengine is broken with more recent versions of mongoengine
-if settings.ENABLE_API:
-    from tastypie.api import Api
-    from crits.actors.api import ActorResource, ActorIdentifierResource
-    from crits.backdoors.api import BackdoorResource
-    from crits.campaigns.api import CampaignResource
-    from crits.certificates.api import CertificateResource
-    from crits.comments.api import CommentResource
-    from crits.domains.api import DomainResource
-    from crits.emails.api import EmailResource
-    from crits.events.api import EventResource
-    from crits.exploits.api import ExploitResource
-    from crits.indicators.api import IndicatorResource, IndicatorActivityResource
-    from crits.ips.api import IPResource
-    from crits.pcaps.api import PCAPResource
-    from crits.raw_data.api import RawDataResource
-    from crits.samples.api import SampleResource
-    from crits.screenshots.api import ScreenshotResource
-    from crits.services.api import ServiceResource
-    from crits.signatures.api import SignatureResource
-    from crits.targets.api import TargetResource
-    from crits.vocabulary.api import VocabResource
-
-    v1_api = Api(api_name='v1')
-    v1_api.register(ActorResource())
-    v1_api.register(ActorIdentifierResource())
-    v1_api.register(BackdoorResource())
-    v1_api.register(CampaignResource())
-    v1_api.register(CertificateResource())
-    v1_api.register(CommentResource())
-    v1_api.register(DomainResource())
-    v1_api.register(EmailResource())
-    v1_api.register(EventResource())
-    v1_api.register(ExploitResource())
-    v1_api.register(IndicatorResource())
-    v1_api.register(IndicatorActivityResource())
-    v1_api.register(IPResource())
-    v1_api.register(PCAPResource())
-    v1_api.register(RawDataResource())
-    v1_api.register(SampleResource())
-    v1_api.register(ScreenshotResource())
-    v1_api.register(ServiceResource())
-    v1_api.register(SignatureResource())
-    v1_api.register(TargetResource())
-    v1_api.register(VocabResource())
-
-    for service_directory in settings.SERVICE_DIRS:
-        if os.path.isdir(service_directory):
-            for d in os.listdir(service_directory):
-                abs_path = os.path.join(service_directory, d, 'urls.py')
-                if os.path.isfile(abs_path):
-                    try:
-                        spec = importlib.util.spec_from_file_location('urls', abs_path)
-                        rdef = importlib.util.module_from_spec(spec)
-                        spec.loader.exec_module(rdef)
-                        rdef.register_api(v1_api)
-                    except Exception as e:
-                        pass
-
-    urlpatterns.append(url(r'^api/', include(v1_api.urls)))
 
 # This code allows static content to be served up by the development server
 if settings.DEVEL_INSTANCE:

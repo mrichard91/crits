@@ -27,10 +27,6 @@ class ConfigGeneralForm(forms.Form):
         widget=forms.TextInput,
         help_text='*Requires a web server restart.',
         required=False)
-    enable_api = forms.BooleanField(
-        help_text='*Requires a web server restart.',
-        initial=False,
-        required=False)
     http_proxy = forms.CharField(
         widget=forms.TextInput,
         help_text='*Requires a web server restart.',

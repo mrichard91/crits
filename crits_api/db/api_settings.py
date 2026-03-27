@@ -284,7 +284,6 @@ CRITS_EMAIL = _crits_config.get("crits_email", "")
 CRITS_EMAIL_SUBJECT_TAG = _crits_config.get("crits_email_subject_tag", "")
 CRITS_EMAIL_END_TAG = _crits_config.get("crits_email_end_tag", True)
 DEVEL_INSTANCE = False
-ENABLE_API = False
 ENABLE_TOASTS = _crits_config.get("enable_toasts", False)
 ENABLE_DT = False
 GIT_HASH = ""

@@ -6,6 +6,7 @@ import os
 import sys
 from typing import Any
 
+from crits_api.db.service_records import get_service_record, list_service_names
 from crits_api.worker.services.base import AnalysisService
 
 logger = logging.getLogger(__name__)
@@ -46,26 +47,22 @@ def get_all_services() -> dict[str, type[AnalysisService]]:
 def _is_triage_enabled(cls: type[AnalysisService]) -> bool:
     """Check if a modern service should run on triage, respecting DB overrides."""
     try:
-        from crits.services.service import CRITsService
-
-        db_record = CRITsService.objects(name=cls.name).first()
+        db_record = get_service_record(cls.name)
         if db_record and db_record.run_on_triage is not None:
             return bool(db_record.run_on_triage)
     except Exception:
-        pass
+        logger.debug("Could not load triage override for %s", cls.name)
     return cls.run_on_triage
 
 
 def _is_service_enabled(cls: type[AnalysisService]) -> bool:
     """Check if a modern service is enabled, respecting DB overrides."""
     try:
-        from crits.services.service import CRITsService
-
-        db_record = CRITsService.objects(name=cls.name).first()
+        db_record = get_service_record(cls.name)
         if db_record and db_record.enabled is not None:
             return bool(db_record.enabled)
     except Exception:
-        pass
+        logger.debug("Could not load enabled override for %s", cls.name)
     return True
 
 
@@ -80,13 +77,17 @@ def get_triage_services() -> list[type[AnalysisService]]:
     ]
 
     # Merge with legacy triage services from the DB
-    legacy_names: list[str] = []
     try:
-        from crits.services.handlers import triage_services as legacy_triage_services
-
-        legacy_names = legacy_triage_services(status=True)
+        legacy_names = list_service_names(
+            {
+                "run_on_triage": True,
+                "enabled": True,
+                "status": "available",
+            }
+        )
     except Exception:
-        logger.debug("Could not load legacy triage services")
+        legacy_names = []
+        logger.debug("Could not load legacy triage service names")
 
     # Filter out legacy services that have a modern replacement
     modern_names = {cls.name for cls in modern_triage}
@@ -109,11 +110,16 @@ def get_triage_service_names() -> list[str]:
     ]
 
     try:
-        from crits.services.handlers import triage_services as legacy_triage_services
-
-        legacy = legacy_triage_services(status=True)
+        legacy = list_service_names(
+            {
+                "run_on_triage": True,
+                "enabled": True,
+                "status": "available",
+            }
+        )
     except Exception:
         legacy = []
+        logger.debug("Could not load combined triage service names")
 
     # Merge — modern first, then legacy not already covered
     seen = set(modern)
