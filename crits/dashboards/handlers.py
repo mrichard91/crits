@@ -22,6 +22,7 @@ import json
 from django.utils.html import escape as html_escape
 import html
 import datetime
+import re
 from django.http import HttpRequest
 from crits.dashboards.utilities import getHREFLink, get_obj_name_from_title, get_obj_type_from_string
 
@@ -436,6 +437,8 @@ def get_table_data(request=None,obj=None,user=None,searchTerm="",
     saved_search.html or the above ConstructTable function
     """
     from crits.core.handlers import get_query, data_query
+    from crits.services.analysis_records import count_analysis_records, find_analysis_records
+    from crits.services.handlers import _analysis_results_query
     response = {"Result": "ERROR"}
     obj_type = get_obj_type_from_string(obj)
 
@@ -447,7 +450,36 @@ def get_table_data(request=None,obj=None,user=None,searchTerm="",
     # Build the query
     term = ""
     #if its being called from saved_search.html
-    if not user.has_access_to(acl.READ):
+    if obj == "AnalysisResult":
+        if request and request.is_ajax():
+            resp = {
+                "Result": "OK",
+                "query": _analysis_results_query(request),
+                "term": request.GET.get("q", ""),
+            }
+        elif user and search_type:
+            term = searchTerm
+            query = {}
+            if term:
+                pattern = {"$regex": re.escape(searchTerm), "$options": "i"}
+                if search_type == "analysis_result":
+                    query["results.result"] = pattern
+                else:
+                    query["$or"] = [
+                        {"service_name": pattern},
+                        {"object_type": pattern},
+                        {"object_id": pattern},
+                        {"analyst": pattern},
+                        {"results.result": pattern},
+                        {"version": pattern},
+                    ]
+            resp = {"Result": "OK", "query": query, "term": term}
+        else:
+            return HttpResponse(
+                json.dumps(response, default=json_handler),
+                content_type="application/json",
+            )
+    elif not user.has_access_to(acl.READ):
         resp = {}
         resp['Result'] = "ERROR"
         resp['msg'] = "User does not have permission to view object."
@@ -471,7 +503,25 @@ def get_table_data(request=None,obj=None,user=None,searchTerm="",
         elif sort['direction'] == 'desc':
             sortBy.append("-"+sort['field'])
     skip = (int(pageNumber)-1)*25
-    if request:
+    if obj == "AnalysisResult":
+        sort_spec = [("start_date", -1)]
+        if sortBy:
+            sort_spec = [
+                (field[1:], -1) if field.startswith("-") else (field, 1)
+                for field in sortBy
+            ]
+        records = find_analysis_records(
+            query,
+            limit=int(maxRows),
+            offset=skip,
+            sort=sort_spec,
+        )
+        response = {
+            "result": "OK",
+            "count": count_analysis_records(query),
+            "data": [record.to_dict() for record in records],
+        }
+    elif request:
         response = data_query(obj_type, user=request.user, query=query,
                           projection=includes, limit=int(maxRows), sort=sortBy, skip=skip)
     else:
@@ -482,7 +532,8 @@ def get_table_data(request=None,obj=None,user=None,searchTerm="",
     response['crits_type'] = obj_type
     # Escape term for rendering in the UI.
     response['term'] = html.escape(term)
-    response['data'] = response['data'].to_dict(excludes, includes)
+    if obj != "AnalysisResult":
+        response['data'] = response['data'].to_dict(excludes, includes)
     response['Records'] = parseDocObjectsToStrings(response.pop('data'), obj)
     response['TotalRecordCount'] = response.pop('count')
     response['Result'] = response.pop('result')
@@ -541,12 +592,29 @@ def generate_search_for_saved_table(user, id=None,request=None):
     url = ""
     if not savedSearch.isDefaultOnDashboard:
         objType = get_obj_type_from_string(savedSearch.objType)
-        resp = get_query_without_request(objType, user, savedSearch.searchTerm, "global")
-        if resp['Result'] == "ERROR":
-            return resp
-        formatted_query = resp['query']
-        term = resp['term']
-        resp = data_query(objType, user, query=formatted_query, count=True)
+        if savedSearch.objType == "AnalysisResult":
+            from crits.services.analysis_records import count_analysis_records
+
+            query = {}
+            if savedSearch.searchTerm:
+                pattern = {"$regex": re.escape(savedSearch.searchTerm), "$options": "i"}
+                query["$or"] = [
+                    {"service_name": pattern},
+                    {"object_type": pattern},
+                    {"object_id": pattern},
+                    {"analyst": pattern},
+                    {"results.result": pattern},
+                    {"version": pattern},
+                ]
+            term = savedSearch.searchTerm
+            resp = {"count": count_analysis_records(query)}
+        else:
+            resp = get_query_without_request(objType, user, savedSearch.searchTerm, "global")
+            if resp['Result'] == "ERROR":
+                return resp
+            formatted_query = resp['query']
+            term = resp['term']
+            resp = data_query(objType, user, query=formatted_query, count=True)
         results.append({'count': resp['count'],
                                       'name': savedSearch.objType})
     else:

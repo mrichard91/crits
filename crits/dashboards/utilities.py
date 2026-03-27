@@ -1,5 +1,4 @@
 from crits.actors.actor import Actor
-from crits.services.analysis_result import AnalysisResult
 from crits.campaigns.campaign import Campaign
 from crits.certificates.certificate import Certificate
 from crits.comments.comment import Comment
@@ -90,7 +89,7 @@ def get_obj_type_from_string(objType):
     if objType == "Actor":
         return Actor
     elif objType == "AnalysisResult":
-        return AnalysisResult
+        return "AnalysisResult"
     elif objType == "Campaign":
         return Campaign
     elif objType == "Certificate":

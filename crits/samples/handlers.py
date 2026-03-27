@@ -45,7 +45,7 @@ from crits.pcaps.handlers import handle_pcap_file
 from crits.samples.forms import XORSearchForm, UnzipSampleForm, UploadFileForm
 from crits.samples.sample import Sample
 from crits.samples.yarahit import YaraHit
-from crits.services.analysis_result import AnalysisResult
+from crits.services.analysis_records import count_analysis_records
 from crits.services.handlers import run_triage, get_supported_services
 from crits.stats.handlers import generate_yara_hits
 
@@ -1007,7 +1007,7 @@ def handle_file(filename, data, source, source_method='', source_reference='',
         sample.reload()
 
         # run sample triage:
-        if AnalysisResult.objects(object_id=str(sample.id)).count() < 1:
+        if count_analysis_records({"object_id": str(sample.id)}) < 1:
             run_triage(sample, user)
 
             if is_return_only_md5 == False:

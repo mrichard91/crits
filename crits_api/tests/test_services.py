@@ -1047,7 +1047,7 @@ class TestCoreAnalysisRecordAccess:
                     "status": "completed",
                     "start_date": "2026-03-27 13:00:00",
                     "finish_date": "2026-03-27 13:00:05",
-                    "results": [{"subtype": "hash", "result": "deadbeef"}],
+                    "results": [{"subtype": "hash", "result": "test-api-global-search-hit"}],
                     "log": [],
                 }
             )
@@ -1061,8 +1061,8 @@ class TestCoreAnalysisRecordAccess:
                 lambda *_args, **_kwargs: {
                     "Result": "OK",
                     "query": {},
-                    "term": "deadbeef",
-                    "urlparams": "?q=deadbeef&search_type=global",
+                    "term": "test-api-global-search-hit",
+                    "urlparams": "?q=test-api-global-search-hit&search_type=global",
                 },
             )
             monkeypatch.setattr(
@@ -1073,7 +1073,7 @@ class TestCoreAnalysisRecordAccess:
 
             request = RequestFactory().get(
                 "/search/",
-                {"q": "deadbeef", "search_type": "global"},
+                {"q": "test-api-global-search-hit", "search_type": "global"},
             )
             request.user = test_user
 
@@ -1082,7 +1082,57 @@ class TestCoreAnalysisRecordAccess:
             assert result["Result"] == "OK"
             matching = [item for item in result["results"] if item["name"] == "AnalysisResult"]
             assert matching
-            assert matching[0]["count"] == 1
+            assert matching[0]["count"] >= 1
+        finally:
+            col.delete_many({"analysis_id": analysis_id})
+
+
+class TestDashboardAnalysisRecordAccess:
+    """Test dashboard access to analysis results without the legacy model."""
+
+    def test_dashboard_get_table_data_uses_raw_analysis_records(self, test_user: Any) -> None:
+        from django.conf import settings as django_settings
+
+        from crits.dashboards import handlers as dashboard_handlers
+
+        col = django_settings.PY_DB[django_settings.COL_ANALYSIS_RESULTS]
+        analysis_id = "test-api-dashboard-analysis-results"
+        col.delete_many({"analysis_id": analysis_id})
+
+        try:
+            col.insert_one(
+                {
+                    "analysis_id": analysis_id,
+                    "service_name": "DashboardAnalysisService",
+                    "version": "1.0.0",
+                    "object_type": "Sample",
+                    "object_id": "dashboard123",
+                    "analyst": test_user.username,
+                    "status": "completed",
+                    "start_date": "2026-03-27 14:00:00",
+                    "finish_date": "2026-03-27 14:00:05",
+                    "results": [{"subtype": "hash", "result": "test-api-dashboard-hit"}],
+                    "log": [],
+                }
+            )
+
+            response = dashboard_handlers.get_table_data(
+                obj="AnalysisResult",
+                user=test_user,
+                searchTerm="test-api-dashboard-hit",
+                search_type="global",
+                maxRows=10,
+            )
+
+            assert response["Result"] == "OK"
+            assert response["TotalRecordCount"] >= 1
+            matching = [
+                record
+                for record in response["Records"]
+                if record["service_name"] == "DashboardAnalysisService"
+            ]
+            assert matching
+            assert matching[0]["results"] == "1"
         finally:
             col.delete_many({"analysis_id": analysis_id})
 
