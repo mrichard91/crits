@@ -602,16 +602,18 @@ class TestLegacyServiceRuntime:
         test_user: Any,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
+        from django.conf import settings as django_settings
+
         import crits.services as services_pkg
         import crits.services.results as service_results
         from crits.services.analysis_result import AnalysisResult
         from crits.services.core import Service
         from crits.services.runtime import execute_service_local
-        from crits.services.service import CRITsService
 
         name = "TestApiLegacyRuntimeService"
-        CRITsService.objects(name=name).delete()
         AnalysisResult.objects(service_name=name).delete()
+        services_col = django_settings.PY_DB[django_settings.COL_SERVICES]
+        services_col.delete_many({"name": name})
 
         class FakeLegacyService(Service):
             name: str = ""
@@ -660,15 +662,18 @@ class TestLegacyServiceRuntime:
         monkeypatch.setattr(service_results, "class_from_type", fake_class_from_type)
 
         try:
-            CRITsService(
-                name=name,
-                description="Service for runtime tests",
-                version="1.0.0",
-                status="available",
-                enabled=True,
-                run_on_triage=False,
-                supported_types=["Sample"],
-            ).save()
+            services_col.insert_one(
+                {
+                    "name": name,
+                    "description": "Service for runtime tests",
+                    "version": "1.0.0",
+                    "status": "available",
+                    "enabled": True,
+                    "run_on_triage": False,
+                    "supported_types": ["Sample"],
+                    "config": {},
+                }
+            )
 
             result = execute_service_local(
                 name=name,
@@ -689,7 +694,7 @@ class TestLegacyServiceRuntime:
             assert ar.results == [{"subtype": "test", "result": "value"}]
         finally:
             AnalysisResult.objects(service_name=name).delete()
-            CRITsService.objects(name=name).delete()
+            services_col.delete_many({"name": name})
             if original_handlers is None:
                 sys.modules.pop("crits.services.handlers", None)
             else:

@@ -11,8 +11,12 @@ import uuid
 
 from django.conf import settings
 
-from crits.services.analysis_result import EmbeddedAnalysisResultLog, AnalysisConfig
-from crits.services.service import CRITsService
+from crits.services.analysis_result import EmbeddedAnalysisResultLog
+from crits.services.service_records import (
+    find_service_records,
+    get_service_record,
+    update_service_record,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -130,40 +134,38 @@ class ServiceManager(object):
         compatability_mode = service_class.compatability_mode
         is_triage_run = service_class.is_triage_run
 
-        svc_obj = CRITsService.objects(name=service_name).first()
+        svc_obj = get_service_record(service_name)
         created = svc_obj is None
         service = service_class()
 
-        if not svc_obj:
-            svc_obj = CRITsService()
-            svc_obj.name = service_name
-            existing_config = {}
-        else:
-            existing_config = svc_obj.config.to_dict() if svc_obj.config else {}
+        existing_config = dict(svc_obj.config) if svc_obj else {}
+        config_to_store = dict(existing_config)
+        status = "available"
 
         try:
             new_config = service.get_config(existing_config)
-            svc_obj.config = AnalysisConfig(**new_config)
+            config_to_store = dict(new_config)
         except ServiceConfigError:
-            svc_obj.status = "misconfigured"
+            status = "misconfigured"
             msg = ("Service %s is misconfigured." % service_name)
             logger.warning(msg)
-        else:
-            svc_obj.status = "available"
 
         # Give the service a chance to tell us what is wrong with the config.
         try:
-            config_dict = svc_obj.config.to_dict() if svc_obj.config else {}
-            service.parse_config(config_dict)
+            service.parse_config(config_to_store)
         except ServiceConfigError:
-            svc_obj.status = "misconfigured"
+            status = "misconfigured"
 
-        svc_obj.description = service_description
-        svc_obj.version = service_version
-        svc_obj.supported_types = supported_types
-        svc_obj.compatability_mode = compatability_mode
-        svc_obj.is_triage_run = is_triage_run
-        svc_obj.save()
+        update_fields = {
+            "description": service_description,
+            "version": service_version,
+            "supported_types": supported_types,
+            "compatability_mode": compatability_mode,
+            "is_triage_run": is_triage_run,
+            "status": status,
+            "config": config_to_store,
+        }
+        update_service_record(service_name, update_fields)
 
         return created
 
@@ -190,11 +192,10 @@ class ServiceManager(object):
         unavailable = 0
         if mark_unavailable:
             available_service_names = set(self._services)
-            for svc in CRITsService.objects():
+            for svc in find_service_records():
                 if svc.name in available_service_names:
                     continue
-                svc.status = 'unavailable'
-                svc.save()
+                update_service_record(svc.name, {"status": "unavailable"})
                 unavailable += 1
 
         return {

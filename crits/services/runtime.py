@@ -9,7 +9,7 @@ from crits.core.class_mapper import class_from_id
 from crits.services.analysis_result import AnalysisConfig
 from crits.services.core import AnalysisTask, ServiceConfigError
 from crits.services.results import finish_task, insert_analysis_results, update_analysis_results
-from crits.services.service import CRITsService
+from crits.services.service_records import get_service_record
 
 
 def _resolve_user(user):
@@ -47,8 +47,8 @@ def execute_service_local(
         result["message"] = "Unable to find user."
         return result
 
-    service = CRITsService.objects(name=name, enabled=True, status="available").first()
-    if not service:
+    service = get_service_record(name)
+    if not service or service.enabled is not True or service.status != "available":
         result["message"] = "Service %s is unknown or not enabled." % name
         return result
 
@@ -78,7 +78,7 @@ def execute_service_local(
         result["message"] = str(e)
         return result
 
-    db_config = service.config.to_dict() if service.config else {}
+    db_config = dict(service.config)
     try:
         service_class.validate_runtime(custom_config, db_config)
     except ServiceConfigError as e:
