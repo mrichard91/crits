@@ -68,6 +68,7 @@ class ServiceRecord:
     """Normalized service metadata record from MongoDB."""
 
     name: str
+    type: str = ""
     description: str = ""
     version: str = ""
     enabled: bool | None = None
@@ -82,6 +83,7 @@ class ServiceRecord:
     def from_document(cls, document: dict[str, Any]) -> "ServiceRecord":
         return cls(
             name=str(document.get("name", "")),
+            type=str(document.get("type", "") or ""),
             description=str(document.get("description", "") or ""),
             version=str(document.get("version", "") or ""),
             enabled=document.get("enabled"),
@@ -92,6 +94,23 @@ class ServiceRecord:
             compatability_mode=document.get("compatability_mode"),
             is_triage_run=document.get("is_triage_run"),
         )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-serializable dict representation."""
+
+        return {
+            "name": self.name,
+            "type": self.type,
+            "description": self.description,
+            "version": self.version,
+            "enabled": self.enabled,
+            "run_on_triage": self.run_on_triage,
+            "status": self.status,
+            "supported_types": list(self.supported_types),
+            "config": dict(self.config),
+            "compatability_mode": self.compatability_mode,
+            "is_triage_run": self.is_triage_run,
+        }
 
 
 def get_service_record(service_name: str) -> ServiceRecord | None:

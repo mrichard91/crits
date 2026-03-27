@@ -162,7 +162,13 @@ def to_dict(obj):
     :returns: dict
     """
 
-    return obj.to_dict()
+    if obj is None:
+        return {}
+    if isinstance(obj, dict):
+        return obj
+    if hasattr(obj, "to_dict"):
+        return obj.to_dict()
+    return {}
 
 @register.filter
 def absVal(value):

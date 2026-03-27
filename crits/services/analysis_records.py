@@ -10,6 +10,7 @@ from datetime import datetime
 from functools import lru_cache
 from typing import Any
 
+from bson import ObjectId
 from pymongo import DESCENDING, MongoClient
 from pymongo.collection import Collection
 
@@ -148,6 +149,10 @@ class AnalysisRecord:
     status: str = ""
     start_date: str = ""
     finish_date: str = ""
+    source: str = ""
+    template: str = ""
+    distributed: bool = False
+    config: dict[str, Any] = field(default_factory=dict)
     results: list[dict[str, Any]] = field(default_factory=list)
     log: list[AnalysisLogRecord] = field(default_factory=list)
 
@@ -164,6 +169,10 @@ class AnalysisRecord:
             status=str(document.get("status", "") or ""),
             start_date=str(document.get("start_date", "") or ""),
             finish_date=str(document.get("finish_date", "") or ""),
+            source=str(document.get("source", "") or ""),
+            template=str(document.get("template", "") or ""),
+            distributed=bool(document.get("distributed", False)),
+            config=_normalize_config(document.get("config")),
             results=_normalize_results(document.get("results")),
             log=[
                 AnalysisLogRecord.from_document(entry)
@@ -171,6 +180,35 @@ class AnalysisRecord:
                 if isinstance(entry, dict)
             ],
         )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-serializable dict representation."""
+
+        return {
+            "id": self.id,
+            "analysis_id": self.analysis_id,
+            "service_name": self.service_name,
+            "version": self.version,
+            "object_type": self.object_type,
+            "object_id": self.object_id,
+            "analyst": self.analyst,
+            "status": self.status,
+            "start_date": self.start_date,
+            "finish_date": self.finish_date,
+            "source": self.source,
+            "template": self.template,
+            "distributed": self.distributed,
+            "config": dict(self.config),
+            "results": list(self.results),
+            "log": [
+                {
+                    "message": entry.message,
+                    "level": entry.level,
+                    "datetime": entry.datetime,
+                }
+                for entry in self.log
+            ],
+        }
 
 
 def create_analysis_record(
@@ -228,6 +266,18 @@ def get_analysis_record(analysis_id: str) -> AnalysisRecord | None:
     return AnalysisRecord.from_document(document)
 
 
+def get_analysis_record_by_id(record_id: str) -> AnalysisRecord | None:
+    """Fetch a single analysis result by MongoDB _id."""
+
+    if not ObjectId.is_valid(record_id):
+        return None
+
+    document = _get_analysis_results_collection().find_one({"_id": ObjectId(record_id)})
+    if not document:
+        return None
+    return AnalysisRecord.from_document(document)
+
+
 def find_analysis_records(
     query: dict[str, Any] | None = None,
     *,
@@ -244,6 +294,12 @@ def find_analysis_records(
         .limit(limit)
     )
     return [AnalysisRecord.from_document(document) for document in cursor]
+
+
+def count_analysis_records(query: dict[str, Any] | None = None) -> int:
+    """Count analysis result documents matching a MongoDB query."""
+
+    return int(_get_analysis_results_collection().count_documents(query or {}))
 
 
 def finish_analysis_record(analysis_id: str, status: str = "completed") -> None:
@@ -289,6 +345,38 @@ def update_analysis_record(
         logger.warning("Analysis record %s not found for update", analysis_id)
 
 
+def append_analysis_results(analysis_id: str, results: list[dict[str, Any]]) -> bool:
+    """Append result rows to an analysis result document."""
+
+    update_result = _get_analysis_results_collection().update_one(
+        {"analysis_id": analysis_id},
+        {
+            "$push": {"results": {"$each": _normalize_results(results)}},
+            "$set": {"schema_version": ANALYSIS_RECORD_SCHEMA_VERSION},
+        },
+    )
+    return update_result.matched_count > 0
+
+
+def append_analysis_log(analysis_id: str, message: str, level: str) -> bool:
+    """Append a log row to an analysis result document."""
+
+    update_result = _get_analysis_results_collection().update_one(
+        {"analysis_id": analysis_id},
+        {
+            "$push": {
+                "log": {
+                    "message": str(message),
+                    "level": str(level),
+                    "datetime": str(datetime.now()),
+                }
+            },
+            "$set": {"schema_version": ANALYSIS_RECORD_SCHEMA_VERSION},
+        },
+    )
+    return update_result.matched_count > 0
+
+
 def update_analysis_record_from_task(task: Any) -> None:
     """Replace a task-backed analysis result document."""
 
@@ -323,3 +411,13 @@ def mark_analysis_error(analysis_id: str, error_message: str) -> None:
 
     if update_result.matched_count == 0:
         logger.warning("Analysis record %s not found for error marking", analysis_id)
+
+
+def delete_analysis_record_by_id(record_id: str) -> bool:
+    """Delete an analysis result document by MongoDB _id."""
+
+    if not ObjectId.is_valid(record_id):
+        return False
+
+    delete_result = _get_analysis_results_collection().delete_one({"_id": ObjectId(record_id)})
+    return delete_result.deleted_count > 0

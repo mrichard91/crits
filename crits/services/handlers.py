@@ -8,11 +8,6 @@ from django.http import HttpResponse
 from multiprocessing import Process
 from threading import Thread, local
 
-try:
-    from mongoengine.base import ValidationError
-except ImportError:
-    from mongoengine.errors import ValidationError
-
 from multiprocessing.pool import Pool, ThreadPool
 
 try:
@@ -28,12 +23,18 @@ from crits.core.class_mapper import class_from_type, class_from_id
 from crits.core.crits_mongoengine import json_handler
 from crits.core.handlers import build_jtable, csv_export
 from crits.core.handlers import jtable_ajax_list, jtable_ajax_delete
-from crits.core.user_tools import user_sources
-from crits.services.analysis_result import AnalysisResult, AnalysisConfig
-from crits.services.analysis_result import EmbeddedAnalysisResultLog
+from crits.services.analysis_records import (
+    append_analysis_log,
+    append_analysis_results,
+    delete_analysis_record_by_id,
+)
 from crits.services.core import ServiceConfigError, AnalysisTask
 from crits.services.results import finish_task, insert_analysis_results, update_analysis_results
-from crits.services.service import CRITsService
+from crits.services.service_records import (
+    find_service_records,
+    get_service_record,
+    update_service_record,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,8 @@ def generate_analysis_results_csv(request):
     :type request: :class:`django.http.HttpRequest`
     :returns: :class:`django.http.HttpResponse`
     """
+
+    from crits.services.analysis_result import AnalysisResult
 
     response = csv_export(request,AnalysisResult)
     return response
@@ -59,6 +62,8 @@ def generate_analysis_results_jtable(request, option):
     :type option: str of either 'jtlist', 'jtdelete', or 'inline'.
     :returns: :class:`django.http.HttpResponse`
     """
+
+    from crits.services.analysis_result import AnalysisResult
 
     obj_type = AnalysisResult
     type_ = "analysis_result"
@@ -172,7 +177,7 @@ def run_service(name, type_, id_, user, obj=None, execute='local',
             result['html'] = 'Could not find object.'
             return result
 
-    service = CRITsService.objects(name=name).first()
+    service = get_service_record(name)
     if not service:
         result['html'] = "Unable to find service in database."
         return result
@@ -205,7 +210,7 @@ def run_service(name, type_, id_, user, obj=None, execute='local',
 
     # Get the config from the database and validate the submitted options
     # exist.
-    db_config = service.config.to_dict()
+    db_config = dict(service.config)
     try:
         service_class.validate_runtime(custom_config, db_config)
     except ServiceConfigError as e:
@@ -240,7 +245,7 @@ def run_service(name, type_, id_, user, obj=None, execute='local',
     service_class.save_runtime_config(saved_config)
 
     task = AnalysisTask(local_obj.obj, service_instance, user)
-    task.config = AnalysisConfig(**saved_config)
+    task.config = dict(saved_config)
     task.start()
     add_task(task)
 
@@ -390,11 +395,10 @@ def add_results(object_type, object_id, analysis_id, result, type_, subtype,
             final[k] = tmp[k]
         final_list.append(final)
 
-    ar = AnalysisResult.objects(analysis_id=analysis_id).first()
-    if ar:
-        AnalysisResult.objects(id=ar.id).update_one(push_all__results=final_list)
-
-    res['success'] = True
+    if append_analysis_results(analysis_id, final_list):
+        res['success'] = True
+    else:
+        res['message'] = "Could not find task to add results to."
     return res
 
 
@@ -430,14 +434,7 @@ def add_log(object_type, object_id, analysis_id, log_message, level, user):
         results['message'] = "Could not find object to add results to."
         return results
 
-    # Update analysis log
-    le = EmbeddedAnalysisResultLog()
-    le.message = log_message
-    le.level = level
-    le.datetime = str(datetime.datetime.now())
-    ar = AnalysisResult.objects(analysis_id=analysis_id).first()
-    if ar:
-        AnalysisResult.objects(id=ar.id).update_one(push__log=le)
+    if append_analysis_log(analysis_id, log_message, level):
         results['success'] = True
     else:
         results['message'] = "Could not find task to add log to."
@@ -449,25 +446,22 @@ def update_config(service_name, config, user):
     """
     Update the configuration for a service.
     """
+    service = get_service_record(service_name)
+    if not service:
+        return {'success': False, 'message': 'Unknown service.'}
 
-    service = CRITsService.objects(name=service_name).first()
-    service.config = AnalysisConfig(**config)
-    try:
-        #TODO: get/validate the config from service author to set status
-        #update_status(service_name)
-        service.save(username=user.username)
-        return {'success': True}
-    except ValidationError as e:
-        return {'success': False, 'message': e}
+    update_service_record(service_name, {"config": dict(config)})
+    return {'success': True}
 
 def get_service_config(name):
     status = {'success': False}
-    service = CRITsService.objects(name=name, status__ne="unavailable").first()
+    services = find_service_records({"name": name, "status": {"$ne": "unavailable"}})
+    service = services[0] if services else None
     if not service:
         status['error'] = 'Service "%s" is unavailable. Please review error logs.' % name
         return status
 
-    config = service.config.to_dict()
+    config = dict(service.config)
     service_class = crits.services.manager.get_service_class(name)
     if not service_class:
         status['error'] = 'Service "%s" is unavilable. Please review error logs.' % name
@@ -476,9 +470,7 @@ def get_service_config(name):
 
     status['config'] = display_config
     status['config_error'] = _get_config_error(service)
-
-    # TODO: fix code so we don't have to do this
-    status['service'] = service.to_dict()
+    status['service'] = service
 
     status['success'] = True
     return status
@@ -492,12 +484,12 @@ def _get_config_error(service):
     """
 
     error = None
-    name = service['name']
-    config = service['config']
-    if service['status'] == 'misconfigured':
+    name = service.name
+    config = dict(service.config)
+    if service.status == 'misconfigured':
         service_class = crits.services.manager.get_service_class(name)
         try:
-            service_class.parse_config(config.to_dict())
+            service_class.parse_config(config)
         except Exception as e:
             error = str(e)
     return error
@@ -505,7 +497,8 @@ def _get_config_error(service):
 
 def do_edit_config(name, user, post_data=None):
     status = {'success': False}
-    service = CRITsService.objects(name=name, status__ne="unavailable").first()
+    services = find_service_records({"name": name, "status": {"$ne": "unavailable"}})
+    service = services[0] if services else None
     if not service:
         status['config_error'] = 'Service "%s" is unavailable. Please review error logs.' % name
         status['form'] = ''
@@ -515,7 +508,7 @@ def do_edit_config(name, user, post_data=None):
     # Get the class that implements this service.
     service_class = crits.services.manager.get_service_class(name)
 
-    config = service.config.to_dict()
+    config = dict(service.config)
     cfg_form, html = service_class.generate_config_form(config)
     # This isn't a form object. It's the HTML.
     status['form'] = html
@@ -528,8 +521,7 @@ def do_edit_config(name, user, post_data=None):
             try:
                 service_class.parse_config(form.cleaned_data)
             except ServiceConfigError as e:
-                service.status = 'misconfigured'
-                service.save()
+                update_service_record(name, {"status": "misconfigured"})
                 status['config_error'] = str(e)
                 return status
 
@@ -537,8 +529,9 @@ def do_edit_config(name, user, post_data=None):
             if not result['success']:
                 return status
 
-            service.status = 'available'
-            service.save()
+            update_service_record(name, {"status": "available"})
+            service = get_service_record(name)
+            status['service'] = service
         else:
             status['config_error'] = form.errors
             return status
@@ -552,7 +545,7 @@ def get_config(service_name):
     Get the configuration for a service.
     """
 
-    service = CRITsService.objects(name=service_name).first()
+    service = get_service_record(service_name)
     if not service:
         return None
 
@@ -567,18 +560,16 @@ def set_enabled(service_name, enabled=True, user=None):
         logger.info("Enabling: %s" % service_name)
     else:
         logger.info("Disabling: %s" % service_name)
-    service = CRITsService.objects(name=service_name).first()
-    service.enabled = enabled
+    service = get_service_record(service_name)
+    if not service:
+        return {'success': False, 'message': 'Unknown service.'}
 
-    try:
-        service.save(username=user.username)
-        if enabled:
-            url = reverse('crits-services-views-disable', args=(service_name,))
-        else:
-            url = reverse('crits-services-views-enable', args=(service_name,))
-        return {'success': True, 'url': url}
-    except ValidationError as e:
-        return {'success': False, 'message': e}
+    update_service_record(service_name, {"enabled": enabled})
+    if enabled:
+        url = reverse('crits-services-views-disable', args=(service_name,))
+    else:
+        url = reverse('crits-services-views-enable', args=(service_name,))
+    return {'success': True, 'url': url}
 
 def set_triage(service_name, enabled=True, user=None):
     """
@@ -589,20 +580,18 @@ def set_triage(service_name, enabled=True, user=None):
         logger.info("Enabling triage: %s" % service_name)
     else:
         logger.info("Disabling triage: %s" % service_name)
-    service = CRITsService.objects(name=service_name).first()
-    service.run_on_triage = enabled
-    try:
-        service.save(username=user.username)
-        if enabled:
-            url = reverse('crits-services-views-disable_triage',
-                          args=(service_name,))
-        else:
-            url = reverse('crits-services-views-enable_triage',
-                          args=(service_name,))
-        return {'success': True, 'url': url}
-    except ValidationError as e:
-        return {'success': False,
-                'message': e}
+    service = get_service_record(service_name)
+    if not service:
+        return {'success': False, 'message': 'Unknown service.'}
+
+    update_service_record(service_name, {"run_on_triage": enabled})
+    if enabled:
+        url = reverse('crits-services-views-disable_triage',
+                      args=(service_name,))
+    else:
+        url = reverse('crits-services-views-enable_triage',
+                      args=(service_name,))
+    return {'success': True, 'url': url}
 
 def enabled_services(status=True):
     """
@@ -610,10 +599,9 @@ def enabled_services(status=True):
     """
 
     if status:
-        services = CRITsService.objects(enabled=True,
-                                        status="available")
+        services = find_service_records({"enabled": True, "status": "available"})
     else:
-        services = CRITsService.objects(enabled=True)
+        services = find_service_records({"enabled": True})
     return [s.name for s in services]
 
 def get_supported_services(crits_type):
@@ -621,9 +609,9 @@ def get_supported_services(crits_type):
     Get the supported services for a type.
     """
 
-    services = CRITsService.objects(enabled=True)
+    services = find_service_records({"enabled": True})
     for s in sorted(services, key=lambda s: s.name.lower()):
-        if s.supported_types == 'all' or crits_type in s.supported_types:
+        if s.supported_types == ['all'] or crits_type in s.supported_types:
             yield s.name
 
 def triage_services(status=True):
@@ -632,10 +620,9 @@ def triage_services(status=True):
     """
 
     if status:
-        services = CRITsService.objects(run_on_triage=True,
-                                        status="available")
+        services = find_service_records({"run_on_triage": True, "status": "available"})
     else:
-        services = CRITsService.objects(run_on_triage=True)
+        services = find_service_records({"run_on_triage": True})
     return [s.name for s in services]
 
 def delete_analysis(task_id, user):
@@ -643,9 +630,7 @@ def delete_analysis(task_id, user):
     Delete analysis results.
     """
 
-    ar = AnalysisResult.objects(id=task_id).first()
-    if ar:
-        ar.delete(username=user.username)
+    delete_analysis_record_by_id(task_id)
 
 # The service pools need to be defined down here because the functions
 # that are used by the services must already be defined.

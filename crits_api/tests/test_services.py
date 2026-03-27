@@ -730,6 +730,145 @@ class TestLegacyServiceRuntimeSettings:
         )
 
 
+class TestLegacyServiceHandlers:
+    """Test raw-backed legacy service handler functions."""
+
+    def test_get_service_config_reads_raw_service_record(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from django.conf import settings as django_settings
+
+        import crits.services as services_pkg
+        from crits.services import handlers
+
+        name = "TestApiLegacyConfigHandlerService"
+        services_col = django_settings.PY_DB[django_settings.COL_SERVICES]
+        services_col.delete_many({"name": name})
+
+        class DummyServiceClass:
+            @staticmethod
+            def get_config_details(config: dict[str, Any]) -> dict[str, Any]:
+                return {"token": config["token"], "timeout": config["timeout"]}
+
+        class DummyManager:
+            @staticmethod
+            def get_service_class(service_name: str) -> type[DummyServiceClass] | None:
+                if service_name == name:
+                    return DummyServiceClass
+                return None
+
+        monkeypatch.setattr(services_pkg, "manager", DummyManager())
+
+        try:
+            services_col.insert_one(
+                {
+                    "name": name,
+                    "description": "Service for handler tests",
+                    "version": "1.0.0",
+                    "status": "available",
+                    "enabled": True,
+                    "run_on_triage": False,
+                    "supported_types": ["Sample"],
+                    "config": {"token": "abc123", "timeout": 30},
+                }
+            )
+
+            result = handlers.get_service_config(name)
+
+            assert result["success"] is True
+            assert result["config"] == {"token": "abc123", "timeout": 30}
+            assert result["service"].name == name
+            assert result["service"].config == {"token": "abc123", "timeout": 30}
+        finally:
+            services_col.delete_many({"name": name})
+
+    def test_add_results_and_log_use_raw_analysis_records(
+        self,
+        test_user: Any,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from crits.services import handlers
+        from crits.services.analysis_records import create_analysis_record, get_analysis_record
+
+        analysis_id = create_analysis_record(
+            service_name="TestApiLegacyHandlerService",
+            version="1.0.0",
+            obj_type="Sample",
+            obj_id="dummy-id",
+            username=test_user.username,
+        )
+
+        class DummyQuerySet:
+            @staticmethod
+            def first() -> object:
+                return object()
+
+        class DummySample:
+            @staticmethod
+            def objects(**kwargs: Any) -> DummyQuerySet:
+                assert kwargs["id"] == "dummy-id"
+                assert "source__name__in" in kwargs
+                return DummyQuerySet()
+
+        monkeypatch.setattr(handlers, "class_from_type", lambda _: DummySample)
+
+        result = handlers.add_results(
+            "Sample",
+            "dummy-id",
+            analysis_id,
+            ["deadbeef"],
+            ["{}"],
+            ["hash"],
+            test_user,
+        )
+        assert result["success"] is True
+
+        log_result = handlers.add_log(
+            "Sample",
+            "dummy-id",
+            analysis_id,
+            "finished",
+            "info",
+            test_user,
+        )
+        assert log_result["success"] is True
+
+        analysis_record = get_analysis_record(analysis_id)
+        assert analysis_record is not None
+        assert analysis_record.results == [{"subtype": "hash", "result": "deadbeef"}]
+        assert analysis_record.log[-1].message == "finished"
+        assert analysis_record.log[-1].level == "info"
+
+    def test_delete_analysis_uses_raw_record_id(self, test_user: Any) -> None:
+        from django.conf import settings as django_settings
+
+        from crits.services import handlers
+
+        col = django_settings.PY_DB[django_settings.COL_ANALYSIS_RESULTS]
+        result = col.insert_one(
+            {
+                "analysis_id": "test-api-legacy-delete-analysis",
+                "service_name": "DeleteHandlerService",
+                "version": "1.0.0",
+                "object_type": "Sample",
+                "object_id": "dummy-id",
+                "analyst": test_user.username,
+                "status": "completed",
+                "start_date": "2026-03-27 10:00:00",
+                "finish_date": "2026-03-27 10:00:05",
+                "results": [],
+                "log": [],
+            }
+        )
+
+        try:
+            handlers.delete_analysis(str(result.inserted_id), test_user)
+            assert col.find_one({"_id": result.inserted_id}) is None
+        finally:
+            col.delete_many({"analysis_id": "test-api-legacy-delete-analysis"})
+
+
 class TestAnalysisRecordReads:
     """Test GraphQL analysis-result reads against raw Mongo documents."""
 

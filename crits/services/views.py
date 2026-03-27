@@ -13,13 +13,13 @@ from django.template.loader import render_to_string
 
 from crits.core.class_mapper import class_from_type
 from crits.core.user_tools import user_can_view_data, get_acl_object
-from crits.services.analysis_result import AnalysisResult
+from crits.services.analysis_records import find_analysis_records, get_analysis_record_by_id
 from crits.services.handlers import do_edit_config, generate_analysis_results_csv
 from crits.services.handlers import generate_analysis_results_jtable
 from crits.services.handlers import get_service_config, set_enabled, set_triage
 from crits.services.handlers import run_service, get_supported_services
 from crits.services.handlers import delete_analysis
-from crits.services.service import CRITsService
+from crits.services.service_records import find_service_records
 import crits.services
 
 logger = logging.getLogger(__name__)
@@ -47,12 +47,13 @@ def list(request):
     List all services.
     """
 
-    all_services = CRITsService.objects()
+    all_services = sorted(find_service_records(), key=lambda item: item.name.lower())
 
-    if all_services:
-        all_services = sorted(all_services, key=lambda item: item.name.lower())
-
-    return render(request, 'services_list.html', {'services': all_services})
+    return render(
+        request,
+        'services_list.html',
+        {'services': all_services, 'service_count': len(all_services)},
+    )
 
 
 @user_passes_test(user_can_view_data)
@@ -68,7 +69,7 @@ def analysis_result(request, analysis_id):
     :returns: :class:`django.http.HttpResponse`
     """
 
-    ar = AnalysisResult.objects(id=analysis_id).first()
+    ar = get_analysis_record_by_id(analysis_id)
     if ar:
         return HttpResponseRedirect(reverse('crits-core-views-details',
                                             args=(ar.object_type,ar.object_id)))
@@ -174,7 +175,8 @@ def get_form(request, name, crits_type, identifier):
     request.user._setup()
     username = request.user.username
 
-    service = CRITsService.objects(name=name, status__ne="unavailable").first()
+    services = find_service_records({"name": name, "status": {"$ne": "unavailable"}})
+    service = services[0] if services else None
     if not service:
         msg = 'Service "%s" is unavailable. Please review error logs.' % name
         response['error'] = msg
@@ -183,7 +185,7 @@ def get_form(request, name, crits_type, identifier):
     # Get the class that implements this service.
     service_class = crits.services.manager.get_service_class(name)
 
-    config = service.config.to_dict()
+    config = dict(service.config)
 
     form_html = service_class.generate_runtime_form(username,
                                                     config,
@@ -225,8 +227,10 @@ def refresh_services(request, crits_type, identifier):
         return HttpResponse(json.dumps(response), content_type="application/json")
 
     # Get analysis results.
-    results = AnalysisResult.objects(object_type=crits_type,
-                                     object_id=identifier)
+    results = find_analysis_records(
+        {"object_type": crits_type, "object_id": identifier},
+        limit=500,
+    )
 
     relationship = {'type': crits_type,
                     'value': identifier}
