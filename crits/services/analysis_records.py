@@ -423,3 +423,10 @@ def delete_analysis_record_by_id(record_id: str) -> bool:
 
     delete_result = _get_analysis_results_collection().delete_one({"_id": ObjectId(record_id)})
     return delete_result.deleted_count > 0
+
+
+def delete_analysis_records(query: dict[str, Any] | None = None) -> int:
+    """Delete analysis result documents matching a MongoDB query."""
+
+    delete_result = _get_analysis_results_collection().delete_many(query or {})
+    return int(delete_result.deleted_count)

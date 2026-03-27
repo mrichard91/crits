@@ -1708,10 +1708,9 @@ class CritsBaseAttributes(CritsDocument, CritsBaseDocument,
         Delete all analysis results for this top-level object.
         """
 
-        from crits.services.analysis_result import AnalysisResult
-        results = AnalysisResult.objects(object_id=str(self.id))
-        for result in results:
-            result.delete()
+        from crits.services.analysis_records import delete_analysis_records
+
+        delete_analysis_records({"object_id": str(self.id)})
 
     def delete_all_objects(self):
         """
@@ -2587,9 +2586,11 @@ class CritsBaseAttributes(CritsDocument, CritsBaseDocument,
         :returns: list
         """
 
-        from crits.services.analysis_result import AnalysisResult
+        from crits.services.analysis_records import count_analysis_records, find_analysis_records
 
-        return AnalysisResult.objects(object_id=str(self.id))
+        query = {"object_id": str(self.id)}
+        total = count_analysis_records(query)
+        return find_analysis_records(query, limit=total or 1)
 
     def get_details_url(self):
         """

@@ -3707,12 +3707,12 @@ def generate_global_search(request):
                 return {'url': url, 'key': obj[key]}
 
     # Importing here to prevent a circular import with Services and runscript.
-    from crits.services.analysis_result import AnalysisResult
+    from crits.services.analysis_records import count_analysis_records
+    from crits.services.handlers import _analysis_results_query
 
     results = []
     for col_obj,url in [
                     [Actor, "crits-actors-views-actors_listing"],
-                    [AnalysisResult, "crits-services-views-analysis_results_listing"],
                     [Backdoor, "crits-backdoors-views-backdoors_listing"],
                     [Campaign, "crits-campaigns-views-campaigns_listing"],
                     [Certificate, "crits-certificates-views-certificates_listing"],
@@ -3746,6 +3746,16 @@ def generate_global_search(request):
             results.append({'count': resp['count'],
                             'url': url,
                             'name': ctype})
+
+    analysis_result_query = _analysis_results_query(request)
+    results.insert(
+        1,
+        {
+            'count': count_analysis_records(analysis_result_query),
+            'url': "crits-services-views-analysis_results_listing",
+            'name': "AnalysisResult",
+        },
+    )
     return {'url_params': urlparams,
             'term': term,
             'results': results,

@@ -960,6 +960,133 @@ class TestLegacyServiceHandlers:
             col.delete_many({"analysis_id": analysis_id})
 
 
+class TestCoreAnalysisRecordAccess:
+    """Test core-layer access to analysis records without the legacy model."""
+
+    def test_crits_base_attributes_get_and_delete_analysis_results(self) -> None:
+        from django.conf import settings as django_settings
+
+        from crits.core.crits_mongoengine import CritsBaseAttributes
+
+        col = django_settings.PY_DB[django_settings.COL_ANALYSIS_RESULTS]
+        object_id = "507f1f77bcf86cd799439011"
+        analysis_ids = [
+            "test-api-core-analysis-access-1",
+            "test-api-core-analysis-access-2",
+        ]
+        col.delete_many({"analysis_id": {"$in": analysis_ids}})
+
+        try:
+            col.insert_many(
+                [
+                    {
+                        "analysis_id": analysis_ids[0],
+                        "service_name": "CoreAnalysisA",
+                        "version": "1.0.0",
+                        "object_type": "Sample",
+                        "object_id": object_id,
+                        "analyst": "tester",
+                        "status": "completed",
+                        "start_date": "2026-03-27 10:00:00",
+                        "finish_date": "2026-03-27 10:00:05",
+                        "results": [],
+                        "log": [],
+                    },
+                    {
+                        "analysis_id": analysis_ids[1],
+                        "service_name": "CoreAnalysisB",
+                        "version": "1.0.0",
+                        "object_type": "Sample",
+                        "object_id": object_id,
+                        "analyst": "tester",
+                        "status": "completed",
+                        "start_date": "2026-03-27 11:00:00",
+                        "finish_date": "2026-03-27 11:00:05",
+                        "results": [],
+                        "log": [],
+                    },
+                ]
+            )
+
+            dummy = cast(Any, types.SimpleNamespace(id=object_id))
+            results = CritsBaseAttributes.get_analysis_results(dummy)
+
+            assert [result.service_name for result in results] == [
+                "CoreAnalysisB",
+                "CoreAnalysisA",
+            ]
+
+            CritsBaseAttributes.delete_all_analysis_results(dummy)
+            assert col.count_documents({"object_id": object_id}) == 0
+        finally:
+            col.delete_many({"analysis_id": {"$in": analysis_ids}})
+
+    def test_generate_global_search_counts_analysis_results_raw(
+        self,
+        test_user: Any,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from django.conf import settings as django_settings
+        from django.test import RequestFactory
+
+        import crits.core.handlers as core_handlers
+
+        col = django_settings.PY_DB[django_settings.COL_ANALYSIS_RESULTS]
+        analysis_id = "test-api-core-global-search-analysis"
+        col.delete_many({"analysis_id": analysis_id})
+
+        try:
+            col.insert_one(
+                {
+                    "analysis_id": analysis_id,
+                    "service_name": "GlobalSearchService",
+                    "version": "1.0.0",
+                    "object_type": "Sample",
+                    "object_id": "search123",
+                    "analyst": test_user.username,
+                    "status": "completed",
+                    "start_date": "2026-03-27 13:00:00",
+                    "finish_date": "2026-03-27 13:00:05",
+                    "results": [{"subtype": "hash", "result": "deadbeef"}],
+                    "log": [],
+                }
+            )
+
+            monkeypatch.setattr(
+                core_handlers, "ObjectId", types.SimpleNamespace(is_valid=lambda _: False)
+            )
+            monkeypatch.setattr(
+                core_handlers,
+                "get_query",
+                lambda *_args, **_kwargs: {
+                    "Result": "OK",
+                    "query": {},
+                    "term": "deadbeef",
+                    "urlparams": "?q=deadbeef&search_type=global",
+                },
+            )
+            monkeypatch.setattr(
+                core_handlers,
+                "data_query",
+                lambda *_args, **_kwargs: {"count": 0},
+            )
+
+            request = RequestFactory().get(
+                "/search/",
+                {"q": "deadbeef", "search_type": "global"},
+            )
+            request.user = test_user
+
+            result = core_handlers.generate_global_search(request)
+
+            assert result["Result"] == "OK"
+            matching = [item for item in result["results"] if item["name"] == "AnalysisResult"]
+            assert matching
+            assert matching[0]["count"] == 1
+        finally:
+            col.delete_many({"analysis_id": analysis_id})
+
+
 class TestAnalysisRecordReads:
     """Test GraphQL analysis-result reads against raw Mongo documents."""
 
