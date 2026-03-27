@@ -6,7 +6,6 @@ from django.conf import settings
 import crits.services
 
 from crits.core.class_mapper import class_from_id
-from crits.services.analysis_result import AnalysisConfig
 from crits.services.core import AnalysisTask, ServiceConfigError
 from crits.services.results import finish_task, insert_analysis_results, update_analysis_results
 from crits.services.service_records import get_service_record
@@ -108,7 +107,7 @@ def execute_service_local(
     service_class.save_runtime_config(saved_config)
 
     task = AnalysisTask(local_obj.obj, service_instance, resolved_user)
-    task.config = AnalysisConfig(**saved_config)
+    task.config = dict(saved_config)
     task.start()
     insert_analysis_results(task)
 

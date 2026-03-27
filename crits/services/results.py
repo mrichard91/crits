@@ -3,7 +3,12 @@ import logging
 
 from crits.core.class_mapper import class_from_type
 from crits.core.user_tools import user_sources
-from crits.services.analysis_result import AnalysisResult, EmbeddedAnalysisResultLog
+from crits.services.analysis_records import (
+    create_analysis_record_from_task,
+    finish_analysis_record,
+    get_analysis_record,
+    update_analysis_record_from_task,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,12 +51,11 @@ def finish_task(object_type, object_id, analysis_id, status, user):
         results["message"] = "Could not find object to add results to."
         return results
 
-    date = str(datetime.datetime.now())
-    ar = AnalysisResult.objects(analysis_id=analysis_id).first()
-    if ar:
-        AnalysisResult.objects(id=ar.id).update_one(
-            set__status=status,
-            set__finish_date=date,
+    analysis_record = get_analysis_record(analysis_id)
+    if analysis_record:
+        finish_analysis_record(
+            analysis_id=analysis_id,
+            status=status,
         )
 
     results["success"] = True
@@ -61,45 +65,29 @@ def finish_task(object_type, object_id, analysis_id, status, user):
 def insert_analysis_results(task):
     """Insert a new analysis result document for a task."""
 
-    ar = AnalysisResult()
-    tdict = task.to_dict()
-    tdict["analysis_id"] = tdict["id"]
-    del tdict["id"]
-    ar.merge(arg_dict=tdict)
-    ar.save()
+    create_analysis_record_from_task(task)
 
 
 def update_analysis_results(task):
     """Persist the current state of an analysis task."""
 
-    found = False
-    ar = AnalysisResult.objects(analysis_id=task.task_id).first()
-    if ar:
-        found = True
-
-    if not found:
+    if not get_analysis_record(task.task_id):
         logger.warning("Tried to update a task that didn't exist.")
         insert_analysis_results(task)
         return
-
-    tdict = task.to_dict()
-    tdict["analysis_id"] = tdict["id"]
-    del tdict["id"]
-
-    new_dict = {}
-    for key in tdict.keys():
-        new_dict["set__%s" % key] = tdict[key]
     try:
-        AnalysisResult.objects(id=ar.id).update_one(**new_dict)
+        update_analysis_record_from_task(task)
     except Exception as e:
         task.status = "error"
-        new_dict["set__results"] = []
-        le = EmbeddedAnalysisResultLog()
-        le.message = "DB Update Failed: %s" % e
-        le.level = "error"
-        le.datetime = str(datetime.datetime.now())
-        new_dict["set__log"].append(le)
+        task.results = []
+        task.log.append(
+            {
+                "message": "DB Update Failed: %s" % e,
+                "level": "error",
+                "datetime": str(datetime.datetime.now()),
+            }
+        )
         try:
-            AnalysisResult.objects(id=ar.id).update_one(**new_dict)
+            update_analysis_record_from_task(task)
         except Exception:
-            AnalysisResult.objects(id=ar.id).update_one(set__log=[le])
+            logger.exception("Failed to persist analysis error log for %s", task.task_id)

@@ -11,7 +11,6 @@ import uuid
 
 from django.conf import settings
 
-from crits.services.analysis_result import EmbeddedAnalysisResultLog
 from crits.services.service_records import (
     find_service_records,
     get_service_record,
@@ -604,11 +603,13 @@ class Service(object):
         self.ensure_current_task()
 
         now = str(datetime.now())
-        log = EmbeddedAnalysisResultLog()
-        log.level = level
-        log.message = msg
-        log.datetime = now
-        self.current_task.log.append(log)
+        self.current_task.log.append(
+            {
+                "level": level,
+                "message": msg,
+                "datetime": now,
+            }
+        )
 
     def _write_to_file(self):
         """

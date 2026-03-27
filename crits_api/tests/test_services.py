@@ -606,12 +606,13 @@ class TestLegacyServiceRuntime:
 
         import crits.services as services_pkg
         import crits.services.results as service_results
-        from crits.services.analysis_result import AnalysisResult
+        from crits.services.analysis_records import get_analysis_record
         from crits.services.core import Service
         from crits.services.runtime import execute_service_local
 
         name = "TestApiLegacyRuntimeService"
-        AnalysisResult.objects(service_name=name).delete()
+        analysis_results_col = django_settings.PY_DB[django_settings.COL_ANALYSIS_RESULTS]
+        analysis_results_col.delete_many({"service_name": name})
         services_col = django_settings.PY_DB[django_settings.COL_SERVICES]
         services_col.delete_many({"name": name})
 
@@ -686,14 +687,14 @@ class TestLegacyServiceRuntime:
             assert result["success"] is True
             assert result["analysis_id"]
 
-            ar = AnalysisResult.objects(analysis_id=result["analysis_id"]).first()
+            ar = get_analysis_record(result["analysis_id"])
             assert ar is not None
             assert ar.status == "completed"
             assert ar.service_name == name
             assert ar.analyst == test_user.username
             assert ar.results == [{"subtype": "test", "result": "value"}]
         finally:
-            AnalysisResult.objects(service_name=name).delete()
+            analysis_results_col.delete_many({"service_name": name})
             services_col.delete_many({"name": name})
             if original_handlers is None:
                 sys.modules.pop("crits.services.handlers", None)
