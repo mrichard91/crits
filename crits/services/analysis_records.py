@@ -283,13 +283,15 @@ def find_analysis_records(
     *,
     limit: int = 50,
     offset: int = 0,
+    sort: list[tuple[str, int]] | None = None,
 ) -> list[AnalysisRecord]:
     """Fetch analysis results matching a MongoDB query."""
 
+    sort_spec = sort or [("start_date", DESCENDING)]
     cursor = (
         _get_analysis_results_collection()
         .find(query or {})
-        .sort("start_date", DESCENDING)
+        .sort(sort_spec)
         .skip(offset)
         .limit(limit)
     )

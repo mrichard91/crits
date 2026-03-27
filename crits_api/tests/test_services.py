@@ -4,6 +4,7 @@ Covers: toggle enabled/triage, query persistence, registration resilience,
 and the fix for settings not being reset on container restart.
 """
 
+import json
 import sys
 import types
 from collections.abc import Generator
@@ -867,6 +868,96 @@ class TestLegacyServiceHandlers:
             assert col.find_one({"_id": result.inserted_id}) is None
         finally:
             col.delete_many({"analysis_id": "test-api-legacy-delete-analysis"})
+
+    def test_generate_analysis_results_jtable_uses_raw_records(self, test_user: Any) -> None:
+        from django.conf import settings as django_settings
+        from django.test import RequestFactory
+
+        from crits.services import handlers
+
+        col = django_settings.PY_DB[django_settings.COL_ANALYSIS_RESULTS]
+        analysis_id = "test-api-legacy-jtable-analysis"
+        col.delete_many({"analysis_id": analysis_id})
+
+        try:
+            col.insert_one(
+                {
+                    "analysis_id": analysis_id,
+                    "service_name": "LegacyJtableService",
+                    "version": "1.0.0",
+                    "object_type": "Sample",
+                    "object_id": "abc123",
+                    "analyst": test_user.username,
+                    "status": "completed",
+                    "start_date": "2026-03-27 12:00:00",
+                    "finish_date": "2026-03-27 12:00:05",
+                    "results": [{"subtype": "hash", "result": "deadbeef"}],
+                    "log": [],
+                }
+            )
+
+            request = RequestFactory().get(
+                "/analysis_results/list/jtlist/",
+                {"jtStartIndex": "0", "jtPageSize": "10"},
+            )
+            request.user = test_user
+
+            response = handlers.generate_analysis_results_jtable(request, "jtlist")
+            payload = json.loads(response.content)
+
+            assert payload["Result"] == "OK"
+            assert payload["TotalRecordCount"] >= 1
+            matching = [
+                record
+                for record in payload["Records"]
+                if record["service_name"] == "LegacyJtableService"
+            ]
+            assert matching
+            assert matching[0]["results"] == 1
+        finally:
+            col.delete_many({"analysis_id": analysis_id})
+
+    def test_generate_analysis_results_csv_uses_raw_records(self, test_user: Any) -> None:
+        from django.conf import settings as django_settings
+        from django.test import RequestFactory
+
+        from crits.services import handlers
+
+        col = django_settings.PY_DB[django_settings.COL_ANALYSIS_RESULTS]
+        analysis_id = "test-api-legacy-csv-analysis"
+        col.delete_many({"analysis_id": analysis_id})
+
+        try:
+            col.insert_one(
+                {
+                    "analysis_id": analysis_id,
+                    "service_name": "LegacyCsvService",
+                    "version": "1.0.0",
+                    "object_type": "Sample",
+                    "object_id": "csv123",
+                    "analyst": test_user.username,
+                    "status": "completed",
+                    "start_date": "2026-03-27 12:30:00",
+                    "finish_date": "2026-03-27 12:30:05",
+                    "results": [{"subtype": "hash", "result": "feedface"}],
+                    "log": [],
+                }
+            )
+
+            request = RequestFactory().get(
+                "/analysis_results/list/csv/",
+                {"fields": "object_type,service_name,results,object_id"},
+            )
+            request.user = test_user
+
+            response = handlers.generate_analysis_results_csv(request)
+            content = response.content.decode()
+
+            assert response["Content-Type"] == "text/csv"
+            assert "LegacyCsvService" in content
+            assert "csv123" in content
+        finally:
+            col.delete_many({"analysis_id": analysis_id})
 
 
 class TestAnalysisRecordReads:

@@ -1,8 +1,12 @@
 import ast
+import csv
 import datetime
+import html
+import io
 import json
 import logging
 import copy
+import re
 
 from django.http import HttpResponse
 from multiprocessing import Process
@@ -21,12 +25,13 @@ import crits.services
 
 from crits.core.class_mapper import class_from_type, class_from_id
 from crits.core.crits_mongoengine import json_handler
-from crits.core.handlers import build_jtable, csv_export
-from crits.core.handlers import jtable_ajax_list, jtable_ajax_delete
+from crits.core.handlers import build_jtable
 from crits.services.analysis_records import (
     append_analysis_log,
     append_analysis_results,
+    count_analysis_records,
     delete_analysis_record_by_id,
+    find_analysis_records,
 )
 from crits.services.core import ServiceConfigError, AnalysisTask
 from crits.services.results import finish_task, insert_analysis_results, update_analysis_results
@@ -38,6 +43,100 @@ from crits.services.service_records import (
 
 logger = logging.getLogger(__name__)
 
+ANALYSIS_RESULT_JTABLE_OPTS = {
+    'details_url': 'crits-services-views-analysis_result',
+    'details_url_key': 'id',
+    'default_sort': "start_date DESC",
+    'searchurl': 'crits-services-views-analysis_results_listing',
+    'fields': ["object_type", "service_name", "version", "start_date", "finish_date",
+               "results", "object_id", "id"],
+    'jtopts_fields': ["details", "object_type", "service_name", "version", "start_date",
+                      "finish_date", "results", "id"],
+    'hidden_fields': ["object_id", "id"],
+    'linked_fields': ["object_type", "service_name"],
+    'details_link': 'details',
+    'no_sort': ['details'],
+}
+
+
+def _analysis_results_query(request):
+    params = request.GET.copy()
+    params.update(request.POST.copy())
+
+    query: dict[str, object] = {}
+
+    for key in ("analysis_id", "object_type", "object_id", "service_name", "version", "status"):
+        value = params.get(key)
+        if value:
+            query[key] = value
+
+    if params.get("otype") and "object_type" not in query:
+        query["object_type"] = params.get("otype")
+
+    analysis_result_value = params.get("analysis_result")
+    if analysis_result_value:
+        query["results.result"] = analysis_result_value
+
+    term = params.get("q", "")
+    if term:
+        pattern = re.escape(term)
+        search_type = params.get("search_type", "")
+        if search_type == "analysis_result":
+            query["results.result"] = {"$regex": pattern, "$options": "i"}
+        else:
+            query["$or"] = [
+                {"service_name": {"$regex": pattern, "$options": "i"}},
+                {"object_type": {"$regex": pattern, "$options": "i"}},
+                {"object_id": {"$regex": pattern, "$options": "i"}},
+                {"analyst": {"$regex": pattern, "$options": "i"}},
+                {"results.result": {"$regex": pattern, "$options": "i"}},
+                {"version": {"$regex": pattern, "$options": "i"}},
+            ]
+
+    return query
+
+
+def _analysis_results_sort(request):
+    sort_expr = request.GET.get("jtSorting", ANALYSIS_RESULT_JTABLE_OPTS["default_sort"])
+    allowed_fields = {
+        "object_type",
+        "service_name",
+        "version",
+        "start_date",
+        "finish_date",
+        "object_id",
+        "status",
+        "analyst",
+        "analysis_id",
+    }
+    sort_spec: list[tuple[str, int]] = []
+
+    for key in sort_expr.split(","):
+        parts = key.split()
+        if len(parts) != 2:
+            continue
+        keyname, keyorder = parts
+        if keyname not in allowed_fields:
+            continue
+        direction = -1 if keyorder.upper() == "DESC" else 1
+        sort_spec.append((keyname, direction))
+
+    return sort_spec or [("start_date", -1)]
+
+
+def _analysis_result_record(record):
+    return {
+        "object_type": html.escape(record.object_type),
+        "service_name": html.escape(record.service_name),
+        "version": html.escape(record.version),
+        "start_date": html.escape(record.start_date),
+        "finish_date": html.escape(record.finish_date),
+        "results": len(record.results),
+        "object_id": html.escape(record.object_id),
+        "id": record.id,
+        "url": reverse('crits-services-views-analysis_result', args=(record.id,)),
+    }
+
 def generate_analysis_results_csv(request):
     """
     Generate a CSV file of the Analysis Results information
@@ -47,9 +146,34 @@ def generate_analysis_results_csv(request):
     :returns: :class:`django.http.HttpResponse`
     """
 
-    from crits.services.analysis_result import AnalysisResult
+    query = _analysis_results_query(request)
+    requested_fields = request.GET.get("fields", "")
+    fields = [field for field in requested_fields.split(",") if field] or [
+        "object_type",
+        "service_name",
+        "version",
+        "start_date",
+        "finish_date",
+        "results",
+        "object_id",
+    ]
 
-    response = csv_export(request,AnalysisResult)
+    records = find_analysis_records(
+        query,
+        limit=max(count_analysis_records(query), 1),
+        sort=_analysis_results_sort(request),
+    )
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(fields)
+
+    for record in records:
+        formatted = _analysis_result_record(record)
+        writer.writerow([formatted.get(field, "") for field in fields])
+
+    response = HttpResponse(buffer.getvalue(), content_type="text/csv")
+    response['Content-Disposition'] = "attachment;filename=crits-AnalysisResult-export.csv"
     return response
 
 def generate_analysis_results_jtable(request, option):
@@ -63,27 +187,36 @@ def generate_analysis_results_jtable(request, option):
     :returns: :class:`django.http.HttpResponse`
     """
 
-    from crits.services.analysis_result import AnalysisResult
-
-    obj_type = AnalysisResult
     type_ = "analysis_result"
-    mapper = obj_type._meta['jtable_opts']
+    mapper = ANALYSIS_RESULT_JTABLE_OPTS
     if option == "jtlist":
-        # Sets display url
-        details_url = mapper['details_url']
-        details_url_key = mapper['details_url_key']
-        fields = mapper['fields']
-        response = jtable_ajax_list(obj_type,
-                                    details_url,
-                                    details_url_key,
-                                    request,
-                                    includes=fields)
+        page_size = request.user.get_preference('ui', 'table_page_size', 25)
+        skip = int(request.GET.get("jtStartIndex", "0"))
+        if "jtLimit" in request.GET:
+            page_size = int(request.GET['jtLimit'])
+        else:
+            page_size = int(request.GET.get("jtPageSize", page_size))
+
+        query = _analysis_results_query(request)
+        response = {
+            "Result": "OK",
+            "Records": [
+                _analysis_result_record(record)
+                for record in find_analysis_records(
+                    query,
+                    limit=page_size,
+                    offset=skip,
+                    sort=_analysis_results_sort(request),
+                )
+            ],
+            "TotalRecordCount": count_analysis_records(query),
+        }
         return HttpResponse(json.dumps(response,
                                        default=json_handler),
                             content_type="application/json")
     if option == "jtdelete":
         response = {"Result": "ERROR"}
-        if jtable_ajax_delete(obj_type,request):
+        if "id" in request.POST and delete_analysis_record_by_id(request.POST["id"]):
             response = {"Result": "OK"}
         return HttpResponse(json.dumps(response,
                                        default=json_handler),

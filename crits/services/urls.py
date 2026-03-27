@@ -1,8 +1,8 @@
 import os
 
-from django.conf import settings
 from django.urls import include, re_path as url
 
+from .runtime_settings import get_service_dirs
 from . import views
 
 urlpatterns = [
@@ -22,7 +22,7 @@ urlpatterns = [
     url(r'^delete_task/(?P<crits_type>\w+)/(?P<identifier>\w+)/(?P<task_id>[-\w]+)/$', views.delete_task, name='crits-services-views-delete_task'),
 ]
 
-for service_directory in settings.SERVICE_DIRS:
+for service_directory in get_service_dirs():
     if os.path.isdir(service_directory):
         for d in os.listdir(service_directory):
             abs_path = os.path.join(service_directory, d, 'urls.py')
