@@ -37,10 +37,13 @@ def test_service_manager_is_lazy_and_cached(monkeypatch: MonkeyPatch) -> None:
 def test_service_record_sync_is_explicit() -> None:
     """Constructing a manager should not write DB records until sync is requested."""
     from crits.services.core import Service, ServiceManager
-    from crits.services.service import CRITsService
+    from crits.services.service_records import (
+        delete_service_records,
+        get_service_record,
+    )
 
     service_name = "TestApiExplicitSyncService"
-    CRITsService.objects(name=service_name).delete()
+    delete_service_records({"name": service_name})
 
     class ExplicitSyncService(Service):
         name = service_name
@@ -56,21 +59,20 @@ def test_service_record_sync_is_explicit() -> None:
 
     try:
         manager = ServiceManager(services_packages=[])
-        assert CRITsService.objects(name=service_name).first() is None
+        assert get_service_record(service_name) is None
 
         manager._services = {service_name: ExplicitSyncService}
         summary = manager.sync_service_records(mark_unavailable=False)
 
-        svc = CRITsService.objects(name=service_name).first()
+        svc = get_service_record(service_name)
         assert svc is not None
         assert svc.status == "available"
         assert svc.version == "1.2.3"
         assert svc.description == "Service used to verify explicit sync behavior"
-        assert list(svc.supported_types or []) == ["Sample"]
-        assert svc.config is not None
-        assert svc.config.to_dict()["token"] == "abc123"
+        assert list(svc.supported_types) == ["Sample"]
+        assert svc.config["token"] == "abc123"
         assert summary["created"] == 1
         assert summary["updated"] == 0
         assert summary["unavailable"] == 0
     finally:
-        CRITsService.objects(name=service_name).delete()
+        delete_service_records({"name": service_name})

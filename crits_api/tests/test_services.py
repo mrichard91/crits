@@ -13,33 +13,43 @@ from typing import Any, cast
 
 import pytest
 
+from crits.services.service_records import (
+    delete_service_records,
+    get_service_record,
+    update_service_record,
+)
 from crits_api.auth.context import GraphQLContext
 from crits_api.tests.conftest import execute_gql
 
 # ── Helper: seed a service record in the DB ────────────────────────────
 
 
+def _seed_service_record(name: str) -> None:
+    """Create a standard service record used by GraphQL tests."""
+
+    delete_service_records({"name": name})
+    update_service_record(
+        name,
+        {
+            "description": "Service for API tests",
+            "version": "1.0.0",
+            "status": "available",
+            "enabled": False,
+            "run_on_triage": False,
+            "supported_types": ["Sample", "Indicator"],
+        },
+    )
+
+
 @pytest.fixture
 def test_service(admin_context: GraphQLContext) -> Generator[str]:
     """Create a test service record directly in MongoDB and clean up after."""
-    from crits.services.service import CRITsService
-
     name = "TestApiService"
-    CRITsService.objects(name=name).delete()
-    svc = CRITsService(
-        name=name,
-        description="Service for API tests",
-        version="1.0.0",
-        status="available",
-        enabled=False,
-        run_on_triage=False,
-        supported_types=["Sample", "Indicator"],
-    )
-    svc.save()
+    _seed_service_record(name)
 
     yield name
 
-    CRITsService.objects(name=name).delete()
+    delete_service_records({"name": name})
 
 
 # ── Toggle Enabled ────────────────────────────────────────────────────
@@ -63,10 +73,8 @@ class TestToggleServiceEnabled:
         assert result.errors is None
         assert result.data["toggleServiceEnabled"]["success"] is True
 
-        # Verify persisted in DB
-        from crits.services.service import CRITsService
-
-        svc = CRITsService.objects(name=test_service).first()
+        svc = get_service_record(test_service)
+        assert svc is not None
         assert svc.enabled is True
 
     def test_disable_service(self, admin_context: GraphQLContext, test_service: str) -> None:
@@ -96,9 +104,8 @@ class TestToggleServiceEnabled:
         assert result.errors is None
         assert result.data["toggleServiceEnabled"]["success"] is True
 
-        from crits.services.service import CRITsService
-
-        svc = CRITsService.objects(name=test_service).first()
+        svc = get_service_record(test_service)
+        assert svc is not None
         assert svc.enabled is False
 
     def test_enable_unauthenticated(self, anon_context: GraphQLContext) -> None:
@@ -134,9 +141,8 @@ class TestToggleServiceTriage:
         assert result.errors is None
         assert result.data["toggleServiceTriage"]["success"] is True
 
-        from crits.services.service import CRITsService
-
-        svc = CRITsService.objects(name=test_service).first()
+        svc = get_service_record(test_service)
+        assert svc is not None
         assert svc.run_on_triage is True
 
     def test_disable_triage(self, admin_context: GraphQLContext, test_service: str) -> None:
@@ -166,9 +172,8 @@ class TestToggleServiceTriage:
         assert result.errors is None
         assert result.data["toggleServiceTriage"]["success"] is True
 
-        from crits.services.service import CRITsService
-
-        svc = CRITsService.objects(name=test_service).first()
+        svc = get_service_record(test_service)
+        assert svc is not None
         assert svc.run_on_triage is False
 
     def test_triage_unauthenticated(self, anon_context: GraphQLContext) -> None:
@@ -198,8 +203,6 @@ class TestServiceSettingsPersistence:
         self, admin_context: GraphQLContext, test_service: str
     ) -> None:
         """Toggling status to 'misconfigured' should NOT reset enabled."""
-        from crits.services.service import CRITsService
-
         # Enable the service
         execute_gql(
             admin_context,
@@ -213,20 +216,17 @@ class TestServiceSettingsPersistence:
 
         # Simulate what _register_services does for a misconfigured service:
         # set status to misconfigured but should NOT touch enabled/run_on_triage
-        svc = CRITsService.objects(name=test_service).first()
-        svc.status = "misconfigured"
-        svc.save()
+        update_service_record(test_service, {"status": "misconfigured"})
 
         # Verify enabled was NOT reset
-        svc.reload()
+        svc = get_service_record(test_service)
+        assert svc is not None
         assert svc.enabled is True, "enabled was reset when status changed to misconfigured"
 
     def test_triage_survives_status_change(
         self, admin_context: GraphQLContext, test_service: str
     ) -> None:
         """Toggling status to 'unavailable' should NOT reset run_on_triage."""
-        from crits.services.service import CRITsService
-
         # Enable triage
         execute_gql(
             admin_context,
@@ -240,12 +240,11 @@ class TestServiceSettingsPersistence:
 
         # Simulate what _register_services does for unavailable services:
         # set status to unavailable but should NOT touch enabled/run_on_triage
-        svc = CRITsService.objects(name=test_service).first()
-        svc.status = "unavailable"
-        svc.save()
+        update_service_record(test_service, {"status": "unavailable"})
 
         # Verify run_on_triage was NOT reset
-        svc.reload()
+        svc = get_service_record(test_service)
+        assert svc is not None
         assert svc.run_on_triage is True, (
             "run_on_triage was reset when status changed to unavailable"
         )
@@ -254,8 +253,6 @@ class TestServiceSettingsPersistence:
         self, admin_context: GraphQLContext, test_service: str
     ) -> None:
         """Simulate a full container restart: toggle on, re-register, verify."""
-        from crits.services.service import CRITsService
-
         # Toggle both on
         execute_gql(
             admin_context,
@@ -278,14 +275,18 @@ class TestServiceSettingsPersistence:
 
         # Simulate re-registration: update metadata fields (description,
         # version, etc.) like _register_services does — but NOT enabled/triage
-        svc = CRITsService.objects(name=test_service).first()
-        svc.description = "Updated description on restart"
-        svc.version = "1.0.1"
-        svc.status = "available"
-        svc.save()
+        update_service_record(
+            test_service,
+            {
+                "description": "Updated description on restart",
+                "version": "1.0.1",
+                "status": "available",
+            },
+        )
 
         # Verify both flags survived
-        svc.reload()
+        svc = get_service_record(test_service)
+        assert svc is not None
         assert svc.enabled is True, "enabled was lost during re-registration"
         assert svc.run_on_triage is True, "run_on_triage was lost during re-registration"
 
@@ -377,8 +378,6 @@ class TestUpdateServiceConfig:
         self, admin_context: GraphQLContext, test_service: str
     ) -> None:
         """Updating config should NOT touch enabled or run_on_triage."""
-        from crits.services.service import CRITsService
-
         # Enable both flags
         execute_gql(
             admin_context,
@@ -415,7 +414,8 @@ class TestUpdateServiceConfig:
         assert result.data["updateServiceConfig"]["success"] is True
 
         # Verify flags were NOT touched
-        svc = CRITsService.objects(name=test_service).first()
+        svc = get_service_record(test_service)
+        assert svc is not None
         assert svc.enabled is True, "enabled was reset by config update"
         assert svc.run_on_triage is True, "run_on_triage was reset by config update"
 

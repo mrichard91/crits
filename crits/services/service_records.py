@@ -141,3 +141,10 @@ def update_service_record(service_name: str, fields: dict[str, Any]) -> None:
         {"$set": update_fields},
         upsert=True,
     )
+
+
+def delete_service_records(query: dict[str, Any] | None = None) -> int:
+    """Delete service records matching a MongoDB query."""
+
+    delete_result = _get_services_collection().delete_many(query or {})
+    return int(delete_result.deleted_count)

@@ -73,9 +73,9 @@ def _clean_test_data() -> None:
         pass
     # Clean test services
     try:
-        from crits.services.service import CRITsService
+        from crits.services.service_records import delete_service_records
 
-        CRITsService.objects(name__startswith="TestApi").delete()
+        delete_service_records({"name": {"$regex": "^TestApi"}})
     except Exception:
         pass
 

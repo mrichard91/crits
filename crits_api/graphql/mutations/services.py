@@ -274,7 +274,7 @@ class ServiceMutations:
     ) -> MutationResult:
         """Toggle the enabled flag for a service.
 
-        Uses upsert to create a CRITsService DB record if one doesn't exist yet.
+        Uses upsert to create a persisted service record if one doesn't exist yet.
         """
         try:
             update_service_record(service_name, {"enabled": enabled})
@@ -333,7 +333,7 @@ class ServiceMutations:
     ) -> MutationResult:
         """Toggle the run_on_triage flag for a service.
 
-        Uses upsert to create a CRITsService DB record if one doesn't exist yet.
+        Uses upsert to create a persisted service record if one doesn't exist yet.
         """
         try:
             update_service_record(service_name, {"run_on_triage": run_on_triage})
