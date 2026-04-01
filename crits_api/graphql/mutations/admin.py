@@ -9,7 +9,6 @@ import logging
 import strawberry
 from strawberry.types import Info
 
-from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_admin
 from crits_api.db.admin_access_records import (
     create_role_record,
@@ -30,6 +29,16 @@ from crits_api.db.admin_config_records import (
     delete_admin_config_record,
     get_admin_config_record,
     update_admin_config_record_active,
+)
+from crits_api.db.admin_user_records import (
+    create_user_record,
+    username_exists,
+)
+from crits_api.db.admin_user_records import (
+    reset_user_password as reset_admin_user_password,
+)
+from crits_api.db.admin_user_records import (
+    update_user_record as update_admin_user_record,
 )
 from crits_api.graphql.types.admin import ConfigTypeEnum
 from crits_api.graphql.types.common import DeleteResult, MutationResult
@@ -308,36 +317,28 @@ class AdminMutations:
         last_name: str = "",
         roles: list[str] | None = None,
     ) -> MutationResult:
-        from crits.core.user import CRITsUser
-
-        ctx: GraphQLContext = info.context
-        analyst = ctx.user.username if ctx.user else "unknown"
         try:
-            existing = CRITsUser.objects(username=username).first()
-            if existing:
+            if username_exists(username):
                 return MutationResult(success=False, message=f"User '{username}' already exists")
 
-            user = CRITsUser.create_user(username, password, email or None, analyst=analyst)
+            user = create_user_record(
+                username,
+                password,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                roles=roles,
+            )
             if user is None:
                 return MutationResult(
                     success=False,
                     message="Password does not meet complexity requirements",
                 )
 
-            if first_name:
-                user.first_name = first_name
-            if last_name:
-                user.last_name = last_name
-            if roles:
-                user.roles = roles
-                user.acl_needs_update = True
-            if first_name or last_name or roles:
-                user.save(username=analyst)
-
             return MutationResult(
                 success=True,
                 message=f"User '{username}' created",
-                id=str(user.id),
+                id=user.id,
             )
         except Exception as e:
             logger.error(f"Error creating user: {e}")
@@ -354,26 +355,16 @@ class AdminMutations:
         last_name: str | None = None,
         organization: str | None = None,
     ) -> MutationResult:
-        from bson import ObjectId
-
-        from crits.core.user import CRITsUser
-
-        ctx: GraphQLContext = info.context
-        analyst = ctx.user.username if ctx.user else "unknown"
         try:
-            user = CRITsUser.objects(id=ObjectId(id)).first()
+            user = update_admin_user_record(
+                id,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                organization=organization,
+            )
             if not user:
                 return MutationResult(success=False, message="User not found")
-
-            if email is not None:
-                user.email = email
-            if first_name is not None:
-                user.first_name = first_name
-            if last_name is not None:
-                user.last_name = last_name
-            if organization is not None:
-                user.organization = organization
-            user.save(username=analyst)
             return MutationResult(success=True, message="User updated", id=id)
         except Exception as e:
             logger.error(f"Error updating user: {e}")
@@ -382,21 +373,11 @@ class AdminMutations:
     @strawberry.mutation(description="Toggle a user's active status")
     @require_admin
     def toggle_user_active(self, info: Info, id: str, active: bool) -> MutationResult:
-        from bson import ObjectId
-
-        from crits.core.user import CRITsUser
-
-        ctx: GraphQLContext = info.context
-        analyst = ctx.user.username if ctx.user else "unknown"
         try:
-            user = CRITsUser.objects(id=ObjectId(id)).first()
+            user = update_admin_user_record(id, is_active=active)
             if not user:
                 return MutationResult(success=False, message="User not found")
 
-            if active:
-                user.mark_active(analyst=analyst)
-            else:
-                user.mark_inactive(analyst=analyst)
             return MutationResult(
                 success=True,
                 message=f"User '{user.username}' {'activated' if active else 'deactivated'}",
@@ -409,20 +390,10 @@ class AdminMutations:
     @strawberry.mutation(description="Set a user's roles")
     @require_admin
     def set_user_roles(self, info: Info, id: str, roles: list[str]) -> MutationResult:
-        from bson import ObjectId
-
-        from crits.core.user import CRITsUser
-
-        ctx: GraphQLContext = info.context
-        analyst = ctx.user.username if ctx.user else "unknown"
         try:
-            user = CRITsUser.objects(id=ObjectId(id)).first()
+            user = update_admin_user_record(id, roles=roles)
             if not user:
                 return MutationResult(success=False, message="User not found")
-
-            user.roles = roles
-            user.acl_needs_update = True
-            user.save(username=analyst)
             return MutationResult(success=True, message="Roles updated", id=id)
         except Exception as e:
             logger.error(f"Error setting user roles: {e}")
@@ -431,23 +402,15 @@ class AdminMutations:
     @strawberry.mutation(description="Reset a user's password")
     @require_admin
     def reset_user_password(self, info: Info, id: str, new_password: str) -> MutationResult:
-        from bson import ObjectId
-
-        from crits.core.user import CRITsUser
-
-        ctx: GraphQLContext = info.context
-        analyst = ctx.user.username if ctx.user else "unknown"
         try:
-            user = CRITsUser.objects(id=ObjectId(id)).first()
-            if not user:
-                return MutationResult(success=False, message="User not found")
-
-            result = user.set_password(new_password, analyst=analyst)
-            if result is False:
+            user = reset_admin_user_password(id, new_password)
+            if user is False:
                 return MutationResult(
                     success=False,
                     message="Password does not meet complexity requirements",
                 )
+            if not user:
+                return MutationResult(success=False, message="User not found")
             return MutationResult(success=True, message="Password reset successfully", id=id)
         except Exception as e:
             logger.error(f"Error resetting user password: {e}")

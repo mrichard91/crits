@@ -40,6 +40,7 @@ def _clean_test_data() -> None:
 
     # Clean test user
     CRITsUser.objects(username=TEST_USER).delete()
+    CRITsUser.objects(username__startswith="TestApi").delete()
     # Clean test sources (anything starting with "TestApi")
     SourceAccess.objects(name__startswith="TestApi").delete()
     # Clean test roles
