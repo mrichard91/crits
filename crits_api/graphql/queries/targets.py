@@ -8,6 +8,14 @@ import strawberry
 from strawberry.types import Info
 
 from crits_api.auth.permissions import require_permission
+from crits_api.db.tlo_records import (
+    build_contains_filter,
+    count_tlo_records,
+    distinct_tlo_values,
+    get_tlo_record,
+    list_tlo_records,
+    to_model_namespace,
+)
 from crits_api.graphql.types.target import TargetType
 
 logger = logging.getLogger(__name__)
@@ -21,17 +29,10 @@ class TargetQueries:
     @require_permission("Target.read")
     def target(self, info: Info, id: str) -> TargetType | None:
         """Get a single target by its ID."""
-        from bson import ObjectId
-
-        from crits.targets.target import Target
-
         try:
-            query = {"_id": ObjectId(id)}
-
-            target = Target.objects(__raw__=query).first()
-
+            target = get_tlo_record("targets", id)
             if target:
-                return TargetType.from_model(target)
+                return TargetType.from_model(to_model_namespace(target))
             return None
 
         except Exception as e:
@@ -54,35 +55,24 @@ class TargetQueries:
         sort_dir: str | None = None,
     ) -> list[TargetType]:
         """List targets with optional filtering."""
-        from crits.targets.target import Target
-
         limit = min(limit, 100)
 
         try:
-            queryset = Target.objects
-
-            if email_contains:
-                queryset = queryset.filter(email_address__icontains=email_contains)
-
-            if department:
-                queryset = queryset.filter(department__icontains=department)
-
-            if division:
-                queryset = queryset.filter(division__icontains=division)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            from crits_api.graphql.queries.sorting import apply_sorting
-
-            queryset = apply_sorting(
-                queryset,
-                sort_by,
-                sort_dir,
-                {
+            filters = {
+                **build_contains_filter("email_address", email_contains),
+                **build_contains_filter("department", department),
+                **build_contains_filter("division", division),
+                **({"status": status} if status else {}),
+                **({"campaign.name": campaign} if campaign else {}),
+            }
+            targets = list_tlo_records(
+                "targets",
+                filters=filters,
+                limit=limit,
+                offset=offset,
+                sort_by=sort_by,
+                sort_dir=sort_dir,
+                allowed_sort_fields={
                     "emailAddress": "email_address",
                     "department": "department",
                     "division": "division",
@@ -91,9 +81,8 @@ class TargetQueries:
                     "created": "created",
                 },
             )
-            targets = queryset.skip(offset).limit(limit)
 
-            return [TargetType.from_model(t) for t in targets]
+            return [TargetType.from_model(to_model_namespace(target)) for target in targets]
 
         except Exception as e:
             logger.error(f"Error listing targets: {e}")
@@ -111,27 +100,15 @@ class TargetQueries:
         campaign: str | None = None,
     ) -> int:
         """Count targets matching the filters."""
-        from crits.targets.target import Target
-
         try:
-            queryset = Target.objects
-
-            if email_contains:
-                queryset = queryset.filter(email_address__icontains=email_contains)
-
-            if department:
-                queryset = queryset.filter(department__icontains=department)
-
-            if division:
-                queryset = queryset.filter(division__icontains=division)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            return queryset.count()
+            filters = {
+                **build_contains_filter("email_address", email_contains),
+                **build_contains_filter("department", department),
+                **build_contains_filter("division", division),
+                **({"status": status} if status else {}),
+                **({"campaign.name": campaign} if campaign else {}),
+            }
+            return count_tlo_records("targets", filters=filters)
 
         except Exception as e:
             logger.error(f"Error counting targets: {e}")
@@ -141,11 +118,8 @@ class TargetQueries:
     @require_permission("Target.read")
     def target_departments(self, info: Info) -> list[str]:
         """Get list of distinct departments."""
-        from crits.targets.target import Target
-
         try:
-            depts = Target.objects.distinct("department")
-            return sorted([d for d in depts if d])
+            return distinct_tlo_values("targets", "department")
         except Exception as e:
             logger.error(f"Error getting departments: {e}")
             return []
@@ -154,11 +128,8 @@ class TargetQueries:
     @require_permission("Target.read")
     def target_divisions(self, info: Info) -> list[str]:
         """Get list of distinct divisions."""
-        from crits.targets.target import Target
-
         try:
-            divs = Target.objects.distinct("division")
-            return sorted([d for d in divs if d])
+            return distinct_tlo_values("targets", "division")
         except Exception as e:
             logger.error(f"Error getting divisions: {e}")
             return []

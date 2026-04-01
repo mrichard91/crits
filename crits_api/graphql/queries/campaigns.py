@@ -8,6 +8,14 @@ import strawberry
 from strawberry.types import Info
 
 from crits_api.auth.permissions import require_permission
+from crits_api.db.tlo_records import (
+    build_contains_filter,
+    count_tlo_records,
+    distinct_tlo_values,
+    get_tlo_record,
+    list_tlo_records,
+    to_model_namespace,
+)
 from crits_api.graphql.types.campaign import CampaignType
 
 logger = logging.getLogger(__name__)
@@ -21,18 +29,10 @@ class CampaignQueries:
     @require_permission("Campaign.read")
     def campaign(self, info: Info, id: str) -> CampaignType | None:
         """Get a single campaign by its ID."""
-        from bson import ObjectId
-
-        from crits.campaigns.campaign import Campaign
-
         try:
-            query = {"_id": ObjectId(id)}
-            # Campaigns don't have source filtering - they're visible to all authenticated users
-
-            campaign = Campaign.objects(__raw__=query).first()
-
+            campaign = get_tlo_record("campaigns", id)
             if campaign:
-                return CampaignType.from_model(campaign)
+                return CampaignType.from_model(to_model_namespace(campaign))
             return None
 
         except Exception as e:
@@ -53,29 +53,22 @@ class CampaignQueries:
         sort_dir: str | None = None,
     ) -> list[CampaignType]:
         """List campaigns with optional filtering."""
-        from crits.campaigns.campaign import Campaign
-
         limit = min(limit, 100)
 
         try:
-            queryset = Campaign.objects
-
-            if name_contains:
-                queryset = queryset.filter(name__icontains=name_contains)
-
-            if active:
-                queryset = queryset.filter(active=active)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            from crits_api.graphql.queries.sorting import apply_sorting
-
-            queryset = apply_sorting(
-                queryset,
-                sort_by,
-                sort_dir,
-                {
+            filters = {
+                **build_contains_filter("name", name_contains),
+                **({"active": active} if active else {}),
+                **({"status": status} if status else {}),
+            }
+            campaigns = list_tlo_records(
+                "campaigns",
+                filters=filters,
+                limit=limit,
+                offset=offset,
+                sort_by=sort_by,
+                sort_dir=sort_dir,
+                allowed_sort_fields={
                     "name": "name",
                     "active": "active",
                     "status": "status",
@@ -83,9 +76,8 @@ class CampaignQueries:
                     "created": "created",
                 },
             )
-            campaigns = queryset.skip(offset).limit(limit)
 
-            return [CampaignType.from_model(c) for c in campaigns]
+            return [CampaignType.from_model(to_model_namespace(campaign)) for campaign in campaigns]
 
         except Exception as e:
             logger.error(f"Error listing campaigns: {e}")
@@ -101,21 +93,13 @@ class CampaignQueries:
         status: str | None = None,
     ) -> int:
         """Count campaigns matching the filters."""
-        from crits.campaigns.campaign import Campaign
-
         try:
-            queryset = Campaign.objects
-
-            if name_contains:
-                queryset = queryset.filter(name__icontains=name_contains)
-
-            if active:
-                queryset = queryset.filter(active=active)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            return queryset.count()
+            filters = {
+                **build_contains_filter("name", name_contains),
+                **({"active": active} if active else {}),
+                **({"status": status} if status else {}),
+            }
+            return count_tlo_records("campaigns", filters=filters)
 
         except Exception as e:
             logger.error(f"Error counting campaigns: {e}")
@@ -125,11 +109,8 @@ class CampaignQueries:
     @require_permission("Campaign.read")
     def campaign_names(self, info: Info) -> list[str]:
         """Get list of all campaign names."""
-        from crits.campaigns.campaign import Campaign
-
         try:
-            names = Campaign.objects.distinct("name")
-            return sorted([n for n in names if n])
+            return distinct_tlo_values("campaigns", "name")
         except Exception as e:
             logger.error(f"Error getting campaign names: {e}")
             return []

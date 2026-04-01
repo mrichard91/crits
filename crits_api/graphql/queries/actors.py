@@ -9,6 +9,14 @@ from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_permission
+from crits_api.db.tlo_records import (
+    build_contains_filter,
+    combine_filters,
+    count_tlo_records,
+    get_tlo_record,
+    list_tlo_records,
+    to_model_namespace,
+)
 from crits_api.graphql.types.actor import ActorType
 
 logger = logging.getLogger(__name__)
@@ -22,24 +30,16 @@ class ActorQueries:
     @require_permission("Actor.read")
     def actor(self, info: Info, id: str) -> ActorType | None:
         """Get a single actor by its ID."""
-        from bson import ObjectId
-
-        from crits.actors.actor import Actor
-
         ctx: GraphQLContext = info.context
 
         try:
-            query = {"_id": ObjectId(id)}
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    query.update(source_filter)
 
-            actor = Actor.objects(__raw__=query).first()
-
+            actor = get_tlo_record("actors", id, filters=source_filter)
             if actor:
-                return ActorType.from_model(actor)
+                return ActorType.from_model(to_model_namespace(actor))
             return None
 
         except Exception as e:
@@ -60,44 +60,37 @@ class ActorQueries:
         sort_dir: str | None = None,
     ) -> list[ActorType]:
         """List actors with optional filtering."""
-        from crits.actors.actor import Actor
-
         ctx: GraphQLContext = info.context
         limit = min(limit, 100)
 
         try:
-            queryset = Actor.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if name_contains:
-                queryset = queryset.filter(name__icontains=name_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("name", name_contains),
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            from crits_api.graphql.queries.sorting import apply_sorting
-
-            queryset = apply_sorting(
-                queryset,
-                sort_by,
-                sort_dir,
-                {
+            actors = list_tlo_records(
+                "actors",
+                filters=filters,
+                limit=limit,
+                offset=offset,
+                sort_by=sort_by,
+                sort_dir=sort_dir,
+                allowed_sort_fields={
                     "name": "name",
                     "status": "status",
                     "modified": "modified",
                     "created": "created",
                 },
             )
-            actors = queryset.skip(offset).limit(limit)
 
-            return [ActorType.from_model(a) for a in actors]
+            return [ActorType.from_model(to_model_namespace(actor)) for actor in actors]
 
         except Exception as e:
             logger.error(f"Error listing actors: {e}")
@@ -113,28 +106,21 @@ class ActorQueries:
         campaign: str | None = None,
     ) -> int:
         """Count actors matching the filters."""
-        from crits.actors.actor import Actor
-
         ctx: GraphQLContext = info.context
 
         try:
-            queryset = Actor.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if name_contains:
-                queryset = queryset.filter(name__icontains=name_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("name", name_contains),
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            return queryset.count()
+            return count_tlo_records("actors", filters=filters)
 
         except Exception as e:
             logger.error(f"Error counting actors: {e}")
