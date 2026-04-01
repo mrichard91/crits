@@ -18,7 +18,6 @@ from crits_api.auth.session import (
     load_user_acl,
     load_user_sources,
 )
-from crits_api.db.auth_records import get_auth_config
 from crits_api.db.connection import ensure_connected
 
 logger = logging.getLogger(__name__)
@@ -81,9 +80,6 @@ def _is_auth_only_operation(operation: OperationDefinitionNode | None) -> bool:
 
 async def _should_bootstrap_legacy_stack(request: Request) -> bool:
     """Decide whether this request needs the Django/MongoEngine stack."""
-
-    if get_auth_config().ldap_auth:
-        return True
 
     if request.method.upper() != "POST":
         return True

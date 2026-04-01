@@ -79,6 +79,13 @@ class AuthConfig:
     """Authentication-relevant runtime configuration."""
 
     ldap_auth: bool = False
+    ldap_tls: bool = False
+    ldap_server: str = ""
+    ldap_bind_dn: str = ""
+    ldap_bind_password: str = ""
+    ldap_usercn: str = ""
+    ldap_userdn: str = ""
+    ldap_update_on_login: bool = False
     invalid_login_attempts: int = 3
     password_complexity_regex: str = (
         r"(?=^.{8,}$)((?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*$"
@@ -164,6 +171,13 @@ def get_auth_config() -> AuthConfig:
     document = _get_config_collection().find_one({}) or {}
     return AuthConfig(
         ldap_auth=bool(document.get("ldap_auth", False)),
+        ldap_tls=bool(document.get("ldap_tls", False)),
+        ldap_server=str(document.get("ldap_server", "") or ""),
+        ldap_bind_dn=str(document.get("ldap_bind_dn", "") or ""),
+        ldap_bind_password=str(document.get("ldap_bind_password", "") or ""),
+        ldap_usercn=str(document.get("ldap_usercn", "") or ""),
+        ldap_userdn=str(document.get("ldap_userdn", "") or ""),
+        ldap_update_on_login=bool(document.get("ldap_update_on_login", False)),
         invalid_login_attempts=int(document.get("invalid_login_attempts", 3) or 3),
         password_complexity_regex=str(
             document.get(

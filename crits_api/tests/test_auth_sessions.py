@@ -1,18 +1,17 @@
 """Tests for GraphQL auth mutations and raw session-backed user loading."""
 
 import asyncio
-import sys
-from types import ModuleType, SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
 from crits_api.auth.context import GraphQLContext
+from crits_api.auth.ldap import LdapAuthResult
 from crits_api.auth.redis_session import create_session
 from crits_api.auth.session import get_session_data, get_user_from_session
 from crits_api.config import settings
-from crits_api.db.auth_records import AuthConfig
+from crits_api.db.auth_records import AuthConfig, AuthUserRecord
 from crits_api.tests.conftest import TEST_PASS, TEST_USER, execute_gql
 
 
@@ -111,24 +110,16 @@ def test_login_ldap_secret_generation_uses_raw_update(
 
     from crits_api.graphql.mutations import auth as auth_mutation
 
-    user = SimpleNamespace(
+    user = AuthUserRecord(
         id="507f1f77bcf86cd799439011",
         username=TEST_USER,
+        password="",
         secret="",
         totp=False,
         is_active=True,
         invalid_login_attempts=0,
-        get_access_list=lambda update=False: {},
     )
     updated: list[tuple[str, dict[str, object]]] = []
-
-    fake_core_user: Any = ModuleType("crits.core.user")
-
-    class FakeAuthBackend:
-        def authenticate(self, **kwargs: object) -> object:
-            return user
-
-    fake_core_user.CRITsAuthBackend = FakeAuthBackend
 
     def fake_update_auth_user_by_username(
         username: str,
@@ -138,9 +129,21 @@ def test_login_ldap_secret_generation_uses_raw_update(
         updated.append((username, set_fields))
         return object()
 
-    monkeypatch.setitem(sys.modules, "crits.core.user", fake_core_user)
     monkeypatch.setattr(
-        auth_mutation, "get_auth_config", lambda: AuthConfig(ldap_auth=True, totp_web="Required")
+        auth_mutation,
+        "get_auth_config",
+        lambda: AuthConfig(
+            ldap_auth=True,
+            ldap_server="ldap.example.com",
+            ldap_userdn="dc=example,dc=com",
+            totp_web="Required",
+        ),
+    )
+    monkeypatch.setattr(auth_mutation, "get_auth_user_by_username", lambda _username: user)
+    monkeypatch.setattr(
+        auth_mutation,
+        "authenticate_ldap_user",
+        lambda _username, _password, _config: LdapAuthResult(authenticated=True),
     )
     monkeypatch.setattr(
         auth_mutation,
@@ -172,3 +175,50 @@ def test_login_ldap_secret_generation_uses_raw_update(
             {"secret": "encrypted-secret", "totp": True},
         )
     ]
+
+
+def test_login_ldap_falls_back_to_local_password(monkeypatch: pytest.MonkeyPatch) -> None:
+    response = MagicMock()
+    context = GraphQLContext(request=_request_with_headers(), response=response, user=None)
+
+    from crits_api.graphql.mutations import auth as auth_mutation
+
+    user = AuthUserRecord(
+        id="507f1f77bcf86cd799439011",
+        username=TEST_USER,
+        password="placeholder-hash",
+        is_active=True,
+    )
+
+    monkeypatch.setattr(
+        auth_mutation,
+        "get_auth_config",
+        lambda: AuthConfig(
+            ldap_auth=True,
+            ldap_server="ldap.example.com",
+            ldap_userdn="dc=example,dc=com",
+        ),
+    )
+    monkeypatch.setattr(auth_mutation, "get_auth_user_by_username", lambda _username: user)
+    monkeypatch.setattr(
+        auth_mutation,
+        "authenticate_ldap_user",
+        lambda _username, _password, _config: LdapAuthResult(authenticated=False),
+    )
+    monkeypatch.setattr(auth_mutation, "check_password", lambda _password, _stored: True)
+
+    result = execute_gql(
+        context,
+        f"""
+        mutation {{
+            login(username: "{TEST_USER}", password: "{TEST_PASS}") {{
+                success message status
+            }}
+        }}
+        """,
+    )
+
+    assert result.errors is None
+    assert result.data["login"]["success"] is True
+    assert result.data["login"]["status"] == "login_successful"
+    response.set_cookie.assert_called_once()

@@ -8,7 +8,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from crits_api.db import connection
-from crits_api.db.auth_records import AuthConfig
 
 
 def _request_with_query(query: str, *, content_type: str = "application/json") -> MagicMock:
@@ -54,7 +53,6 @@ def test_graphql_context_bootstraps_legacy_connection(monkeypatch: pytest.Monkey
 
     monkeypatch.setattr(graphql_context, "ensure_connected", lambda: calls.append("connect"))
     monkeypatch.setattr(graphql_context, "get_user_from_session", fake_get_user_from_session)
-    monkeypatch.setattr(graphql_context, "get_auth_config", lambda: AuthConfig(ldap_auth=False))
 
     request = _request_with_query("query { actors(limit: 1) { totalCount } }")
     ctx = asyncio.run(graphql_context.get_context(request, MagicMock()))
@@ -77,7 +75,6 @@ def test_graphql_auth_context_skips_legacy_connection_when_ldap_disabled(
 
     monkeypatch.setattr(graphql_context, "ensure_connected", lambda: calls.append("connect"))
     monkeypatch.setattr(graphql_context, "get_user_from_session", fake_get_user_from_session)
-    monkeypatch.setattr(graphql_context, "get_auth_config", lambda: AuthConfig(ldap_auth=False))
 
     request = _request_with_query('mutation { login(username: "u", password: "p") { success } }')
     ctx = asyncio.run(graphql_context.get_context(request, MagicMock()))
@@ -86,10 +83,10 @@ def test_graphql_auth_context_skips_legacy_connection_when_ldap_disabled(
     assert ctx.user is None
 
 
-def test_graphql_auth_context_bootstraps_when_ldap_enabled(
+def test_graphql_auth_context_skips_legacy_connection_with_ldap_enabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """LDAP mode keeps the auth mutation on the legacy bootstrap path."""
+    """Auth-only GraphQL requests should stay off Django even when LDAP is enabled."""
 
     from crits_api.graphql import context as graphql_context
 
@@ -100,12 +97,11 @@ def test_graphql_auth_context_bootstraps_when_ldap_enabled(
 
     monkeypatch.setattr(graphql_context, "ensure_connected", lambda: calls.append("connect"))
     monkeypatch.setattr(graphql_context, "get_user_from_session", fake_get_user_from_session)
-    monkeypatch.setattr(graphql_context, "get_auth_config", lambda: AuthConfig(ldap_auth=True))
 
     request = _request_with_query('mutation { login(username: "u", password: "p") { success } }')
     ctx = asyncio.run(graphql_context.get_context(request, MagicMock()))
 
-    assert calls == ["connect"]
+    assert calls == []
     assert ctx.user is None
 
 
