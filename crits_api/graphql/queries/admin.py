@@ -10,6 +10,10 @@ import strawberry
 from strawberry.types import Info
 
 from crits_api.auth.permissions import require_admin, require_authenticated
+from crits_api.db.admin_config_records import (
+    AdminConfigType,
+    list_admin_config_records,
+)
 from crits_api.graphql.types.admin import (
     NamedConfigType,
     RoleType,
@@ -95,10 +99,11 @@ class AdminQueries:
     @strawberry.field(description="List raw data types")
     @require_admin
     def raw_data_types(self, info: Info) -> list[NamedConfigType]:
-        from crits.raw_data.raw_data import RawDataType
-
         try:
-            return [NamedConfigType.from_model(t) for t in RawDataType.objects().order_by("name")]
+            return [
+                NamedConfigType.from_model(record)
+                for record in list_admin_config_records(AdminConfigType.RAW_DATA_TYPE)
+            ]
         except Exception as e:
             logger.error(f"Error fetching raw data types: {e}")
             return []
@@ -106,10 +111,11 @@ class AdminQueries:
     @strawberry.field(description="List signature types")
     @require_admin
     def signature_types(self, info: Info) -> list[NamedConfigType]:
-        from crits.signatures.signature import SignatureType
-
         try:
-            return [NamedConfigType.from_model(t) for t in SignatureType.objects().order_by("name")]
+            return [
+                NamedConfigType.from_model(record)
+                for record in list_admin_config_records(AdminConfigType.SIGNATURE_TYPE)
+            ]
         except Exception as e:
             logger.error(f"Error fetching signature types: {e}")
             return []
@@ -117,12 +123,10 @@ class AdminQueries:
     @strawberry.field(description="List signature dependencies")
     @require_admin
     def signature_dependencies(self, info: Info) -> list[NamedConfigType]:
-        from crits.signatures.signature import SignatureDependency
-
         try:
             return [
-                NamedConfigType.from_model(t)
-                for t in SignatureDependency.objects().order_by("name")
+                NamedConfigType.from_model(record)
+                for record in list_admin_config_records(AdminConfigType.SIGNATURE_DEPENDENCY)
             ]
         except Exception as e:
             logger.error(f"Error fetching signature dependencies: {e}")
@@ -131,10 +135,11 @@ class AdminQueries:
     @strawberry.field(description="List IDB actions")
     @require_admin
     def actions(self, info: Info) -> list[NamedConfigType]:
-        from crits.core.crits_mongoengine import Action
-
         try:
-            return [NamedConfigType.from_model(a) for a in Action.objects().order_by("name")]
+            return [
+                NamedConfigType.from_model(record)
+                for record in list_admin_config_records(AdminConfigType.ACTION)
+            ]
         except Exception as e:
             logger.error(f"Error fetching actions: {e}")
             return []

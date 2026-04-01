@@ -5,39 +5,29 @@ CRUD mutations for sources, roles, and simple config types.
 """
 
 import logging
-from typing import Any
 
 import strawberry
 from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_admin
+from crits_api.db.admin_config_records import (
+    AdminConfigType,
+    create_admin_config_record,
+    delete_admin_config_record,
+    get_admin_config_record,
+    update_admin_config_record_active,
+)
 from crits_api.graphql.types.admin import ConfigTypeEnum
 from crits_api.graphql.types.common import DeleteResult, MutationResult
 
 logger = logging.getLogger(__name__)
 
 
-def _get_config_model(config_type: ConfigTypeEnum) -> Any:
-    """Return the MongoEngine document class for a config type."""
-    if config_type == ConfigTypeEnum.RAW_DATA_TYPE:
-        from crits.raw_data.raw_data import RawDataType
+def _to_admin_config_type(config_type: ConfigTypeEnum) -> AdminConfigType:
+    """Translate GraphQL enum values to raw config-record types."""
 
-        return RawDataType
-    elif config_type == ConfigTypeEnum.SIGNATURE_TYPE:
-        from crits.signatures.signature import SignatureType
-
-        return SignatureType
-    elif config_type == ConfigTypeEnum.SIGNATURE_DEPENDENCY:
-        from crits.signatures.signature import SignatureDependency
-
-        return SignatureDependency
-    elif config_type == ConfigTypeEnum.ACTION:
-        from crits.core.crits_mongoengine import Action
-
-        return Action
-    else:
-        raise ValueError(f"Unknown config type: {config_type}")
+    return AdminConfigType(config_type.value)
 
 
 @strawberry.type
@@ -281,20 +271,19 @@ class AdminMutations:
         self, info: Info, config_type: ConfigTypeEnum, name: str
     ) -> MutationResult:
         try:
-            model = _get_config_model(config_type)
-            existing = model.objects(name=name).first()
+            config_kind = _to_admin_config_type(config_type)
+            existing = get_admin_config_record(config_kind, name)
             if existing:
                 return MutationResult(
                     success=False,
                     message=f"'{name}' already exists for {config_type.value}",
                 )
 
-            item = model(name=name, active="on")
-            item.save()
+            item = create_admin_config_record(config_kind, name, active="on")
             return MutationResult(
                 success=True,
                 message=f"'{name}' created",
-                id=str(item.id),
+                id=item.id,
             )
         except Exception as e:
             logger.error(f"Error creating config item: {e}")
@@ -306,16 +295,14 @@ class AdminMutations:
         self, info: Info, config_type: ConfigTypeEnum, name: str, active: bool
     ) -> MutationResult:
         try:
-            model = _get_config_model(config_type)
-            item = model.objects(name=name).first()
+            config_kind = _to_admin_config_type(config_type)
+            item = update_admin_config_record_active(config_kind, name, active=active)
             if not item:
                 return MutationResult(
                     success=False,
                     message=f"'{name}' not found for {config_type.value}",
                 )
 
-            item.active = "on" if active else "off"
-            item.save()
             return MutationResult(
                 success=True,
                 message=f"'{name}' {'activated' if active else 'deactivated'}",
@@ -330,16 +317,14 @@ class AdminMutations:
         self, info: Info, config_type: ConfigTypeEnum, name: str
     ) -> DeleteResult:
         try:
-            model = _get_config_model(config_type)
-            item = model.objects(name=name).first()
-            if not item:
+            config_kind = _to_admin_config_type(config_type)
+            item_id = delete_admin_config_record(config_kind, name)
+            if not item_id:
                 return DeleteResult(
                     success=False,
                     message=f"'{name}' not found for {config_type.value}",
                 )
 
-            item_id = str(item.id)
-            item.delete()
             return DeleteResult(
                 success=True,
                 message=f"'{name}' deleted",
