@@ -80,17 +80,7 @@ class AuthMutations:
         totp = auth_config.totp_web
 
         if auth_config.ldap_auth:
-            from crits.config.config import CRITsConfig
-            from crits.core.user import CRITsAuthBackend, EmbeddedLoginAttempt
-            from crits.core.user_tools import save_user_secret
-
-            crits_config = CRITsConfig.objects().first()
-            if not crits_config:
-                return LoginResult(
-                    success=False,
-                    message=error_msg,
-                    status="login_failed",
-                )
+            from crits.core.user import CRITsAuthBackend
 
             user = CRITsAuthBackend().authenticate(
                 username=username,
@@ -124,10 +114,12 @@ class AuthMutations:
                         status="no_secret",
                     )
                 elif not secret and totp_pass:
-                    res = save_user_secret(username, totp_pass, "crits", (200, 200))
-                    if res["success"]:
-                        user.reload()
-                        totp_secret = res["secret"]
+                    encrypted_secret, totp_secret = gen_user_secret(totp_pass, username)
+                    updated_user = update_auth_user_by_username(
+                        username,
+                        set_fields={"secret": encrypted_secret, "totp": True},
+                    )
+                    if updated_user:
                         message = f"Setup your authenticator using: '{totp_secret}'"
                         message += " Then authenticate again with your PIN + token."
                         return LoginResult(
@@ -142,29 +134,21 @@ class AuthMutations:
                         status="secret_generated",
                     )
                 elif not valid_totp(username, totp_pass, secret):
-                    attempt = EmbeddedLoginAttempt(
-                        user_agent=user_agent,
-                        remote_addr=remote_addr,
-                        accept_language=accept_language,
+                    update_auth_user_by_id(
+                        str(user.id),
+                        set_fields={"invalid_login_attempts": user.invalid_login_attempts + 1},
+                        append_login_attempt=_login_attempt(
+                            success=False,
+                            user_agent=user_agent,
+                            remote_addr=remote_addr,
+                            accept_language=accept_language,
+                        ),
                     )
-                    attempt.success = False
-                    user.login_attempts.append(attempt)
-                    user.invalid_login_attempts += 1
-                    user.save()
                     return LoginResult(
                         success=False,
                         message=error_msg,
                         status="login_failed",
                     )
-
-                attempt = EmbeddedLoginAttempt(
-                    user_agent=user_agent,
-                    remote_addr=remote_addr,
-                    accept_language=accept_language,
-                )
-                attempt.success = True
-                user.login_attempts.append(attempt)
-                user.save()
 
             if not user.is_active:
                 logger.info("Attempted login to a disabled account: %s", user.username)
@@ -175,11 +159,18 @@ class AuthMutations:
                 )
 
             user.get_access_list(update=True)
-            user.invalid_login_attempts = 0
-            user.password_reset.reset_code = ""
-            user.save()
+            update_auth_user_by_id(
+                str(user.id),
+                set_fields={"invalid_login_attempts": 0, "password_reset.reset_code": ""},
+                append_login_attempt=_login_attempt(
+                    success=True,
+                    user_agent=user_agent,
+                    remote_addr=remote_addr,
+                    accept_language=accept_language,
+                ),
+            )
 
-            session_timeout = crits_config.session_timeout * 60 * 60
+            session_timeout = auth_config.session_timeout_hours * 60 * 60
             session_key = create_session(
                 redis_url=settings.redis_url,
                 user_id=str(user.id),
