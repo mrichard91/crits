@@ -1,23 +1,20 @@
 """
-Django session integration for CRITs GraphQL API.
+Session integration for CRITs GraphQL API.
 
-Reads Django session cookies to authenticate users, allowing
-session sharing between Django and FastAPI services.
+Reads shared session cookies from Redis and hydrates lightweight
+request-time user state without loading the legacy user model.
 """
 
 import json
 import logging
 import pickle
-from typing import TYPE_CHECKING, Optional
 
 import redis.asyncio as redis
 from fastapi import Request
 
+from crits_api.auth.user_state import AuthenticatedUser, build_authenticated_user
 from crits_api.config import settings
-from crits_api.db.connection import ensure_connected
-
-if TYPE_CHECKING:
-    from crits.core.user import CRITsUser
+from crits_api.db.auth_records import get_auth_user_by_id
 
 logger = logging.getLogger(__name__)
 
@@ -94,18 +91,18 @@ async def get_session_data(session_key: str) -> dict | None:
         return None
 
 
-async def get_user_from_session(request: Request) -> Optional["CRITsUser"]:
+async def get_user_from_session(request: Request) -> AuthenticatedUser | None:
     """
-    Get the authenticated user from Django session cookie.
+    Get the authenticated user from the shared session cookie.
 
     Reads the sessionid cookie, loads session from Redis,
-    and retrieves the CRITsUser object.
+    and retrieves the corresponding raw user record.
 
     Args:
         request: FastAPI request object
 
     Returns:
-        CRITsUser object or None if not authenticated
+        Authenticated user state or None if not authenticated
     """
     # Get session cookie
     session_key = request.cookies.get(settings.session_cookie_name)
@@ -114,12 +111,6 @@ async def get_user_from_session(request: Request) -> Optional["CRITsUser"]:
         return None
 
     logger.debug(f"Looking up session: {session_key[:20]}...")
-
-    # Only bootstrap the legacy model layer if this request is actually
-    # attempting to authenticate with a shared Django session.
-    ensure_connected()
-
-    from crits.core.user import CRITsUser
 
     # Try to load from Redis directly
     session_data = await get_session_data(session_key)
@@ -130,12 +121,13 @@ async def get_user_from_session(request: Request) -> Optional["CRITsUser"]:
         logger.debug(f"Session contains user_id: {user_id}")
         if user_id:
             try:
-                user = CRITsUser.objects(id=user_id).first()
-                if user and user.is_active:
+                user_record = get_auth_user_by_id(str(user_id))
+                if user_record and user_record.is_active:
+                    user = build_authenticated_user(user_record)
                     logger.debug(f"Authenticated user from session: {user.username}")
                     return user
-                elif user:
-                    logger.debug(f"User {user.username} is not active")
+                elif user_record:
+                    logger.debug(f"User {user_record.username} is not active")
                 else:
                     logger.debug(f"User with id {user_id} not found")
             except Exception as e:
@@ -145,30 +137,29 @@ async def get_user_from_session(request: Request) -> Optional["CRITsUser"]:
     return None
 
 
-def load_user_acl(user: "CRITsUser") -> dict:
+def load_user_acl(user: AuthenticatedUser) -> dict:
     """
     Load and cache user's merged ACL permissions.
 
     Args:
-        user: CRITsUser object
+        user: Authenticated user state
 
     Returns:
         Merged ACL dictionary from all user's roles
     """
     try:
-        # get_access_list() merges permissions from all roles
         return user.get_access_list()
     except Exception as e:
         logger.error(f"Error loading ACL for user {user.username}: {e}")
         return {}
 
 
-def load_user_sources(user: "CRITsUser") -> list:
+def load_user_sources(user: AuthenticatedUser) -> list:
     """
     Load user's source access list.
 
     Args:
-        user: CRITsUser object
+        user: Authenticated user state
 
     Returns:
         List of SourceAccess objects
@@ -177,10 +168,7 @@ def load_user_sources(user: "CRITsUser") -> list:
 
     sources = []
     try:
-        acl = user.get_access_list()
-        source_access_list = acl.get("sources", [])
-
-        for source in source_access_list:
+        for source in user.source_acls:
             sources.append(
                 SourceAccess(
                     name=source.name,

@@ -14,7 +14,7 @@ from starlette.responses import Response
 from strawberry.fastapi import BaseContext
 
 if TYPE_CHECKING:
-    from crits.core.user import CRITsUser
+    from crits_api.auth.user_state import AuthenticatedUser
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class GraphQLContext(BaseContext):
 
     request: Request
     response: Response | None = None
-    user: Optional["CRITsUser"] = None
+    user: Optional["AuthenticatedUser"] = None
     acl: dict[str, Any] = field(default_factory=dict)
     sources: list[SourceAccess] = field(default_factory=list)
     _sources_hash: str | None = field(default=None, repr=False)

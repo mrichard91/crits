@@ -2,13 +2,22 @@
 
 import logging
 import os
+from datetime import datetime
 
 import strawberry
+from django.contrib.auth.hashers import check_password
 from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.redis_session import create_session, delete_session
+from crits_api.auth.totp import gen_user_secret, valid_totp
 from crits_api.config import settings
+from crits_api.db.auth_records import (
+    get_auth_config,
+    get_auth_user_by_username,
+    update_auth_user_by_id,
+    update_auth_user_by_username,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +41,22 @@ def _get_secure_cookie() -> bool:
     return os.environ.get("SECURE_COOKIES", "true").lower() in ("true", "1", "yes")
 
 
+def _login_attempt(
+    *,
+    success: bool,
+    user_agent: str,
+    remote_addr: str,
+    accept_language: str,
+) -> dict[str, object]:
+    return {
+        "success": success,
+        "user_agent": user_agent,
+        "remote_addr": remote_addr,
+        "accept_language": accept_language,
+        "date": datetime.now(),
+    }
+
+
 @strawberry.type
 class AuthMutations:
     @strawberry.mutation(description="Authenticate a user and create a session")
@@ -42,11 +67,6 @@ class AuthMutations:
         password: str,
         totp_pass: str | None = None,
     ) -> LoginResult:
-        from crits.config.config import CRITsConfig
-        from crits.core.totp import valid_totp
-        from crits.core.user import CRITsAuthBackend, EmbeddedLoginAttempt
-        from crits.core.user_tools import save_user_secret
-
         ctx: GraphQLContext = info.context
         request = ctx.request
         error_msg = "Unknown user or bad password."
@@ -56,26 +76,136 @@ class AuthMutations:
         remote_addr = request.client.host if request.client else ""
         accept_language = request.headers.get("accept-language", "")
 
-        # Load CRITs config
-        crits_config = CRITsConfig.objects().first()
-        if not crits_config:
-            return LoginResult(
-                success=False,
-                message=error_msg,
-                status="login_failed",
+        auth_config = get_auth_config()
+        totp = auth_config.totp_web
+
+        if auth_config.ldap_auth:
+            from crits.config.config import CRITsConfig
+            from crits.core.user import CRITsAuthBackend, EmbeddedLoginAttempt
+            from crits.core.user_tools import save_user_secret
+
+            crits_config = CRITsConfig.objects().first()
+            if not crits_config:
+                return LoginResult(
+                    success=False,
+                    message=error_msg,
+                    status="login_failed",
+                )
+
+            user = CRITsAuthBackend().authenticate(
+                username=username,
+                password=password,
+                user_agent=user_agent,
+                remote_addr=remote_addr,
+                accept_language=accept_language,
+                totp_enabled=totp,
             )
 
-        totp = crits_config.totp_web
+            if not user:
+                return LoginResult(
+                    success=False,
+                    message=error_msg,
+                    status="login_failed",
+                )
 
-        # Authenticate via CRITsAuthBackend (handles LDAP, brute force, lockout)
-        user = CRITsAuthBackend().authenticate(
-            username=username,
-            password=password,
-            user_agent=user_agent,
-            remote_addr=remote_addr,
-            accept_language=accept_language,
-            totp_enabled=totp,
-        )
+            if totp == "Required" or (totp == "Optional" and user.totp):
+                if not totp_pass:
+                    return LoginResult(
+                        success=False,
+                        message="TOTP required",
+                        status="totp_required",
+                    )
+
+                secret = user.secret
+                if not secret and not totp_pass:
+                    return LoginResult(
+                        success=False,
+                        message="You have no TOTP secret. Please enter a new PIN in the TOTP field.",
+                        status="no_secret",
+                    )
+                elif not secret and totp_pass:
+                    res = save_user_secret(username, totp_pass, "crits", (200, 200))
+                    if res["success"]:
+                        user.reload()
+                        totp_secret = res["secret"]
+                        message = f"Setup your authenticator using: '{totp_secret}'"
+                        message += " Then authenticate again with your PIN + token."
+                        return LoginResult(
+                            success=False,
+                            message=message,
+                            status="secret_generated",
+                            totp_secret=totp_secret,
+                        )
+                    return LoginResult(
+                        success=False,
+                        message="Secret generation failed",
+                        status="secret_generated",
+                    )
+                elif not valid_totp(username, totp_pass, secret):
+                    attempt = EmbeddedLoginAttempt(
+                        user_agent=user_agent,
+                        remote_addr=remote_addr,
+                        accept_language=accept_language,
+                    )
+                    attempt.success = False
+                    user.login_attempts.append(attempt)
+                    user.invalid_login_attempts += 1
+                    user.save()
+                    return LoginResult(
+                        success=False,
+                        message=error_msg,
+                        status="login_failed",
+                    )
+
+                attempt = EmbeddedLoginAttempt(
+                    user_agent=user_agent,
+                    remote_addr=remote_addr,
+                    accept_language=accept_language,
+                )
+                attempt.success = True
+                user.login_attempts.append(attempt)
+                user.save()
+
+            if not user.is_active:
+                logger.info("Attempted login to a disabled account: %s", user.username)
+                return LoginResult(
+                    success=False,
+                    message=error_msg,
+                    status="login_failed",
+                )
+
+            user.get_access_list(update=True)
+            user.invalid_login_attempts = 0
+            user.password_reset.reset_code = ""
+            user.save()
+
+            session_timeout = crits_config.session_timeout * 60 * 60
+            session_key = create_session(
+                redis_url=settings.redis_url,
+                user_id=str(user.id),
+                ttl=session_timeout,
+            )
+
+            if ctx.response:
+                secure = _get_secure_cookie()
+                ctx.response.set_cookie(
+                    key="sessionid",
+                    value=session_key,
+                    path="/",
+                    httponly=True,
+                    samesite="lax",
+                    secure=secure,
+                    max_age=session_timeout,
+                )
+
+            logger.info("User %s logged in successfully", user.username)
+            return LoginResult(
+                success=True,
+                message="Login successful",
+                status="login_successful",
+            )
+
+        user = get_auth_user_by_username(username)
 
         if not user:
             return LoginResult(
@@ -84,7 +214,32 @@ class AuthMutations:
                 status="login_failed",
             )
 
-        # TOTP handling
+        if not password or not check_password(password, user.password):
+            failed_attempt_count = user.invalid_login_attempts + 1
+            set_fields: dict[str, object] = {"invalid_login_attempts": failed_attempt_count}
+            if user.is_active and failed_attempt_count > auth_config.invalid_login_threshold:
+                set_fields["is_active"] = False
+                logger.info(
+                    "Account disabled due to too many invalid login attempts: %s",
+                    user.username,
+                )
+
+            update_auth_user_by_id(
+                user.id,
+                set_fields=set_fields,
+                append_login_attempt=_login_attempt(
+                    success=False,
+                    user_agent=user_agent,
+                    remote_addr=remote_addr,
+                    accept_language=accept_language,
+                ),
+            )
+            return LoginResult(
+                success=False,
+                message=error_msg,
+                status="login_failed",
+            )
+
         if totp == "Required" or (totp == "Optional" and user.totp):
             if not totp_pass:
                 return LoginResult(
@@ -101,11 +256,12 @@ class AuthMutations:
                     status="no_secret",
                 )
             elif not secret and totp_pass:
-                # Generate new secret
-                res = save_user_secret(username, totp_pass, "crits", (200, 200))
-                if res["success"]:
-                    user.reload()
-                    totp_secret = res["secret"]
+                encrypted_secret, totp_secret = gen_user_secret(totp_pass, username)
+                updated_user = update_auth_user_by_username(
+                    username,
+                    set_fields={"secret": encrypted_secret, "totp": True},
+                )
+                if updated_user:
                     message = f"Setup your authenticator using: '{totp_secret}'"
                     message += " Then authenticate again with your PIN + token."
                     return LoginResult(
@@ -120,33 +276,22 @@ class AuthMutations:
                     status="secret_generated",
                 )
             elif not valid_totp(username, totp_pass, secret):
-                # Invalid TOTP - track the failed attempt
-                e = EmbeddedLoginAttempt(
-                    user_agent=user_agent,
-                    remote_addr=remote_addr,
-                    accept_language=accept_language,
+                update_auth_user_by_id(
+                    user.id,
+                    set_fields={"invalid_login_attempts": user.invalid_login_attempts + 1},
+                    append_login_attempt=_login_attempt(
+                        success=False,
+                        user_agent=user_agent,
+                        remote_addr=remote_addr,
+                        accept_language=accept_language,
+                    ),
                 )
-                e.success = False
-                user.login_attempts.append(e)
-                user.invalid_login_attempts += 1
-                user.save()
                 return LoginResult(
                     success=False,
                     message=error_msg,
                     status="login_failed",
                 )
 
-            # TOTP valid - track successful attempt
-            e = EmbeddedLoginAttempt(
-                user_agent=user_agent,
-                remote_addr=remote_addr,
-                accept_language=accept_language,
-            )
-            e.success = True
-            user.login_attempts.append(e)
-            user.save()
-
-        # Final login steps
         if not user.is_active:
             logger.info("Attempted login to a disabled account: %s", user.username)
             return LoginResult(
@@ -155,20 +300,28 @@ class AuthMutations:
                 status="login_failed",
             )
 
-        user.get_access_list(update=True)
-        user.invalid_login_attempts = 0
-        user.password_reset.reset_code = ""
-        user.save()
+        update_auth_user_by_id(
+            user.id,
+            set_fields={
+                "invalid_login_attempts": 0,
+                "password_reset.reset_code": "",
+                "acl_needs_update": user.acl_needs_update,
+            },
+            append_login_attempt=_login_attempt(
+                success=True,
+                user_agent=user_agent,
+                remote_addr=remote_addr,
+                accept_language=accept_language,
+            ),
+        )
 
-        # Create session via Redis
-        session_timeout = crits_config.session_timeout * 60 * 60  # hours to seconds
+        session_timeout = auth_config.session_timeout_hours * 60 * 60
         session_key = create_session(
             redis_url=settings.redis_url,
             user_id=str(user.id),
             ttl=session_timeout,
         )
 
-        # Set session cookie on response
         if ctx.response:
             secure = _get_secure_cookie()
             ctx.response.set_cookie(
