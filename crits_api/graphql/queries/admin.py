@@ -10,6 +10,11 @@ import strawberry
 from strawberry.types import Info
 
 from crits_api.auth.permissions import require_admin, require_authenticated
+from crits_api.db.admin_access_records import (
+    get_role_record,
+    list_role_records,
+    list_source_access_records,
+)
 from crits_api.db.admin_config_records import (
     AdminConfigType,
     list_admin_config_records,
@@ -31,10 +36,8 @@ class AdminQueries:
     @strawberry.field(description="List all sources")
     @require_admin
     def sources(self, info: Info) -> list[SourceAccessType]:
-        from crits.core.source_access import SourceAccess
-
         try:
-            return [SourceAccessType.from_model(s) for s in SourceAccess.objects().order_by("name")]
+            return [SourceAccessType.from_model(source) for source in list_source_access_records()]
         except Exception as e:
             logger.error(f"Error fetching sources: {e}")
             return []
@@ -42,10 +45,8 @@ class AdminQueries:
     @strawberry.field(description="List all roles")
     @require_admin
     def roles(self, info: Info) -> list[RoleType]:
-        from crits.core.role import Role
-
         try:
-            return [RoleType.from_model(r) for r in Role.objects().order_by("name")]
+            return [RoleType.from_model(role) for role in list_role_records()]
         except Exception as e:
             logger.error(f"Error fetching roles: {e}")
             return []
@@ -53,12 +54,8 @@ class AdminQueries:
     @strawberry.field(description="Get a single role by ID")
     @require_admin
     def role(self, info: Info, id: str) -> RoleType | None:
-        from bson import ObjectId
-
-        from crits.core.role import Role
-
         try:
-            role = Role.objects(id=ObjectId(id)).first()
+            role = get_role_record(id)
             if role:
                 return RoleType.from_model(role)
             return None

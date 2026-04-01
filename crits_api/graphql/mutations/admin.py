@@ -11,6 +11,19 @@ from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_admin
+from crits_api.db.admin_access_records import (
+    create_role_record,
+    create_source_access_record,
+    get_role_record_by_name,
+    get_source_access_record,
+    is_valid_role_permission,
+    remove_role_source,
+    role_name_exists,
+    update_role_permission,
+    update_role_record,
+    update_source_access_active,
+    upsert_role_source,
+)
 from crits_api.db.admin_config_records import (
     AdminConfigType,
     create_admin_config_record,
@@ -39,19 +52,16 @@ class AdminMutations:
     @strawberry.mutation(description="Create a new source")
     @require_admin
     def create_source(self, info: Info, name: str) -> MutationResult:
-        from crits.core.source_access import SourceAccess
-
         try:
-            existing = SourceAccess.objects(name=name).first()
+            existing = get_source_access_record(name)
             if existing:
                 return MutationResult(success=False, message=f"Source '{name}' already exists")
 
-            source = SourceAccess(name=name, active="on")
-            source.save()
+            source = create_source_access_record(name, active="on")
             return MutationResult(
                 success=True,
                 message=f"Source '{name}' created",
-                id=str(source.id),
+                id=source.id,
             )
         except Exception as e:
             logger.error(f"Error creating source: {e}")
@@ -60,15 +70,11 @@ class AdminMutations:
     @strawberry.mutation(description="Toggle a source active/inactive")
     @require_admin
     def toggle_source(self, info: Info, name: str, active: bool) -> MutationResult:
-        from crits.core.source_access import SourceAccess
-
         try:
-            source = SourceAccess.objects(name=name).first()
+            source = update_source_access_active(name, active=active)
             if not source:
                 return MutationResult(success=False, message=f"Source '{name}' not found")
 
-            source.active = "on" if active else "off"
-            source.save()
             return MutationResult(
                 success=True,
                 message=f"Source '{name}' {'activated' if active else 'deactivated'}",
@@ -82,21 +88,16 @@ class AdminMutations:
     @strawberry.mutation(description="Create a new role")
     @require_admin
     def create_role(self, info: Info, name: str, description: str | None = None) -> MutationResult:
-        from crits.core.role import Role
-
         try:
-            existing = Role.objects(name=name).first()
+            existing = get_role_record_by_name(name)
             if existing:
                 return MutationResult(success=False, message=f"Role '{name}' already exists")
 
-            role = Role(name=name, active="on")
-            if description:
-                role.description = description
-            role.save()
+            role = create_role_record(name, description=description or "")
             return MutationResult(
                 success=True,
                 message=f"Role '{name}' created",
-                id=str(role.id),
+                id=role.id,
             )
         except Exception as e:
             logger.error(f"Error creating role: {e}")
@@ -111,27 +112,19 @@ class AdminMutations:
         name: str | None = None,
         description: str | None = None,
     ) -> MutationResult:
-        from bson import ObjectId
-
-        from crits.core.role import Role
-
         try:
-            role = Role.objects(id=ObjectId(id)).first()
+            role = update_role_record(id)
             if not role:
                 return MutationResult(success=False, message="Role not found")
 
-            if name is not None:
-                # Check for duplicate name
-                dup = Role.objects(name=name, id__ne=ObjectId(id)).first()
-                if dup:
-                    return MutationResult(
-                        success=False,
-                        message=f"Role '{name}' already exists",
-                    )
-                role.name = name
-            if description is not None:
-                role.description = description
-            role.save()
+            if name is not None and role_name_exists(name, exclude_id=id):
+                return MutationResult(
+                    success=False,
+                    message=f"Role '{name}' already exists",
+                )
+            role = update_role_record(id, name=name, description=description)
+            if not role:
+                return MutationResult(success=False, message="Role not found")
             return MutationResult(success=True, message="Role updated", id=id)
         except Exception as e:
             logger.error(f"Error updating role: {e}")
@@ -140,17 +133,11 @@ class AdminMutations:
     @strawberry.mutation(description="Toggle a role active/inactive")
     @require_admin
     def toggle_role(self, info: Info, id: str, active: bool) -> MutationResult:
-        from bson import ObjectId
-
-        from crits.core.role import Role
-
         try:
-            role = Role.objects(id=ObjectId(id)).first()
+            role = update_role_record(id, active=active)
             if not role:
                 return MutationResult(success=False, message="Role not found")
 
-            role.active = "on" if active else "off"
-            role.save()
             return MutationResult(
                 success=True,
                 message=f"Role '{role.name}' {'activated' if active else 'deactivated'}",
@@ -173,33 +160,19 @@ class AdminMutations:
         tlp_amber: bool = False,
         tlp_green: bool = False,
     ) -> MutationResult:
-        from bson import ObjectId
-
-        from crits.core.role import Role
-
         try:
-            role = Role.objects(id=ObjectId(id)).first()
+            role = upsert_role_source(
+                id,
+                source_name=source_name,
+                read=read,
+                write=write,
+                tlp_red=tlp_red,
+                tlp_amber=tlp_amber,
+                tlp_green=tlp_green,
+            )
             if not role:
                 return MutationResult(success=False, message="Role not found")
 
-            # Upsert: update flags if source already exists, otherwise add
-            existing = next((s for s in role.sources if s.name == source_name), None)
-            if existing:
-                existing.read = read
-                existing.write = write
-                existing.tlp_red = tlp_red
-                existing.tlp_amber = tlp_amber
-                existing.tlp_green = tlp_green
-            else:
-                role.add_source(
-                    source_name,
-                    read=read,
-                    write=write,
-                    tlp_red=tlp_red,
-                    tlp_amber=tlp_amber,
-                    tlp_green=tlp_green,
-                )
-            role.save()
             return MutationResult(
                 success=True,
                 message=f"Source '{source_name}' updated on role",
@@ -212,17 +185,11 @@ class AdminMutations:
     @strawberry.mutation(description="Remove a source from a role")
     @require_admin
     def remove_role_source(self, info: Info, id: str, source_name: str) -> MutationResult:
-        from bson import ObjectId
-
-        from crits.core.role import Role
-
         try:
-            role = Role.objects(id=ObjectId(id)).first()
+            role = remove_role_source(id, source_name=source_name)
             if not role:
                 return MutationResult(success=False, message="Role not found")
 
-            role.sources = [s for s in role.sources if s.name != source_name]
-            role.save()
             return MutationResult(
                 success=True,
                 message=f"Source '{source_name}' removed from role",
@@ -237,23 +204,16 @@ class AdminMutations:
     def set_role_permission(
         self, info: Info, id: str, permission: str, value: bool
     ) -> MutationResult:
-        from bson import ObjectId
-
-        from crits.core.role import Role
-
         try:
-            role = Role.objects(id=ObjectId(id)).first()
-            if not role:
-                return MutationResult(success=False, message="Role not found")
-
-            if not hasattr(role, permission):
+            if not is_valid_role_permission(permission):
                 return MutationResult(
                     success=False,
                     message=f"Unknown permission: {permission}",
                 )
 
-            setattr(role, permission, value)
-            role.save()
+            role = update_role_permission(id, permission=permission, value=value)
+            if not role:
+                return MutationResult(success=False, message="Role not found")
             return MutationResult(
                 success=True,
                 message=f"Permission '{permission}' set to {value}",
