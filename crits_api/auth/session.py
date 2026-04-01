@@ -14,6 +14,7 @@ import redis.asyncio as redis
 from fastapi import Request
 
 from crits_api.config import settings
+from crits_api.db.connection import ensure_connected
 
 if TYPE_CHECKING:
     from crits.core.user import CRITsUser
@@ -106,9 +107,6 @@ async def get_user_from_session(request: Request) -> Optional["CRITsUser"]:
     Returns:
         CRITsUser object or None if not authenticated
     """
-    # Import CRITsUser - Django should already be set up via connect_mongodb()
-    from crits.core.user import CRITsUser
-
     # Get session cookie
     session_key = request.cookies.get(settings.session_cookie_name)
     if not session_key:
@@ -116,6 +114,12 @@ async def get_user_from_session(request: Request) -> Optional["CRITsUser"]:
         return None
 
     logger.debug(f"Looking up session: {session_key[:20]}...")
+
+    # Only bootstrap the legacy model layer if this request is actually
+    # attempting to authenticate with a shared Django session.
+    ensure_connected()
+
+    from crits.core.user import CRITsUser
 
     # Try to load from Redis directly
     session_data = await get_session_data(session_key)

@@ -25,12 +25,12 @@ async def download_sample(request: Request, md5: str) -> StreamingResponse | JSO
     Authentication: Django session cookie
     Permission: Sample.read
     """
-    from crits.samples.sample import Sample
-
     # Authenticate
     user = await get_user_from_session(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Authentication required"})
+
+    from crits.samples.sample import Sample
 
     # Check permission
     if not user.has_access_to("Sample.read") and not getattr(user, "is_superuser", False):

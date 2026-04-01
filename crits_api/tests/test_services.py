@@ -898,7 +898,7 @@ class TestLegacyServiceHandlers:
 
             request = RequestFactory().get(
                 "/analysis_results/list/jtlist/",
-                {"jtStartIndex": "0", "jtPageSize": "10"},
+                {"analysis_id": analysis_id, "jtStartIndex": "0", "jtPageSize": "10"},
             )
             request.user = test_user
 
@@ -946,7 +946,10 @@ class TestLegacyServiceHandlers:
 
             request = RequestFactory().get(
                 "/analysis_results/list/csv/",
-                {"fields": "object_type,service_name,results,object_id"},
+                {
+                    "analysis_id": analysis_id,
+                    "fields": "object_type,service_name,results,object_id",
+                },
             )
             request.user = test_user
 
@@ -1151,13 +1154,14 @@ class TestAnalysisRecordReads:
         col.delete_many({"analysis_id": analysis_id})
 
         try:
+            obj_id = "test-api-analysis-query-obj"
             col.insert_one(
                 {
                     "analysis_id": analysis_id,
                     "service_name": "TestApiQueryService",
                     "version": "1.2.3",
                     "object_type": "Sample",
-                    "object_id": "abc123",
+                    "object_id": obj_id,
                     "analyst": "test_api_user",
                     "status": "completed",
                     "start_date": "2026-03-26 11:00:00",
@@ -1177,7 +1181,7 @@ class TestAnalysisRecordReads:
                 admin_context,
                 """
                 query {
-                    analysisResults(objType: "Sample", objId: "abc123") {
+                    analysisResults(objType: "Sample", objId: "test-api-analysis-query-obj") {
                         analysisId
                         serviceName
                         status

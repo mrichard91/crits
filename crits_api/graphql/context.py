@@ -15,6 +15,7 @@ from crits_api.auth.session import (
     load_user_acl,
     load_user_sources,
 )
+from crits_api.db.connection import ensure_connected
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,8 @@ async def get_context(request: Request, response: Response) -> GraphQLContext:
     Returns:
         GraphQLContext with user info and permissions
     """
+    ensure_connected()
+
     # Try to get authenticated user from Django session
     user = await get_user_from_session(request)
 

@@ -54,3 +54,10 @@ def connect_mongodb() -> None:
 def is_connected() -> bool:
     """Check if Django/MongoDB is set up."""
     return _django_setup
+
+
+def ensure_connected() -> None:
+    """Initialize the legacy Django/MongoEngine stack on first real use."""
+
+    if not is_connected():
+        connect_mongodb()

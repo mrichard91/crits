@@ -16,7 +16,6 @@ from starlette.requests import Request as StarletteRequest
 from strawberry.fastapi import GraphQLRouter
 
 from crits_api.config import settings
-from crits_api.db.connection import connect_mongodb
 from crits_api.graphql.context import get_context
 from crits_api.graphql.schema import schema
 from crits_api.routes.chat import router as chat_router
@@ -33,14 +32,11 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan handler for startup/shutdown."""
-    # Startup
     logger.info("Starting CRITs GraphQL API...")
-    connect_mongodb()
-    logger.info(f"Connected to MongoDB at {settings.mongo_host}:{settings.mongo_port}")
+    logger.info("Legacy Django bootstrap deferred until a request needs shared models")
 
     yield
 
-    # Shutdown
     logger.info("Shutting down CRITs GraphQL API...")
 
 
