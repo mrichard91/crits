@@ -9,6 +9,16 @@ from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_permission
+from crits_api.db.tlo_records import (
+    build_contains_filter,
+    combine_filters,
+    count_tlo_records,
+    distinct_tlo_values,
+    get_tlo_record,
+    list_tlo_records,
+    to_model_namespace,
+)
+from crits_api.db.tlo_vocabulary import DEFAULT_IP_TYPES
 from crits_api.graphql.types.ip import IPType
 
 logger = logging.getLogger(__name__)
@@ -22,24 +32,16 @@ class IPQueries:
     @require_permission("IP.read")
     def ip(self, info: Info, id: str) -> IPType | None:
         """Get a single IP by its ID."""
-        from bson import ObjectId
-
-        from crits.ips.ip import IP
-
         ctx: GraphQLContext = info.context
 
         try:
-            query = {"_id": ObjectId(id)}
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    query.update(source_filter)
 
-            ip_obj = IP.objects(__raw__=query).first()
-
+            ip_obj = get_tlo_record("ips", id, filters=source_filter)
             if ip_obj:
-                return IPType.from_model(ip_obj)
+                return IPType.from_model(to_model_namespace(ip_obj))
             return None
 
         except Exception as e:
@@ -61,38 +63,30 @@ class IPQueries:
         sort_dir: str | None = None,
     ) -> list[IPType]:
         """List IPs with optional filtering."""
-        from crits.ips.ip import IP
-
         ctx: GraphQLContext = info.context
         limit = min(limit, 100)
 
         try:
-            queryset = IP.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if ip_contains:
-                queryset = queryset.filter(ip__icontains=ip_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("ip", ip_contains),
+                {"ip_type": ip_type} if ip_type else {},
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if ip_type:
-                queryset = queryset.filter(ip_type=ip_type)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            from crits_api.graphql.queries.sorting import apply_sorting
-
-            queryset = apply_sorting(
-                queryset,
-                sort_by,
-                sort_dir,
-                {
+            ips = list_tlo_records(
+                "ips",
+                filters=filters,
+                limit=limit,
+                offset=offset,
+                sort_by=sort_by,
+                sort_dir=sort_dir,
+                allowed_sort_fields={
                     "ip": "ip",
                     "ipType": "ip_type",
                     "status": "status",
@@ -100,9 +94,8 @@ class IPQueries:
                     "created": "created",
                 },
             )
-            ips = queryset.skip(offset).limit(limit)
 
-            return [IPType.from_model(ip) for ip in ips]
+            return [IPType.from_model(to_model_namespace(ip)) for ip in ips]
 
         except Exception as e:
             logger.error(f"Error listing IPs: {e}")
@@ -119,31 +112,22 @@ class IPQueries:
         campaign: str | None = None,
     ) -> int:
         """Count IPs matching the filters."""
-        from crits.ips.ip import IP
-
         ctx: GraphQLContext = info.context
 
         try:
-            queryset = IP.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if ip_contains:
-                queryset = queryset.filter(ip__icontains=ip_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("ip", ip_contains),
+                {"ip_type": ip_type} if ip_type else {},
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if ip_type:
-                queryset = queryset.filter(ip_type=ip_type)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            return queryset.count()
+            return count_tlo_records("ips", filters=filters)
 
         except Exception as e:
             logger.error(f"Error counting IPs: {e}")
@@ -153,13 +137,6 @@ class IPQueries:
     @require_permission("IP.read")
     def ip_types(self, info: Info) -> list[str]:
         """Get list of distinct IP types (vocabulary + any custom DB values)."""
-        from crits.vocabulary.ips import IPTypes
-
-        values = set(IPTypes.values())
-        try:
-            from crits.ips.ip import IP
-
-            values.update(t for t in IP.objects.distinct("ip_type") if t)
-        except Exception:
-            pass
+        values = set(DEFAULT_IP_TYPES)
+        values.update(distinct_tlo_values("ips", "ip_type"))
         return sorted(values)

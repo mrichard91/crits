@@ -9,6 +9,16 @@ from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_permission
+from crits_api.db.tlo_records import (
+    build_contains_filter,
+    combine_filters,
+    count_tlo_records,
+    distinct_tlo_values,
+    get_tlo_record,
+    list_tlo_records,
+    to_model_namespace,
+)
+from crits_api.db.tlo_vocabulary import DEFAULT_DOMAIN_RECORD_TYPES
 from crits_api.graphql.types.domain import DomainType
 
 logger = logging.getLogger(__name__)
@@ -22,24 +32,16 @@ class DomainQueries:
     @require_permission("Domain.read")
     def domain(self, info: Info, id: str) -> DomainType | None:
         """Get a single domain by its ID."""
-        from bson import ObjectId
-
-        from crits.domains.domain import Domain
-
         ctx: GraphQLContext = info.context
 
         try:
-            query = {"_id": ObjectId(id)}
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    query.update(source_filter)
 
-            domain = Domain.objects(__raw__=query).first()
-
+            domain = get_tlo_record("domains", id, filters=source_filter)
             if domain:
-                return DomainType.from_model(domain)
+                return DomainType.from_model(to_model_namespace(domain))
             return None
 
         except Exception as e:
@@ -61,38 +63,30 @@ class DomainQueries:
         sort_dir: str | None = None,
     ) -> list[DomainType]:
         """List domains with optional filtering."""
-        from crits.domains.domain import Domain
-
         ctx: GraphQLContext = info.context
         limit = min(limit, 100)
 
         try:
-            queryset = Domain.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if domain_contains:
-                queryset = queryset.filter(domain__icontains=domain_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("domain", domain_contains),
+                {"record_type": record_type} if record_type else {},
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if record_type:
-                queryset = queryset.filter(record_type=record_type)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            from crits_api.graphql.queries.sorting import apply_sorting
-
-            queryset = apply_sorting(
-                queryset,
-                sort_by,
-                sort_dir,
-                {
+            domains = list_tlo_records(
+                "domains",
+                filters=filters,
+                limit=limit,
+                offset=offset,
+                sort_by=sort_by,
+                sort_dir=sort_dir,
+                allowed_sort_fields={
                     "domain": "domain",
                     "recordType": "record_type",
                     "status": "status",
@@ -100,9 +94,8 @@ class DomainQueries:
                     "created": "created",
                 },
             )
-            domains = queryset.skip(offset).limit(limit)
 
-            return [DomainType.from_model(d) for d in domains]
+            return [DomainType.from_model(to_model_namespace(domain)) for domain in domains]
 
         except Exception as e:
             logger.error(f"Error listing domains: {e}")
@@ -119,31 +112,22 @@ class DomainQueries:
         campaign: str | None = None,
     ) -> int:
         """Count domains matching the filters."""
-        from crits.domains.domain import Domain
-
         ctx: GraphQLContext = info.context
 
         try:
-            queryset = Domain.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if domain_contains:
-                queryset = queryset.filter(domain__icontains=domain_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("domain", domain_contains),
+                {"record_type": record_type} if record_type else {},
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if record_type:
-                queryset = queryset.filter(record_type=record_type)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            return queryset.count()
+            return count_tlo_records("domains", filters=filters)
 
         except Exception as e:
             logger.error(f"Error counting domains: {e}")
@@ -153,11 +137,6 @@ class DomainQueries:
     @require_permission("Domain.read")
     def domain_record_types(self, info: Info) -> list[str]:
         """Get list of distinct domain record types (common DNS types + any custom DB values)."""
-        values = {"A", "AAAA", "CNAME", "MX", "NS", "PTR", "SOA", "SRV", "TXT"}
-        try:
-            from crits.domains.domain import Domain
-
-            values.update(t for t in Domain.objects.distinct("record_type") if t)
-        except Exception:
-            pass
+        values = set(DEFAULT_DOMAIN_RECORD_TYPES)
+        values.update(distinct_tlo_values("domains", "record_type"))
         return sorted(values)

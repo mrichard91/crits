@@ -9,6 +9,16 @@ from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_permission
+from crits_api.db.tlo_records import (
+    build_contains_filter,
+    combine_filters,
+    count_tlo_records,
+    distinct_tlo_values,
+    get_tlo_record,
+    list_tlo_records,
+    to_model_namespace,
+)
+from crits_api.db.tlo_vocabulary import DEFAULT_EVENT_TYPES
 from crits_api.graphql.types.event import EventType
 
 logger = logging.getLogger(__name__)
@@ -22,24 +32,16 @@ class EventQueries:
     @require_permission("Event.read")
     def event(self, info: Info, id: str) -> EventType | None:
         """Get a single event by its ID."""
-        from bson import ObjectId
-
-        from crits.events.event import Event
-
         ctx: GraphQLContext = info.context
 
         try:
-            query = {"_id": ObjectId(id)}
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    query.update(source_filter)
 
-            event = Event.objects(__raw__=query).first()
-
+            event = get_tlo_record("events", id, filters=source_filter)
             if event:
-                return EventType.from_model(event)
+                return EventType.from_model(to_model_namespace(event))
             return None
 
         except Exception as e:
@@ -61,38 +63,30 @@ class EventQueries:
         sort_dir: str | None = None,
     ) -> list[EventType]:
         """List events with optional filtering."""
-        from crits.events.event import Event
-
         ctx: GraphQLContext = info.context
         limit = min(limit, 100)
 
         try:
-            queryset = Event.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if title_contains:
-                queryset = queryset.filter(title__icontains=title_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("title", title_contains),
+                {"event_type": event_type} if event_type else {},
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if event_type:
-                queryset = queryset.filter(event_type=event_type)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            from crits_api.graphql.queries.sorting import apply_sorting
-
-            queryset = apply_sorting(
-                queryset,
-                sort_by,
-                sort_dir,
-                {
+            events = list_tlo_records(
+                "events",
+                filters=filters,
+                limit=limit,
+                offset=offset,
+                sort_by=sort_by,
+                sort_dir=sort_dir,
+                allowed_sort_fields={
                     "title": "title",
                     "eventType": "event_type",
                     "status": "status",
@@ -100,9 +94,8 @@ class EventQueries:
                     "created": "created",
                 },
             )
-            events = queryset.skip(offset).limit(limit)
 
-            return [EventType.from_model(e) for e in events]
+            return [EventType.from_model(to_model_namespace(event)) for event in events]
 
         except Exception as e:
             logger.error(f"Error listing events: {e}")
@@ -119,31 +112,22 @@ class EventQueries:
         campaign: str | None = None,
     ) -> int:
         """Count events matching the filters."""
-        from crits.events.event import Event
-
         ctx: GraphQLContext = info.context
 
         try:
-            queryset = Event.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if title_contains:
-                queryset = queryset.filter(title__icontains=title_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("title", title_contains),
+                {"event_type": event_type} if event_type else {},
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if event_type:
-                queryset = queryset.filter(event_type=event_type)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            return queryset.count()
+            return count_tlo_records("events", filters=filters)
 
         except Exception as e:
             logger.error(f"Error counting events: {e}")
@@ -153,13 +137,6 @@ class EventQueries:
     @require_permission("Event.read")
     def event_types(self, info: Info) -> list[str]:
         """Get list of distinct event types (vocabulary + any custom DB values)."""
-        from crits.vocabulary.events import EventTypes
-
-        values = set(EventTypes.values())
-        try:
-            from crits.events.event import Event
-
-            values.update(t for t in Event.objects.distinct("event_type") if t)
-        except Exception:
-            pass
+        values = set(DEFAULT_EVENT_TYPES)
+        values.update(distinct_tlo_values("events", "event_type"))
         return sorted(values)
