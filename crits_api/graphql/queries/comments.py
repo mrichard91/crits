@@ -7,8 +7,18 @@ import strawberry
 from strawberry.types import Info
 
 from crits_api.auth.permissions import require_authenticated
+from crits_api.db.tlo_records import coerce_object_id, get_tlo_collection, to_model_namespace
 
 logger = logging.getLogger(__name__)
+
+
+def _to_comment_namespace(record: dict[str, Any]) -> Any:
+    """Normalize raw Mongo comment fields to the GraphQL type shape."""
+
+    normalized = dict(record)
+    if "date" in normalized and "created" not in normalized:
+        normalized["created"] = normalized["date"]
+    return to_model_namespace(normalized)
 
 
 @strawberry.type
@@ -68,15 +78,17 @@ class CommentQueries:
         Returns:
             List of comments ordered by creation date
         """
-        from bson import ObjectId
-
-        from crits.comments.comment import Comment
-
         try:
-            results = Comment.objects(obj_id=ObjectId(obj_id), obj_type=obj_type).order_by(
-                "+created"
+            object_id = coerce_object_id(obj_id)
+            if object_id is None:
+                return []
+
+            results = (
+                get_tlo_collection("comments")
+                .find({"obj_id": object_id, "obj_type": obj_type})
+                .sort("date", 1)
             )
-            return [CommentType.from_model(c) for c in results]
+            return [CommentType.from_model(_to_comment_namespace(comment)) for comment in results]
         except Exception as e:
             logger.error(f"Error fetching comments: {e}")
             return []
