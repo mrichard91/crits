@@ -9,6 +9,15 @@ from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_permission
+from crits_api.db.tlo_records import (
+    build_contains_filter,
+    combine_filters,
+    count_tlo_records,
+    distinct_tlo_values,
+    get_tlo_record,
+    list_tlo_records,
+    to_model_namespace,
+)
 from crits_api.graphql.types.signature import SignatureType
 
 logger = logging.getLogger(__name__)
@@ -22,24 +31,16 @@ class SignatureQueries:
     @require_permission("Signature.read")
     def signature(self, info: Info, id: str) -> SignatureType | None:
         """Get a single signature by its ID."""
-        from bson import ObjectId
-
-        from crits.signatures.signature import Signature
-
         ctx: GraphQLContext = info.context
 
         try:
-            query = {"_id": ObjectId(id)}
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    query.update(source_filter)
 
-            signature = Signature.objects(__raw__=query).first()
-
+            signature = get_tlo_record("signatures", id, filters=source_filter)
             if signature:
-                return SignatureType.from_model(signature)
+                return SignatureType.from_model(to_model_namespace(signature))
             return None
 
         except Exception as e:
@@ -61,38 +62,30 @@ class SignatureQueries:
         sort_dir: str | None = None,
     ) -> list[SignatureType]:
         """List signatures with optional filtering."""
-        from crits.signatures.signature import Signature
-
         ctx: GraphQLContext = info.context
         limit = min(limit, 100)
 
         try:
-            queryset = Signature.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if title_contains:
-                queryset = queryset.filter(title__icontains=title_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("title", title_contains),
+                {"data_type": data_type} if data_type else {},
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if data_type:
-                queryset = queryset.filter(data_type=data_type)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            from crits_api.graphql.queries.sorting import apply_sorting
-
-            queryset = apply_sorting(
-                queryset,
-                sort_by,
-                sort_dir,
-                {
+            signatures = list_tlo_records(
+                "signatures",
+                filters=filters,
+                limit=limit,
+                offset=offset,
+                sort_by=sort_by,
+                sort_dir=sort_dir,
+                allowed_sort_fields={
                     "title": "title",
                     "dataType": "data_type",
                     "version": "version",
@@ -101,9 +94,10 @@ class SignatureQueries:
                     "created": "created",
                 },
             )
-            signatures = queryset.skip(offset).limit(limit)
 
-            return [SignatureType.from_model(s) for s in signatures]
+            return [
+                SignatureType.from_model(to_model_namespace(signature)) for signature in signatures
+            ]
 
         except Exception as e:
             logger.error(f"Error listing signatures: {e}")
@@ -120,31 +114,22 @@ class SignatureQueries:
         campaign: str | None = None,
     ) -> int:
         """Count signatures matching the filters."""
-        from crits.signatures.signature import Signature
-
         ctx: GraphQLContext = info.context
 
         try:
-            queryset = Signature.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if title_contains:
-                queryset = queryset.filter(title__icontains=title_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("title", title_contains),
+                {"data_type": data_type} if data_type else {},
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if data_type:
-                queryset = queryset.filter(data_type=data_type)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            return queryset.count()
+            return count_tlo_records("signatures", filters=filters)
 
         except Exception as e:
             logger.error(f"Error counting signatures: {e}")
@@ -154,11 +139,8 @@ class SignatureQueries:
     @require_permission("Signature.read")
     def signature_data_types(self, info: Info) -> list[str]:
         """Get list of distinct signature data types."""
-        from crits.signatures.signature import Signature
-
         try:
-            types = Signature.objects.distinct("data_type")
-            return sorted([t for t in types if t])
+            return distinct_tlo_values("signatures", "data_type")
         except Exception as e:
             logger.error(f"Error getting signature data types: {e}")
             return []

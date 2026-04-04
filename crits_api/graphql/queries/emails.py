@@ -9,6 +9,14 @@ from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_permission
+from crits_api.db.tlo_records import (
+    build_contains_filter,
+    combine_filters,
+    count_tlo_records,
+    get_tlo_record,
+    list_tlo_records,
+    to_model_namespace,
+)
 from crits_api.graphql.types.email_type import EmailType
 
 logger = logging.getLogger(__name__)
@@ -22,24 +30,16 @@ class EmailQueries:
     @require_permission("Email.read")
     def email(self, info: Info, id: str) -> EmailType | None:
         """Get a single email by its ID."""
-        from bson import ObjectId
-
-        from crits.emails.email import Email
-
         ctx: GraphQLContext = info.context
 
         try:
-            query = {"_id": ObjectId(id)}
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    query.update(source_filter)
 
-            email = Email.objects(__raw__=query).first()
-
+            email = get_tlo_record("emails", id, filters=source_filter)
             if email:
-                return EmailType.from_model(email)
+                return EmailType.from_model(to_model_namespace(email))
             return None
 
         except Exception as e:
@@ -61,38 +61,30 @@ class EmailQueries:
         sort_dir: str | None = None,
     ) -> list[EmailType]:
         """List emails with optional filtering."""
-        from crits.emails.email import Email
-
         ctx: GraphQLContext = info.context
         limit = min(limit, 100)
 
         try:
-            queryset = Email.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if subject_contains:
-                queryset = queryset.filter(subject__icontains=subject_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("subject", subject_contains),
+                build_contains_filter("from_address", from_address),
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if from_address:
-                queryset = queryset.filter(from_address__icontains=from_address)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            from crits_api.graphql.queries.sorting import apply_sorting
-
-            queryset = apply_sorting(
-                queryset,
-                sort_by,
-                sort_dir,
-                {
+            emails = list_tlo_records(
+                "emails",
+                filters=filters,
+                limit=limit,
+                offset=offset,
+                sort_by=sort_by,
+                sort_dir=sort_dir,
+                allowed_sort_fields={
                     "subject": "subject",
                     "fromAddress": "from_address",
                     "status": "status",
@@ -100,9 +92,8 @@ class EmailQueries:
                     "created": "created",
                 },
             )
-            emails = queryset.skip(offset).limit(limit)
 
-            return [EmailType.from_model(e) for e in emails]
+            return [EmailType.from_model(to_model_namespace(email)) for email in emails]
 
         except Exception as e:
             logger.error(f"Error listing emails: {e}")
@@ -119,31 +110,22 @@ class EmailQueries:
         campaign: str | None = None,
     ) -> int:
         """Count emails matching the filters."""
-        from crits.emails.email import Email
-
         ctx: GraphQLContext = info.context
 
         try:
-            queryset = Email.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if subject_contains:
-                queryset = queryset.filter(subject__icontains=subject_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("subject", subject_contains),
+                build_contains_filter("from_address", from_address),
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if from_address:
-                queryset = queryset.filter(from_address__icontains=from_address)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            return queryset.count()
+            return count_tlo_records("emails", filters=filters)
 
         except Exception as e:
             logger.error(f"Error counting emails: {e}")
