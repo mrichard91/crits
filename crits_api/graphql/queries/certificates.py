@@ -9,6 +9,14 @@ from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_permission
+from crits_api.db.tlo_records import (
+    build_contains_filter,
+    combine_filters,
+    count_tlo_records,
+    get_tlo_record,
+    list_tlo_records,
+    to_model_namespace,
+)
 from crits_api.graphql.types.certificate import CertificateType
 
 logger = logging.getLogger(__name__)
@@ -22,24 +30,16 @@ class CertificateQueries:
     @require_permission("Certificate.read")
     def certificate(self, info: Info, id: str) -> CertificateType | None:
         """Get a single certificate by its ID."""
-        from bson import ObjectId
-
-        from crits.certificates.certificate import Certificate
-
         ctx: GraphQLContext = info.context
 
         try:
-            query = {"_id": ObjectId(id)}
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    query.update(source_filter)
 
-            cert = Certificate.objects(__raw__=query).first()
-
+            cert = get_tlo_record("certificates", id, filters=source_filter)
             if cert:
-                return CertificateType.from_model(cert)
+                return CertificateType.from_model(to_model_namespace(cert))
             return None
 
         except Exception as e:
@@ -61,38 +61,30 @@ class CertificateQueries:
         sort_dir: str | None = None,
     ) -> list[CertificateType]:
         """List certificates with optional filtering."""
-        from crits.certificates.certificate import Certificate
-
         ctx: GraphQLContext = info.context
         limit = min(limit, 100)
 
         try:
-            queryset = Certificate.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if filename_contains:
-                queryset = queryset.filter(filename__icontains=filename_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("filename", filename_contains),
+                {"md5": md5} if md5 else {},
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if md5:
-                queryset = queryset.filter(md5=md5)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            from crits_api.graphql.queries.sorting import apply_sorting
-
-            queryset = apply_sorting(
-                queryset,
-                sort_by,
-                sort_dir,
-                {
+            certs = list_tlo_records(
+                "certificates",
+                filters=filters,
+                limit=limit,
+                offset=offset,
+                sort_by=sort_by,
+                sort_dir=sort_dir,
+                allowed_sort_fields={
                     "filename": "filename",
                     "md5": "md5",
                     "status": "status",
@@ -100,9 +92,8 @@ class CertificateQueries:
                     "created": "created",
                 },
             )
-            certs = queryset.skip(offset).limit(limit)
 
-            return [CertificateType.from_model(c) for c in certs]
+            return [CertificateType.from_model(to_model_namespace(cert)) for cert in certs]
 
         except Exception as e:
             logger.error(f"Error listing certificates: {e}")
@@ -119,31 +110,22 @@ class CertificateQueries:
         campaign: str | None = None,
     ) -> int:
         """Count certificates matching the filters."""
-        from crits.certificates.certificate import Certificate
-
         ctx: GraphQLContext = info.context
 
         try:
-            queryset = Certificate.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if filename_contains:
-                queryset = queryset.filter(filename__icontains=filename_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("filename", filename_contains),
+                {"md5": md5} if md5 else {},
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if md5:
-                queryset = queryset.filter(md5=md5)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            return queryset.count()
+            return count_tlo_records("certificates", filters=filters)
 
         except Exception as e:
             logger.error(f"Error counting certificates: {e}")

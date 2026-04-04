@@ -9,6 +9,14 @@ from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_permission
+from crits_api.db.tlo_records import (
+    build_contains_filter,
+    combine_filters,
+    count_tlo_records,
+    get_tlo_record,
+    list_tlo_records,
+    to_model_namespace,
+)
 from crits_api.graphql.types.screenshot import ScreenshotType
 
 logger = logging.getLogger(__name__)
@@ -22,24 +30,16 @@ class ScreenshotQueries:
     @require_permission("Screenshot.read")
     def screenshot(self, info: Info, id: str) -> ScreenshotType | None:
         """Get a single screenshot by its ID."""
-        from bson import ObjectId
-
-        from crits.screenshots.screenshot import Screenshot
-
         ctx: GraphQLContext = info.context
 
         try:
-            query = {"_id": ObjectId(id)}
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    query.update(source_filter)
 
-            screenshot = Screenshot.objects(__raw__=query).first()
-
+            screenshot = get_tlo_record("screenshots", id, filters=source_filter)
             if screenshot:
-                return ScreenshotType.from_model(screenshot)
+                return ScreenshotType.from_model(to_model_namespace(screenshot))
             return None
 
         except Exception as e:
@@ -59,41 +59,39 @@ class ScreenshotQueries:
         sort_dir: str | None = None,
     ) -> list[ScreenshotType]:
         """List screenshots with optional filtering."""
-        from crits.screenshots.screenshot import Screenshot
-
         ctx: GraphQLContext = info.context
         limit = min(limit, 100)
 
         try:
-            queryset = Screenshot.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if filename_contains:
-                queryset = queryset.filter(filename__icontains=filename_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("filename", filename_contains),
+                {"tags": tag} if tag else {},
+            )
 
-            if tag:
-                queryset = queryset.filter(tags=tag)
-
-            from crits_api.graphql.queries.sorting import apply_sorting
-
-            queryset = apply_sorting(
-                queryset,
-                sort_by,
-                sort_dir,
-                {
+            screenshots = list_tlo_records(
+                "screenshots",
+                filters=filters,
+                limit=limit,
+                offset=offset,
+                sort_by=sort_by,
+                sort_dir=sort_dir,
+                allowed_sort_fields={
                     "filename": "filename",
                     "status": "status",
                     "modified": "modified",
                     "created": "created",
                 },
             )
-            screenshots = queryset.skip(offset).limit(limit)
 
-            return [ScreenshotType.from_model(s) for s in screenshots]
+            return [
+                ScreenshotType.from_model(to_model_namespace(screenshot))
+                for screenshot in screenshots
+            ]
 
         except Exception as e:
             logger.error(f"Error listing screenshots: {e}")
@@ -108,25 +106,20 @@ class ScreenshotQueries:
         tag: str | None = None,
     ) -> int:
         """Count screenshots matching the filters."""
-        from crits.screenshots.screenshot import Screenshot
-
         ctx: GraphQLContext = info.context
 
         try:
-            queryset = Screenshot.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if filename_contains:
-                queryset = queryset.filter(filename__icontains=filename_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("filename", filename_contains),
+                {"tags": tag} if tag else {},
+            )
 
-            if tag:
-                queryset = queryset.filter(tags=tag)
-
-            return queryset.count()
+            return count_tlo_records("screenshots", filters=filters)
 
         except Exception as e:
             logger.error(f"Error counting screenshots: {e}")

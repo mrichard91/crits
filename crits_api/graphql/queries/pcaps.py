@@ -9,6 +9,14 @@ from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_permission
+from crits_api.db.tlo_records import (
+    build_contains_filter,
+    combine_filters,
+    count_tlo_records,
+    get_tlo_record,
+    list_tlo_records,
+    to_model_namespace,
+)
 from crits_api.graphql.types.pcap import PCAPType
 
 logger = logging.getLogger(__name__)
@@ -22,24 +30,16 @@ class PCAPQueries:
     @require_permission("PCAP.read")
     def pcap(self, info: Info, id: str) -> PCAPType | None:
         """Get a single PCAP by its ID."""
-        from bson import ObjectId
-
-        from crits.pcaps.pcap import PCAP
-
         ctx: GraphQLContext = info.context
 
         try:
-            query = {"_id": ObjectId(id)}
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    query.update(source_filter)
 
-            pcap = PCAP.objects(__raw__=query).first()
-
+            pcap = get_tlo_record("pcaps", id, filters=source_filter)
             if pcap:
-                return PCAPType.from_model(pcap)
+                return PCAPType.from_model(to_model_namespace(pcap))
             return None
 
         except Exception as e:
@@ -61,38 +61,30 @@ class PCAPQueries:
         sort_dir: str | None = None,
     ) -> list[PCAPType]:
         """List PCAPs with optional filtering."""
-        from crits.pcaps.pcap import PCAP
-
         ctx: GraphQLContext = info.context
         limit = min(limit, 100)
 
         try:
-            queryset = PCAP.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if filename_contains:
-                queryset = queryset.filter(filename__icontains=filename_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("filename", filename_contains),
+                {"md5": md5} if md5 else {},
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if md5:
-                queryset = queryset.filter(md5=md5)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            from crits_api.graphql.queries.sorting import apply_sorting
-
-            queryset = apply_sorting(
-                queryset,
-                sort_by,
-                sort_dir,
-                {
+            pcaps = list_tlo_records(
+                "pcaps",
+                filters=filters,
+                limit=limit,
+                offset=offset,
+                sort_by=sort_by,
+                sort_dir=sort_dir,
+                allowed_sort_fields={
                     "filename": "filename",
                     "md5": "md5",
                     "status": "status",
@@ -100,9 +92,8 @@ class PCAPQueries:
                     "created": "created",
                 },
             )
-            pcaps = queryset.skip(offset).limit(limit)
 
-            return [PCAPType.from_model(p) for p in pcaps]
+            return [PCAPType.from_model(to_model_namespace(pcap)) for pcap in pcaps]
 
         except Exception as e:
             logger.error(f"Error listing PCAPs: {e}")
@@ -119,31 +110,22 @@ class PCAPQueries:
         campaign: str | None = None,
     ) -> int:
         """Count PCAPs matching the filters."""
-        from crits.pcaps.pcap import PCAP
-
         ctx: GraphQLContext = info.context
 
         try:
-            queryset = PCAP.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if filename_contains:
-                queryset = queryset.filter(filename__icontains=filename_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("filename", filename_contains),
+                {"md5": md5} if md5 else {},
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if md5:
-                queryset = queryset.filter(md5=md5)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            return queryset.count()
+            return count_tlo_records("pcaps", filters=filters)
 
         except Exception as e:
             logger.error(f"Error counting PCAPs: {e}")

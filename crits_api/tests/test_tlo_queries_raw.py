@@ -23,11 +23,15 @@ def _cleanup_raw_tlo_docs() -> None:
     get_tlo_collection("actors").delete_many({"name": {"$regex": f"^{_TEST_PREFIX}"}})
     get_tlo_collection("backdoors").delete_many({"name": {"$regex": f"^{_TEST_PREFIX}"}})
     get_tlo_collection("campaigns").delete_many({"name": {"$regex": f"^{_TEST_PREFIX}"}})
+    get_tlo_collection("certificates").delete_many({"filename": {"$regex": f"^{_TEST_PREFIX}"}})
     get_tlo_collection("domains").delete_many({"domain": {"$regex": f"^{_TEST_PREFIX.lower()}"}})
     get_tlo_collection("emails").delete_many({"subject": {"$regex": f"^{_TEST_PREFIX}"}})
     get_tlo_collection("events").delete_many({"title": {"$regex": f"^{_TEST_PREFIX}"}})
     get_tlo_collection("exploits").delete_many({"name": {"$regex": f"^{_TEST_PREFIX}"}})
     get_tlo_collection("ips").delete_many({"ip": {"$regex": "^203\\.0\\.113\\."}})
+    get_tlo_collection("pcaps").delete_many({"filename": {"$regex": f"^{_TEST_PREFIX}"}})
+    get_tlo_collection("raw_data").delete_many({"title": {"$regex": f"^{_TEST_PREFIX}"}})
+    get_tlo_collection("screenshots").delete_many({"filename": {"$regex": f"^{_TEST_PREFIX}"}})
     get_tlo_collection("signatures").delete_many({"title": {"$regex": f"^{_TEST_PREFIX}"}})
     get_tlo_collection("targets").delete_many(
         {"email_address": {"$regex": f"^{_TEST_PREFIX.lower()}"}}
@@ -396,6 +400,145 @@ def _insert_signature(*, title: str, data_type: str, campaign_name: str) -> str:
         "schema_version": 1,
     }
     return str(get_tlo_collection("signatures").insert_one(document).inserted_id)
+
+
+def _insert_raw_data(*, title: str, data_type: str, campaign_name: str) -> str:
+    now = datetime.now()
+    document = {
+        "title": title,
+        "data_type": data_type,
+        "data": "raw data body",
+        "md5": "",
+        "link_id": "",
+        "version": 1,
+        "tool": {"name": "parser", "version": "1.0", "details": "raw"},
+        "highlights": [],
+        "inlines": [],
+        "description": "raw raw_data",
+        "analyst": "tester",
+        "status": "Analyzed",
+        "tlp": "green",
+        "created": now,
+        "modified": now,
+        "campaign": [
+            {"name": campaign_name, "analyst": "tester", "confidence": "high", "date": now}
+        ],
+        "bucket_list": [],
+        "sectors": [],
+        "source": [],
+        "relationships": [],
+        "actions": [],
+        "tickets": [],
+        "schema_version": 1,
+    }
+    return str(get_tlo_collection("raw_data").insert_one(document).inserted_id)
+
+
+def _insert_certificate(*, filename: str, md5: str, source_name: str, campaign_name: str) -> str:
+    now = datetime.now()
+    document = {
+        "filename": filename,
+        "filetype": "application/x-x509-ca-cert",
+        "md5": md5,
+        "size": 32,
+        "description": "raw certificate",
+        "analyst": "tester",
+        "status": "Analyzed",
+        "tlp": "green",
+        "created": now,
+        "modified": now,
+        "campaign": [
+            {"name": campaign_name, "analyst": "tester", "confidence": "high", "date": now}
+        ],
+        "bucket_list": [],
+        "sectors": [],
+        "source": [
+            {
+                "name": source_name,
+                "instances": [
+                    {
+                        "method": "manual",
+                        "reference": "",
+                        "analyst": "tester",
+                        "date": now,
+                        "tlp": "green",
+                    }
+                ],
+            }
+        ],
+        "relationships": [],
+        "actions": [],
+        "tickets": [],
+        "schema_version": 1,
+    }
+    return str(get_tlo_collection("certificates").insert_one(document).inserted_id)
+
+
+def _insert_pcap(*, filename: str, md5: str, campaign_name: str) -> str:
+    now = datetime.now()
+    document = {
+        "filename": filename,
+        "contentType": "application/vnd.tcpdump.pcap",
+        "md5": md5,
+        "length": 64,
+        "description": "raw pcap",
+        "analyst": "tester",
+        "status": "Analyzed",
+        "tlp": "green",
+        "created": now,
+        "modified": now,
+        "campaign": [
+            {"name": campaign_name, "analyst": "tester", "confidence": "high", "date": now}
+        ],
+        "bucket_list": [],
+        "sectors": [],
+        "source": [],
+        "relationships": [],
+        "actions": [],
+        "tickets": [],
+        "schema_version": 1,
+    }
+    return str(get_tlo_collection("pcaps").insert_one(document).inserted_id)
+
+
+def _insert_screenshot(*, filename: str, tag: str, source_name: str, campaign_name: str) -> str:
+    now = datetime.now()
+    document = {
+        "filename": filename,
+        "description": "raw screenshot",
+        "md5": "",
+        "width": 800,
+        "height": 600,
+        "analyst": "tester",
+        "status": "Analyzed",
+        "tlp": "green",
+        "tags": [tag],
+        "created": now,
+        "modified": now,
+        "campaign": [
+            {"name": campaign_name, "analyst": "tester", "confidence": "high", "date": now}
+        ],
+        "bucket_list": [],
+        "sectors": [],
+        "source": [
+            {
+                "name": source_name,
+                "instances": [
+                    {
+                        "method": "manual",
+                        "reference": "",
+                        "analyst": "tester",
+                        "date": now,
+                        "tlp": "green",
+                    }
+                ],
+            }
+        ],
+        "relationships": [],
+        "actions": [],
+        "schema_version": 1,
+    }
+    return str(get_tlo_collection("screenshots").insert_one(document).inserted_id)
 
 
 def test_actor_queries_use_raw_records_with_source_filtering() -> None:
@@ -786,5 +929,165 @@ def test_signature_queries_use_raw_records(admin_context: GraphQLContext) -> Non
     assert result.data["signaturesCount"] == 1
     assert "YARA" in result.data["signatureDataTypes"]
     assert f"{_TEST_PREFIX}YARA" in result.data["signatureDataTypes"]
+
+    _cleanup_raw_tlo_docs()
+
+
+def test_raw_data_queries_use_raw_records(admin_context: GraphQLContext) -> None:
+    _cleanup_raw_tlo_docs()
+    matching_id = _insert_raw_data(
+        title=f"{_TEST_PREFIX}RawDataAlpha",
+        data_type=f"{_TEST_PREFIX}Log",
+        campaign_name=f"{_TEST_PREFIX}CampaignOne",
+    )
+    _insert_raw_data(
+        title=f"{_TEST_PREFIX}RawDataBeta",
+        data_type="Log",
+        campaign_name=f"{_TEST_PREFIX}CampaignTwo",
+    )
+
+    result = execute_gql(
+        admin_context,
+        f"""
+        query {{
+            rawData(id: "{matching_id}") {{ id title dataType }}
+            rawDataList(titleContains: "{_TEST_PREFIX}RawDataA", dataType: "{_TEST_PREFIX}Log", sortBy: "title", sortDir: "asc") {{
+                title dataType
+            }}
+            rawDataCount(titleContains: "{_TEST_PREFIX}RawDataA", dataType: "{_TEST_PREFIX}Log")
+        }}
+        """,
+    )
+
+    assert result.errors is None
+    assert result.data["rawData"]["title"] == f"{_TEST_PREFIX}RawDataAlpha"
+    assert result.data["rawData"]["dataType"] == f"{_TEST_PREFIX}Log"
+    assert result.data["rawDataList"] == [
+        {"title": f"{_TEST_PREFIX}RawDataAlpha", "dataType": f"{_TEST_PREFIX}Log"}
+    ]
+    assert result.data["rawDataCount"] == 1
+
+    _cleanup_raw_tlo_docs()
+
+
+def test_certificate_queries_use_raw_records_with_source_filtering() -> None:
+    _cleanup_raw_tlo_docs()
+    visible_id = _insert_certificate(
+        filename=f"{_TEST_PREFIX}CertVisible.crt",
+        md5="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        source_name=f"{_TEST_PREFIX}Source",
+        campaign_name=f"{_TEST_PREFIX}CampaignOne",
+    )
+    hidden_id = _insert_certificate(
+        filename=f"{_TEST_PREFIX}CertHidden.crt",
+        md5="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        source_name=f"{_TEST_PREFIX}OtherSource",
+        campaign_name=f"{_TEST_PREFIX}CampaignTwo",
+    )
+
+    result = execute_gql(
+        _limited_context("Certificate"),
+        f"""
+        query {{
+            visible: certificate(id: "{visible_id}") {{ id filename md5 }}
+            hidden: certificate(id: "{hidden_id}") {{ id filename }}
+            certificates(filenameContains: "{_TEST_PREFIX}Cert", sortBy: "filename", sortDir: "asc") {{
+                filename md5
+            }}
+            certificatesCount(filenameContains: "{_TEST_PREFIX}Cert")
+        }}
+        """,
+    )
+
+    assert result.errors is None
+    assert result.data["visible"]["filename"] == f"{_TEST_PREFIX}CertVisible.crt"
+    assert result.data["hidden"] is None
+    assert result.data["certificates"] == [
+        {
+            "filename": f"{_TEST_PREFIX}CertVisible.crt",
+            "md5": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        }
+    ]
+    assert result.data["certificatesCount"] == 1
+
+    _cleanup_raw_tlo_docs()
+
+
+def test_pcap_queries_use_raw_records(admin_context: GraphQLContext) -> None:
+    _cleanup_raw_tlo_docs()
+    matching_id = _insert_pcap(
+        filename=f"{_TEST_PREFIX}CaptureAlpha.pcap",
+        md5="cccccccccccccccccccccccccccccccc",
+        campaign_name=f"{_TEST_PREFIX}CampaignOne",
+    )
+    _insert_pcap(
+        filename=f"{_TEST_PREFIX}CaptureBeta.pcap",
+        md5="dddddddddddddddddddddddddddddddd",
+        campaign_name=f"{_TEST_PREFIX}CampaignTwo",
+    )
+
+    result = execute_gql(
+        admin_context,
+        f"""
+        query {{
+            pcap(id: "{matching_id}") {{ id filename md5 }}
+            pcaps(filenameContains: "{_TEST_PREFIX}CaptureA", md5: "cccccccccccccccccccccccccccccccc", sortBy: "filename", sortDir: "asc") {{
+                filename md5
+            }}
+            pcapsCount(filenameContains: "{_TEST_PREFIX}CaptureA", md5: "cccccccccccccccccccccccccccccccc")
+        }}
+        """,
+    )
+
+    assert result.errors is None
+    assert result.data["pcap"]["filename"] == f"{_TEST_PREFIX}CaptureAlpha.pcap"
+    assert result.data["pcap"]["md5"] == "cccccccccccccccccccccccccccccccc"
+    assert result.data["pcaps"] == [
+        {
+            "filename": f"{_TEST_PREFIX}CaptureAlpha.pcap",
+            "md5": "cccccccccccccccccccccccccccccccc",
+        }
+    ]
+    assert result.data["pcapsCount"] == 1
+
+    _cleanup_raw_tlo_docs()
+
+
+def test_screenshot_queries_use_raw_records_with_source_filtering() -> None:
+    _cleanup_raw_tlo_docs()
+    visible_id = _insert_screenshot(
+        filename=f"{_TEST_PREFIX}ShotVisible.png",
+        tag=f"{_TEST_PREFIX}Tag",
+        source_name=f"{_TEST_PREFIX}Source",
+        campaign_name=f"{_TEST_PREFIX}CampaignOne",
+    )
+    hidden_id = _insert_screenshot(
+        filename=f"{_TEST_PREFIX}ShotHidden.png",
+        tag=f"{_TEST_PREFIX}Tag",
+        source_name=f"{_TEST_PREFIX}OtherSource",
+        campaign_name=f"{_TEST_PREFIX}CampaignTwo",
+    )
+
+    result = execute_gql(
+        _limited_context("Screenshot"),
+        f"""
+        query {{
+            visible: screenshot(id: "{visible_id}") {{ id filename tags }}
+            hidden: screenshot(id: "{hidden_id}") {{ id filename }}
+            screenshots(filenameContains: "{_TEST_PREFIX}Shot", tag: "{_TEST_PREFIX}Tag", sortBy: "filename", sortDir: "asc") {{
+                filename tags
+            }}
+            screenshotsCount(filenameContains: "{_TEST_PREFIX}Shot", tag: "{_TEST_PREFIX}Tag")
+        }}
+        """,
+    )
+
+    assert result.errors is None
+    assert result.data["visible"]["filename"] == f"{_TEST_PREFIX}ShotVisible.png"
+    assert result.data["hidden"] is None
+    assert result.data["screenshots"] == [
+        {"filename": f"{_TEST_PREFIX}ShotVisible.png", "tags": [f"{_TEST_PREFIX}Tag"]}
+    ]
+    assert result.data["screenshotsCount"] == 1
 
     _cleanup_raw_tlo_docs()

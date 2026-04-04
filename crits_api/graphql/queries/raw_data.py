@@ -9,6 +9,15 @@ from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_permission
+from crits_api.db.tlo_records import (
+    build_contains_filter,
+    combine_filters,
+    count_tlo_records,
+    distinct_tlo_values,
+    get_tlo_record,
+    list_tlo_records,
+    to_model_namespace,
+)
 from crits_api.graphql.types.raw_data import RawDataType
 
 logger = logging.getLogger(__name__)
@@ -22,24 +31,16 @@ class RawDataQueries:
     @require_permission("RawData.read")
     def raw_data(self, info: Info, id: str) -> RawDataType | None:
         """Get a single raw data object by its ID."""
-        from bson import ObjectId
-
-        from crits.raw_data.raw_data import RawData
-
         ctx: GraphQLContext = info.context
 
         try:
-            query = {"_id": ObjectId(id)}
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    query.update(source_filter)
 
-            raw_data = RawData.objects(__raw__=query).first()
-
+            raw_data = get_tlo_record("raw_data", id, filters=source_filter)
             if raw_data:
-                return RawDataType.from_model(raw_data)
+                return RawDataType.from_model(to_model_namespace(raw_data))
             return None
 
         except Exception as e:
@@ -61,38 +62,30 @@ class RawDataQueries:
         sort_dir: str | None = None,
     ) -> list[RawDataType]:
         """List raw data objects with optional filtering."""
-        from crits.raw_data.raw_data import RawData
-
         ctx: GraphQLContext = info.context
         limit = min(limit, 100)
 
         try:
-            queryset = RawData.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if title_contains:
-                queryset = queryset.filter(title__icontains=title_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("title", title_contains),
+                {"data_type": data_type} if data_type else {},
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if data_type:
-                queryset = queryset.filter(data_type=data_type)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            from crits_api.graphql.queries.sorting import apply_sorting
-
-            queryset = apply_sorting(
-                queryset,
-                sort_by,
-                sort_dir,
-                {
+            raw_data_list = list_tlo_records(
+                "raw_data",
+                filters=filters,
+                limit=limit,
+                offset=offset,
+                sort_by=sort_by,
+                sort_dir=sort_dir,
+                allowed_sort_fields={
                     "title": "title",
                     "dataType": "data_type",
                     "version": "version",
@@ -101,9 +94,10 @@ class RawDataQueries:
                     "created": "created",
                 },
             )
-            raw_data_list = queryset.skip(offset).limit(limit)
 
-            return [RawDataType.from_model(rd) for rd in raw_data_list]
+            return [
+                RawDataType.from_model(to_model_namespace(raw_data)) for raw_data in raw_data_list
+            ]
 
         except Exception as e:
             logger.error(f"Error listing raw data: {e}")
@@ -120,31 +114,22 @@ class RawDataQueries:
         campaign: str | None = None,
     ) -> int:
         """Count raw data objects matching the filters."""
-        from crits.raw_data.raw_data import RawData
-
         ctx: GraphQLContext = info.context
 
         try:
-            queryset = RawData.objects
-
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if title_contains:
-                queryset = queryset.filter(title__icontains=title_contains)
+            filters = combine_filters(
+                source_filter,
+                build_contains_filter("title", title_contains),
+                {"data_type": data_type} if data_type else {},
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if data_type:
-                queryset = queryset.filter(data_type=data_type)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            return queryset.count()
+            return count_tlo_records("raw_data", filters=filters)
 
         except Exception as e:
             logger.error(f"Error counting raw data: {e}")
@@ -154,11 +139,8 @@ class RawDataQueries:
     @require_permission("RawData.read")
     def raw_data_types(self, info: Info) -> list[str]:
         """Get list of distinct raw data types."""
-        from crits.raw_data.raw_data import RawData
-
         try:
-            types = RawData.objects.distinct("data_type")
-            return sorted([t for t in types if t])
+            return distinct_tlo_values("raw_data", "data_type")
         except Exception as e:
             logger.error(f"Error getting raw data types: {e}")
             return []
