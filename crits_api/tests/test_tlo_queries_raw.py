@@ -28,6 +28,7 @@ def _cleanup_raw_tlo_docs() -> None:
     get_tlo_collection("emails").delete_many({"subject": {"$regex": f"^{_TEST_PREFIX}"}})
     get_tlo_collection("events").delete_many({"title": {"$regex": f"^{_TEST_PREFIX}"}})
     get_tlo_collection("exploits").delete_many({"name": {"$regex": f"^{_TEST_PREFIX}"}})
+    get_tlo_collection("indicators").delete_many({"value": {"$regex": f"^{_TEST_PREFIX}"}})
     get_tlo_collection("ips").delete_many({"ip": {"$regex": "^203\\.0\\.113\\."}})
     get_tlo_collection("pcaps").delete_many({"filename": {"$regex": f"^{_TEST_PREFIX}"}})
     get_tlo_collection("raw_data").delete_many({"title": {"$regex": f"^{_TEST_PREFIX}"}})
@@ -400,6 +401,47 @@ def _insert_signature(*, title: str, data_type: str, campaign_name: str) -> str:
         "schema_version": 1,
     }
     return str(get_tlo_collection("signatures").insert_one(document).inserted_id)
+
+
+def _insert_indicator(*, value: str, ind_type: str, source_name: str, campaign_name: str) -> str:
+    now = datetime.now()
+    document = {
+        "value": value,
+        "ind_type": ind_type,
+        "description": "raw indicator",
+        "analyst": "tester",
+        "status": "Analyzed",
+        "tlp": "green",
+        "created": now,
+        "modified": now,
+        "confidence": {"rating": "high", "analyst": "tester"},
+        "impact": {"rating": "medium", "analyst": "tester"},
+        "threat_types": [],
+        "attack_types": [],
+        "campaign": [
+            {"name": campaign_name, "analyst": "tester", "confidence": "high", "date": now}
+        ],
+        "bucket_list": [],
+        "sectors": [],
+        "source": [
+            {
+                "name": source_name,
+                "instances": [
+                    {
+                        "method": "manual",
+                        "reference": "",
+                        "analyst": "tester",
+                        "date": now,
+                        "tlp": "green",
+                    }
+                ],
+            }
+        ],
+        "relationships": [],
+        "actions": [],
+        "schema_version": 1,
+    }
+    return str(get_tlo_collection("indicators").insert_one(document).inserted_id)
 
 
 def _insert_raw_data(*, title: str, data_type: str, campaign_name: str) -> str:
@@ -929,6 +971,48 @@ def test_signature_queries_use_raw_records(admin_context: GraphQLContext) -> Non
     assert result.data["signaturesCount"] == 1
     assert "YARA" in result.data["signatureDataTypes"]
     assert f"{_TEST_PREFIX}YARA" in result.data["signatureDataTypes"]
+
+    _cleanup_raw_tlo_docs()
+
+
+def test_indicator_queries_use_raw_records_with_source_filtering() -> None:
+    _cleanup_raw_tlo_docs()
+    visible_id = _insert_indicator(
+        value=f"{_TEST_PREFIX}IndicatorVisible",
+        ind_type=f"{_TEST_PREFIX}Type",
+        source_name=f"{_TEST_PREFIX}Source",
+        campaign_name=f"{_TEST_PREFIX}CampaignOne",
+    )
+    hidden_id = _insert_indicator(
+        value=f"{_TEST_PREFIX}IndicatorHidden",
+        ind_type="IPv4 Address",
+        source_name=f"{_TEST_PREFIX}OtherSource",
+        campaign_name=f"{_TEST_PREFIX}CampaignTwo",
+    )
+
+    result = execute_gql(
+        _limited_context("Indicator"),
+        f"""
+        query {{
+            visible: indicator(id: "{visible_id}") {{ id value indType }}
+            hidden: indicator(id: "{hidden_id}") {{ id value }}
+            indicators(indType: "{_TEST_PREFIX}Type", sortBy: "value", sortDir: "asc") {{ value indType }}
+            indicatorsCount(indType: "{_TEST_PREFIX}Type")
+            indicatorTypes
+        }}
+        """,
+    )
+
+    assert result.errors is None
+    assert result.data["visible"]["value"] == f"{_TEST_PREFIX}IndicatorVisible"
+    assert result.data["visible"]["indType"] == f"{_TEST_PREFIX}Type"
+    assert result.data["hidden"] is None
+    assert result.data["indicators"] == [
+        {"value": f"{_TEST_PREFIX}IndicatorVisible", "indType": f"{_TEST_PREFIX}Type"}
+    ]
+    assert result.data["indicatorsCount"] == 1
+    assert "IPv4 Address" in result.data["indicatorTypes"]
+    assert f"{_TEST_PREFIX}Type" in result.data["indicatorTypes"]
 
     _cleanup_raw_tlo_docs()
 

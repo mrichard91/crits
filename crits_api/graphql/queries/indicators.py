@@ -9,6 +9,16 @@ from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_permission
+from crits_api.db.tlo_records import (
+    build_contains_filter,
+    combine_filters,
+    count_tlo_records,
+    distinct_tlo_values,
+    get_tlo_record,
+    list_tlo_records,
+    to_model_namespace,
+)
+from crits_api.db.tlo_vocabulary import DEFAULT_INDICATOR_TYPES
 from crits_api.graphql.types.indicator import IndicatorType
 
 logger = logging.getLogger(__name__)
@@ -30,26 +40,16 @@ class IndicatorQueries:
         Returns:
             The indicator if found and accessible, None otherwise
         """
-        from bson import ObjectId
-
-        from crits.indicators.indicator import Indicator
-
         ctx: GraphQLContext = info.context
 
         try:
-            # Build query with source filtering
-            query = {"_id": ObjectId(id)}
-
-            # Apply source/TLP filtering unless superuser
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    query.update(source_filter)
 
-            indicator = Indicator.objects(__raw__=query).first()
-
+            indicator = get_tlo_record("indicators", id, filters=source_filter)
             if indicator:
-                return IndicatorType.from_model(indicator)
+                return IndicatorType.from_model(to_model_namespace(indicator))
             return None
 
         except Exception as e:
@@ -84,44 +84,32 @@ class IndicatorQueries:
         Returns:
             List of indicators matching the filters
         """
-        from crits.indicators.indicator import Indicator
-
         ctx: GraphQLContext = info.context
 
         # Cap limit at 100
         limit = min(limit, 100)
 
         try:
-            # Start with base queryset
-            queryset = Indicator.objects
-
-            # Apply source/TLP filtering unless superuser
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            # Apply optional filters
-            if ind_type:
-                queryset = queryset.filter(ind_type=ind_type)
+            filters = combine_filters(
+                source_filter,
+                {"ind_type": ind_type} if ind_type else {},
+                build_contains_filter("value", value_contains),
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if value_contains:
-                # Case-insensitive contains search
-                queryset = queryset.filter(value__icontains=value_contains)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            from crits_api.graphql.queries.sorting import apply_sorting
-
-            queryset = apply_sorting(
-                queryset,
-                sort_by,
-                sort_dir,
-                {
+            indicators = list_tlo_records(
+                "indicators",
+                filters=filters,
+                limit=limit,
+                offset=offset,
+                sort_by=sort_by,
+                sort_dir=sort_dir,
+                allowed_sort_fields={
                     "value": "value",
                     "indType": "ind_type",
                     "status": "status",
@@ -130,10 +118,9 @@ class IndicatorQueries:
                 },
             )
 
-            # Apply pagination
-            indicators = queryset.skip(offset).limit(limit)
-
-            return [IndicatorType.from_model(ind) for ind in indicators]
+            return [
+                IndicatorType.from_model(to_model_namespace(indicator)) for indicator in indicators
+            ]
 
         except Exception as e:
             logger.error(f"Error listing indicators: {e}")
@@ -161,32 +148,22 @@ class IndicatorQueries:
         Returns:
             Count of matching indicators
         """
-        from crits.indicators.indicator import Indicator
-
         ctx: GraphQLContext = info.context
 
         try:
-            queryset = Indicator.objects
-
-            # Apply source/TLP filtering unless superuser
+            source_filter = {}
             if not ctx.is_superuser:
                 source_filter = ctx.get_source_filter()
-                if source_filter:
-                    queryset = queryset.filter(__raw__=source_filter)
 
-            if ind_type:
-                queryset = queryset.filter(ind_type=ind_type)
+            filters = combine_filters(
+                source_filter,
+                {"ind_type": ind_type} if ind_type else {},
+                build_contains_filter("value", value_contains),
+                {"status": status} if status else {},
+                {"campaign.name": campaign} if campaign else {},
+            )
 
-            if value_contains:
-                queryset = queryset.filter(value__icontains=value_contains)
-
-            if status:
-                queryset = queryset.filter(status=status)
-
-            if campaign:
-                queryset = queryset.filter(campaign__name=campaign)
-
-            return queryset.count()
+            return count_tlo_records("indicators", filters=filters)
 
         except Exception as e:
             logger.error(f"Error counting indicators: {e}")
@@ -196,13 +173,6 @@ class IndicatorQueries:
     @require_permission("Indicator.read")
     def indicator_types(self, info: Info) -> list[str]:
         """Get list of distinct indicator types (vocabulary + any custom DB values)."""
-        from crits.vocabulary.indicators import IndicatorTypes
-
-        values = set(IndicatorTypes.values())
-        try:
-            from crits.indicators.indicator import Indicator
-
-            values.update(t for t in Indicator.objects.distinct("ind_type") if t)
-        except Exception:
-            pass
+        values = set(DEFAULT_INDICATOR_TYPES)
+        values.update(distinct_tlo_values("indicators", "ind_type"))
         return sorted(values)
