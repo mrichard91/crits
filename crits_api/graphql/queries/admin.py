@@ -20,6 +20,12 @@ from crits_api.db.admin_config_records import (
     list_admin_config_records,
 )
 from crits_api.db.admin_user_records import get_user_record, list_user_records
+from crits_api.db.tlo_vocabulary import (
+    DEFAULT_EVENT_TYPES,
+    DEFAULT_OBJECT_TYPES,
+    DEFAULT_RELATIONSHIP_TYPES,
+    DEFAULT_SECTORS,
+)
 from crits_api.graphql.types.admin import (
     NamedConfigType,
     RoleType,
@@ -136,27 +142,19 @@ class AdminQueries:
     @strawberry.field(description="Get event type vocabulary (read-only)")
     @require_authenticated
     def event_type_vocabulary(self, info: Info) -> list[str]:
-        from crits.vocabulary.events import EventTypes
-
-        return EventTypes.values(sort=True)
+        return sorted(DEFAULT_EVENT_TYPES)
 
     @strawberry.field(description="Get relationship type vocabulary (read-only)")
     @require_authenticated
     def relationship_type_vocabulary(self, info: Info) -> list[str]:
-        from crits.vocabulary.relationships import RelationshipTypes
-
-        return RelationshipTypes.values(sort=True)
+        return sorted(DEFAULT_RELATIONSHIP_TYPES)
 
     @strawberry.field(description="Get object type vocabulary (read-only)")
     @require_authenticated
     def object_type_vocabulary(self, info: Info) -> list[str]:
-        from crits.vocabulary.objects import ObjectTypes
-
-        return ObjectTypes.values(sort=True)
+        return sorted(DEFAULT_OBJECT_TYPES)
 
     @strawberry.field(description="Get sector vocabulary (read-only)")
     @require_authenticated
     def sector_vocabulary(self, info: Info) -> list[str]:
-        from crits.vocabulary.sectors import Sectors
-
-        return Sectors.values(sort=True)
+        return sorted(DEFAULT_SECTORS)

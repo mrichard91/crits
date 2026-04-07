@@ -8,7 +8,14 @@ from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_authenticated
-from crits_api.graphql.queries.relationships import TLO_TYPE_CONFIG, get_model_class
+from crits_api.db.tlo_lookup import (
+    association_count_for_campaign,
+    count_tlo_records_by_type,
+    display_value_for_record,
+    get_campaign_top_records,
+    get_recent_tlo_record,
+    iter_tlo_lookup_configs,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,33 +74,26 @@ class DashboardQueries:
         total = 0
         recent_items: list[RecentActivity] = []
 
-        for tlo_type, (model_path, _search_field, display_field) in TLO_TYPE_CONFIG.items():
+        for tlo_type, _config in iter_tlo_lookup_configs():
             try:
-                model_class = get_model_class(model_path)
-                queryset = model_class.objects
-
-                # Apply source/TLP filtering
+                source_filter = {}
                 if not ctx.is_superuser:
                     source_filter = ctx.get_source_filter()
-                    if source_filter:
-                        queryset = queryset.filter(__raw__=source_filter)
 
-                count = queryset.count()
+                count = count_tlo_records_by_type(tlo_type, filters=source_filter)
                 counts.append(TLOCount(tlo_type=tlo_type, count=count))
                 total += count
 
-                # Get most recent item for this type
                 if count > 0:
-                    recent = queryset.order_by("-modified").limit(1).first()
+                    recent = get_recent_tlo_record(tlo_type, filters=source_filter)
                     if recent:
-                        display = getattr(recent, display_field, None)
                         recent_items.append(
                             RecentActivity(
-                                id=str(recent.id),
+                                id=str(recent.get("_id", "")),
                                 tlo_type=tlo_type,
-                                display_value=str(display) if display else str(recent.id),
-                                modified=getattr(recent, "modified", None),
-                                analyst=getattr(recent, "analyst", "") or "",
+                                display_value=display_value_for_record(recent, tlo_type),
+                                modified=recent.get("modified"),
+                                analyst=str(recent.get("analyst", "") or ""),
                             )
                         )
             except Exception as e:
@@ -117,26 +117,18 @@ class DashboardQueries:
 def _get_top_campaigns(ctx: GraphQLContext, limit: int = 10) -> list[TopCampaign]:
     """Get top campaigns by number of associated TLOs."""
     try:
-        from crits.campaigns.campaign import Campaign
-
-        queryset = Campaign.objects
+        filters = {}
         if not ctx.is_superuser:
             source_filter = ctx.get_source_filter()
             if source_filter:
-                queryset = queryset.filter(__raw__=source_filter)
+                filters = source_filter
 
         campaigns: list[TopCampaign] = []
-        for campaign in queryset.order_by("-modified").limit(limit):
-            name = getattr(campaign, "name", "") or ""
-            # Count is based on the campaign's associated objects
-            count = len(getattr(campaign, "objects", []) or [])
-            if not count:
-                # Fallback: count relationships
-                rels = getattr(campaign, "relationships", []) or []
-                count = len(rels)
+        for campaign in get_campaign_top_records(filters=filters, limit=limit):
+            name = str(campaign.get("name", "") or "")
+            count = association_count_for_campaign(campaign)
             campaigns.append(TopCampaign(name=name, count=count))
 
-        # Sort by count descending
         campaigns.sort(key=lambda c: c.count, reverse=True)
         return campaigns[:limit]
     except Exception as e:

@@ -8,7 +8,11 @@ from strawberry.types import Info
 
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_authenticated
-from crits_api.graphql.queries.relationships import TLO_TYPE_CONFIG, get_model_class
+from crits_api.db.tlo_lookup import (
+    display_value_for_record,
+    iter_tlo_lookup_configs,
+    search_tlo_records,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,39 +58,29 @@ class SearchQueries:
         if not query or len(query) < 2:
             return []
 
-        # Determine which types to search
-        search_types = TLO_TYPE_CONFIG
-        if types:
-            search_types = {k: v for k, v in TLO_TYPE_CONFIG.items() if k in types}
-
         results: list[SearchResult] = []
+        search_types = list(iter_tlo_lookup_configs(types))
         per_type_limit = max(5, limit // max(len(search_types), 1))
 
-        for tlo_type, (model_path, search_field, display_field) in search_types.items():
+        for tlo_type, _config in search_types:
             try:
-                model_class = get_model_class(model_path)
-                queryset = model_class.objects
-
-                # Apply source/TLP filtering
+                source_filter = {}
                 if not ctx.is_superuser:
                     source_filter = ctx.get_source_filter()
-                    if source_filter:
-                        queryset = queryset.filter(__raw__=source_filter)
 
-                # Search with case-insensitive contains
-                filter_kwargs = {f"{search_field}__icontains": query}
-                queryset = queryset.filter(**filter_kwargs)
-                queryset = queryset.order_by("-modified").limit(per_type_limit)
-
-                for obj in queryset:
-                    display = getattr(obj, display_field, None)
+                for record in search_tlo_records(
+                    tlo_type,
+                    query,
+                    filters=source_filter,
+                    limit=per_type_limit,
+                ):
                     results.append(
                         SearchResult(
-                            id=str(obj.id),
+                            id=str(record.get("_id", "")),
                             tlo_type=tlo_type,
-                            display_value=str(display) if display else str(obj.id),
-                            modified=getattr(obj, "modified", None),
-                            status=getattr(obj, "status", "") or "",
+                            display_value=display_value_for_record(record, tlo_type),
+                            modified=record.get("modified"),
+                            status=str(record.get("status", "") or ""),
                         )
                     )
             except Exception as e:

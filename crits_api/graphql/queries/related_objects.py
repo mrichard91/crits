@@ -8,7 +8,11 @@ from strawberry.types import Info
 from crits_api.auth.context import GraphQLContext
 from crits_api.auth.permissions import require_authenticated
 from crits_api.config import settings
-from crits_api.graphql.queries.relationships import TLO_TYPE_CONFIG, get_model_class
+from crits_api.db.tlo_lookup import (
+    TLO_LOOKUP_CONFIG,
+    display_value_for_record,
+    get_tlo_record_by_type,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +56,7 @@ class RelatedObjectQueries:
         """
         ctx: GraphQLContext = info.context
 
-        if tlo_type not in TLO_TYPE_CONFIG:
+        if tlo_type not in TLO_LOOKUP_CONFIG:
             return []
 
         # Cap depth and limit
@@ -73,20 +77,20 @@ class RelatedObjectQueries:
 
             # Get the object and its embedded relationships
             try:
-                obj = _get_object(current_type, current_id)
+                source_filter = {}
+                if not ctx.is_superuser:
+                    source_filter = ctx.get_source_filter()
+
+                obj = get_tlo_record_by_type(current_type, current_id, filters=source_filter)
                 if obj is None:
                     continue
 
-                # Check source access
-                if not ctx.is_superuser and not _check_source_access(ctx, obj):
-                    continue
-
-                relationships = getattr(obj, "relationships", []) or []
+                relationships = obj.get("relationships", []) or []
 
                 for rel in relationships:
-                    rel_type = getattr(rel, "rel_type", "Related To") or "Related To"
-                    rel_obj_type = getattr(rel, "type", "") or ""
-                    rel_obj_id = str(getattr(rel, "value", ""))
+                    rel_type = str(rel.get("relationship", "Related To") or "Related To")
+                    rel_obj_type = str(rel.get("type", "") or "")
+                    rel_obj_id = str(rel.get("value", "") or "")
 
                     if not rel_obj_type or not rel_obj_id:
                         continue
@@ -129,52 +133,23 @@ class RelatedObjectQueries:
         return results
 
 
-def _get_object(tlo_type: str, obj_id: str) -> object | None:
-    """Get a TLO object by type and ID."""
-    try:
-        from crits.core.class_mapper import class_from_id
-
-        return class_from_id(tlo_type, obj_id)
-    except Exception:
-        return None
-
-
-def _check_source_access(ctx: GraphQLContext, obj: object) -> bool:
-    """Check if user can access this object based on sources."""
-    try:
-        if ctx.user and hasattr(ctx.user, "check_source_tlp"):
-            return ctx.user.check_source_tlp(obj)
-        return True
-    except Exception:
-        return False
-
-
 def _resolve_related(ctx: GraphQLContext, tlo_type: str, obj_id: str) -> str | None:
     """
     Resolve a related object and return its display value.
     Returns None if object doesn't exist or user lacks access.
     """
-    if tlo_type not in TLO_TYPE_CONFIG:
+    if tlo_type not in TLO_LOOKUP_CONFIG:
         return None
 
     try:
-        model_path, _search_field, display_field = TLO_TYPE_CONFIG[tlo_type]
-        model_class = get_model_class(model_path)
-
-        queryset = model_class.objects(id=obj_id)
-
-        # Apply source filtering
+        source_filter = {}
         if not ctx.is_superuser:
             source_filter = ctx.get_source_filter()
-            if source_filter:
-                queryset = queryset.filter(__raw__=source_filter)
 
-        obj = queryset.first()
-        if obj is None:
+        record = get_tlo_record_by_type(tlo_type, obj_id, filters=source_filter)
+        if record is None:
             return None
-
-        display = getattr(obj, display_field, None)
-        return str(display) if display else str(obj.id)
+        return display_value_for_record(record, tlo_type)
     except Exception as e:
         logger.debug("Could not resolve %s/%s: %s", tlo_type, obj_id, e)
         return None

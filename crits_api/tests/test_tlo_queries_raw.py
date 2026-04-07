@@ -22,6 +22,7 @@ def _request() -> MagicMock:
 def _cleanup_raw_tlo_docs() -> None:
     get_tlo_collection("actors").delete_many({"name": {"$regex": f"^{_TEST_PREFIX}"}})
     get_tlo_collection("backdoors").delete_many({"name": {"$regex": f"^{_TEST_PREFIX}"}})
+    get_tlo_collection("bucket_lists").delete_many({"name": {"$regex": f"^{_TEST_PREFIX}"}})
     get_tlo_collection("campaigns").delete_many({"name": {"$regex": f"^{_TEST_PREFIX}"}})
     get_tlo_collection("certificates").delete_many({"filename": {"$regex": f"^{_TEST_PREFIX}"}})
     get_tlo_collection("domains").delete_many({"domain": {"$regex": f"^{_TEST_PREFIX.lower()}"}})
@@ -54,7 +55,29 @@ def _limited_context(tlo_type: str) -> GraphQLContext:
     return GraphQLContext(request=_request(), response=MagicMock(), user=user, acl=user.acl)
 
 
-def _insert_actor(*, name: str, source_name: str, campaign_name: str) -> str:
+def _source_limited_context() -> GraphQLContext:
+    source_name = f"{_TEST_PREFIX}Source"
+    user = AuthenticatedUser(
+        id="source-limited-user",
+        username="source-limited-user",
+        is_active=True,
+        is_staff=False,
+        is_superuser=False,
+        organization="TestApiSource",
+        acl={},
+        source_acls=[SourceACL(name=source_name, read=True, tlp_green=True)],
+    )
+    return GraphQLContext(request=_request(), response=MagicMock(), user=user, acl=user.acl)
+
+
+def _insert_actor(
+    *,
+    name: str,
+    source_name: str,
+    campaign_name: str,
+    bucket_list: list[str] | None = None,
+    relationships: list[dict[str, object]] | None = None,
+) -> str:
     now = datetime.now()
     document = {
         "name": name,
@@ -73,7 +96,7 @@ def _insert_actor(*, name: str, source_name: str, campaign_name: str) -> str:
         "campaign": [
             {"name": campaign_name, "analyst": "tester", "confidence": "high", "date": now}
         ],
-        "bucket_list": [],
+        "bucket_list": bucket_list or [],
         "sectors": [],
         "source": [
             {
@@ -89,7 +112,7 @@ def _insert_actor(*, name: str, source_name: str, campaign_name: str) -> str:
                 ],
             }
         ],
-        "relationships": [],
+        "relationships": relationships or [],
         "actions": [],
         "tickets": [],
         "schema_version": 1,
@@ -97,13 +120,38 @@ def _insert_actor(*, name: str, source_name: str, campaign_name: str) -> str:
     return str(get_tlo_collection("actors").insert_one(document).inserted_id)
 
 
-def _insert_campaign(*, name: str, active: str, status: str) -> str:
+def _insert_campaign(
+    *,
+    name: str,
+    active: str,
+    status: str,
+    actor_count: int = 0,
+    backdoor_count: int = 0,
+    domain_count: int = 0,
+    email_count: int = 0,
+    event_count: int = 0,
+    exploit_count: int = 0,
+    indicator_count: int = 0,
+    ip_count: int = 0,
+    pcap_count: int = 0,
+    sample_count: int = 0,
+) -> str:
     now = datetime.now()
     document = {
         "name": name,
         "description": "raw campaign",
         "aliases": [],
         "active": active,
+        "actor_count": actor_count,
+        "backdoor_count": backdoor_count,
+        "domain_count": domain_count,
+        "email_count": email_count,
+        "event_count": event_count,
+        "exploit_count": exploit_count,
+        "indicator_count": indicator_count,
+        "ip_count": ip_count,
+        "pcap_count": pcap_count,
+        "sample_count": sample_count,
         "analyst": "tester",
         "status": status,
         "tlp": "green",
@@ -153,7 +201,15 @@ def _insert_target(*, email: str, department: str, division: str, campaign_name:
     return str(get_tlo_collection("targets").insert_one(document).inserted_id)
 
 
-def _insert_domain(*, domain: str, source_name: str, record_type: str, campaign_name: str) -> str:
+def _insert_domain(
+    *,
+    domain: str,
+    source_name: str,
+    record_type: str,
+    campaign_name: str,
+    bucket_list: list[str] | None = None,
+    relationships: list[dict[str, object]] | None = None,
+) -> str:
     now = datetime.now()
     document = {
         "domain": domain,
@@ -167,7 +223,7 @@ def _insert_domain(*, domain: str, source_name: str, record_type: str, campaign_
         "campaign": [
             {"name": campaign_name, "analyst": "tester", "confidence": "high", "date": now}
         ],
-        "bucket_list": [],
+        "bucket_list": bucket_list or [],
         "sectors": [],
         "source": [
             {
@@ -183,7 +239,7 @@ def _insert_domain(*, domain: str, source_name: str, record_type: str, campaign_
                 ],
             }
         ],
-        "relationships": [],
+        "relationships": relationships or [],
         "actions": [],
         "tickets": [],
         "schema_version": 1,
@@ -442,6 +498,35 @@ def _insert_indicator(*, value: str, ind_type: str, source_name: str, campaign_n
         "schema_version": 1,
     }
     return str(get_tlo_collection("indicators").insert_one(document).inserted_id)
+
+
+def _insert_bucket(
+    *,
+    name: str,
+    actor_count: int = 0,
+    domain_count: int = 0,
+    indicator_count: int = 0,
+) -> str:
+    document = {
+        "name": name,
+        "Actor": actor_count,
+        "Backdoor": 0,
+        "Campaign": 0,
+        "Certificate": 0,
+        "Domain": domain_count,
+        "Email": 0,
+        "Event": 0,
+        "Exploit": 0,
+        "Indicator": indicator_count,
+        "IP": 0,
+        "PCAP": 0,
+        "RawData": 0,
+        "Sample": 0,
+        "Signature": 0,
+        "Target": 0,
+        "schema_version": 1,
+    }
+    return str(get_tlo_collection("bucket_lists").insert_one(document).inserted_id)
 
 
 def _insert_raw_data(*, title: str, data_type: str, campaign_name: str) -> str:
@@ -1173,5 +1258,230 @@ def test_screenshot_queries_use_raw_records_with_source_filtering() -> None:
         {"filename": f"{_TEST_PREFIX}ShotVisible.png", "tags": [f"{_TEST_PREFIX}Tag"]}
     ]
     assert result.data["screenshotsCount"] == 1
+
+    _cleanup_raw_tlo_docs()
+
+
+def test_search_queries_use_raw_lookup_with_source_filtering() -> None:
+    _cleanup_raw_tlo_docs()
+    _insert_actor(
+        name=f"{_TEST_PREFIX}SearchActorVisible",
+        source_name=f"{_TEST_PREFIX}Source",
+        campaign_name=f"{_TEST_PREFIX}CampaignOne",
+    )
+    _insert_actor(
+        name=f"{_TEST_PREFIX}SearchActorHidden",
+        source_name=f"{_TEST_PREFIX}OtherSource",
+        campaign_name=f"{_TEST_PREFIX}CampaignTwo",
+    )
+    _insert_domain(
+        domain=f"{_TEST_PREFIX.lower()}-search-visible.example.com",
+        source_name=f"{_TEST_PREFIX}Source",
+        record_type="TXT",
+        campaign_name=f"{_TEST_PREFIX}CampaignOne",
+    )
+
+    result = execute_gql(
+        _source_limited_context(),
+        f"""
+        query {{
+            actorMatches: searchTlos(tloType: "Actor", searchValue: "{_TEST_PREFIX}SearchActor", limit: 10) {{
+                tloType displayValue
+            }}
+            globalMatches: search(query: "{_TEST_PREFIX}", types: ["Actor", "Domain"], limit: 10) {{
+                tloType displayValue
+            }}
+        }}
+        """,
+    )
+
+    assert result.errors is None
+    assert result.data["actorMatches"] == [
+        {"tloType": "Actor", "displayValue": f"{_TEST_PREFIX}SearchActorVisible"}
+    ]
+    assert {"tloType": "Actor", "displayValue": f"{_TEST_PREFIX}SearchActorVisible"} in result.data[
+        "globalMatches"
+    ]
+    assert {
+        "tloType": "Domain",
+        "displayValue": f"{_TEST_PREFIX.lower()}-search-visible.example.com",
+    } in result.data["globalMatches"]
+    assert {
+        "tloType": "Actor",
+        "displayValue": f"{_TEST_PREFIX}SearchActorHidden",
+    } not in result.data["globalMatches"]
+
+    _cleanup_raw_tlo_docs()
+
+
+def test_tag_queries_use_raw_lookup_with_source_filtering(admin_context: GraphQLContext) -> None:
+    _cleanup_raw_tlo_docs()
+    tag_name = f"{_TEST_PREFIX}TagSummary"
+    _insert_bucket(name=tag_name, actor_count=2)
+    _insert_actor(
+        name=f"{_TEST_PREFIX}TaggedActorVisible",
+        source_name=f"{_TEST_PREFIX}Source",
+        campaign_name=f"{_TEST_PREFIX}CampaignOne",
+        bucket_list=[tag_name],
+    )
+    _insert_actor(
+        name=f"{_TEST_PREFIX}TaggedActorHidden",
+        source_name=f"{_TEST_PREFIX}OtherSource",
+        campaign_name=f"{_TEST_PREFIX}CampaignTwo",
+        bucket_list=[tag_name],
+    )
+
+    result = execute_gql(
+        admin_context,
+        """
+        query($tag: String!) {
+            tagSummary { name total }
+            taggedObjects(tag: $tag, tloType: "Actor", limit: 10) {
+                tloType displayValue
+            }
+        }
+        """,
+        variables={"tag": tag_name},
+    )
+
+    assert result.errors is None
+    assert {"name": tag_name, "total": 2} in result.data["tagSummary"]
+
+    filtered = execute_gql(
+        _source_limited_context(),
+        """
+        query($tag: String!) {
+            taggedObjects(tag: $tag, tloType: "Actor", limit: 10) {
+                tloType displayValue
+            }
+        }
+        """,
+        variables={"tag": tag_name},
+    )
+
+    assert filtered.errors is None
+    assert filtered.data["taggedObjects"] == [
+        {"tloType": "Actor", "displayValue": f"{_TEST_PREFIX}TaggedActorVisible"}
+    ]
+
+    _cleanup_raw_tlo_docs()
+
+
+def test_dashboard_and_vocabulary_queries_use_raw_lookup(admin_context: GraphQLContext) -> None:
+    _cleanup_raw_tlo_docs()
+    _insert_actor(
+        name=f"{_TEST_PREFIX}DashboardActor",
+        source_name=f"{_TEST_PREFIX}Source",
+        campaign_name=f"{_TEST_PREFIX}CampaignOne",
+    )
+    _insert_campaign(
+        name=f"{_TEST_PREFIX}CampaignTop",
+        active="yes",
+        status="Analyzed",
+        actor_count=500,
+        domain_count=400,
+        indicator_count=300,
+        sample_count=200,
+    )
+
+    result = execute_gql(
+        admin_context,
+        """
+        query {
+            dashboardStats {
+                counts { tloType count }
+                recentActivity { tloType displayValue }
+                topCampaigns { name count }
+            }
+            relationshipTypes
+            eventTypeVocabulary
+            objectTypeVocabulary
+            sectorVocabulary
+        }
+        """,
+    )
+
+    assert result.errors is None
+    actor_counts = [
+        item for item in result.data["dashboardStats"]["counts"] if item["tloType"] == "Actor"
+    ]
+    assert actor_counts and actor_counts[0]["count"] >= 1
+    assert {
+        "tloType": "Actor",
+        "displayValue": f"{_TEST_PREFIX}DashboardActor",
+    } in result.data["dashboardStats"]["recentActivity"]
+    assert {
+        "name": f"{_TEST_PREFIX}CampaignTop",
+        "count": 1400,
+    } in result.data["dashboardStats"]["topCampaigns"]
+    assert "Resolved To" in result.data["relationshipTypes"]
+    assert "Malicious Code" in result.data["eventTypeVocabulary"]
+    assert "MD5" in result.data["objectTypeVocabulary"]
+    assert "Energy" in result.data["sectorVocabulary"]
+
+    _cleanup_raw_tlo_docs()
+
+
+def test_related_objects_use_raw_lookup_with_source_filtering() -> None:
+    _cleanup_raw_tlo_docs()
+    visible_domain_id = _insert_domain(
+        domain=f"{_TEST_PREFIX.lower()}-related-visible.example.com",
+        source_name=f"{_TEST_PREFIX}Source",
+        record_type="TXT",
+        campaign_name=f"{_TEST_PREFIX}CampaignOne",
+    )
+    hidden_domain_id = _insert_domain(
+        domain=f"{_TEST_PREFIX.lower()}-related-hidden.example.com",
+        source_name=f"{_TEST_PREFIX}OtherSource",
+        record_type="TXT",
+        campaign_name=f"{_TEST_PREFIX}CampaignTwo",
+    )
+    actor_id = _insert_actor(
+        name=f"{_TEST_PREFIX}RelatedActor",
+        source_name=f"{_TEST_PREFIX}Source",
+        campaign_name=f"{_TEST_PREFIX}CampaignOne",
+        relationships=[
+            {
+                "relationship": "Resolved To",
+                "type": "Domain",
+                "value": visible_domain_id,
+                "date": datetime.now(),
+                "analyst": "tester",
+                "rel_reason": "",
+                "rel_confidence": "high",
+            },
+            {
+                "relationship": "Resolved To",
+                "type": "Domain",
+                "value": hidden_domain_id,
+                "date": datetime.now(),
+                "analyst": "tester",
+                "rel_reason": "",
+                "rel_confidence": "high",
+            },
+        ],
+    )
+
+    result = execute_gql(
+        _source_limited_context(),
+        """
+        query($id: String!) {
+            relatedObjects(id: $id, tloType: "Actor", depth: 1, totalLimit: 10) {
+                tloType displayValue relationship depth
+            }
+        }
+        """,
+        variables={"id": actor_id},
+    )
+
+    assert result.errors is None
+    assert result.data["relatedObjects"] == [
+        {
+            "tloType": "Domain",
+            "displayValue": f"{_TEST_PREFIX.lower()}-related-visible.example.com",
+            "relationship": "Resolved To",
+            "depth": 1,
+        }
+    ]
 
     _cleanup_raw_tlo_docs()
